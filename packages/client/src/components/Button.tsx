@@ -33,11 +33,23 @@ const buttonVariants = cva(
   },
 );
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
-    VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
-}
+type BaseButtonProps = Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  'aria-label' | 'aria-labelledby'
+> &
+  VariantProps<typeof buttonVariants> & {
+    asChild?: boolean;
+  };
+
+export type ButtonProps =
+  | (BaseButtonProps & {
+      'aria-label': string;
+      'aria-labelledby'?: never;
+    })
+  | (BaseButtonProps & {
+      'aria-labelledby': string;
+      'aria-label'?: never;
+    });
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
