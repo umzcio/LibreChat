@@ -39,16 +39,39 @@ type BaseButtonProps = Omit<
 > &
   VariantProps<typeof buttonVariants> & {
     asChild?: boolean;
-  };
+  } & (
+    | {
+        'aria-label': string;
+        'aria-labelledby'?: never;
+        title?: never;
+      }
+    | {
+        'aria-labelledby': string;
+        'aria-label'?: never;
+        title?: never;
+      }
+    | {
+        'aria-label'?: never;
+        'aria-labelledby'?: never;
+        title: string;
+      }
+  );
 
 export type ButtonProps =
   | (BaseButtonProps & {
       'aria-label': string;
       'aria-labelledby'?: never;
+      title?: never;
     })
   | (BaseButtonProps & {
       'aria-labelledby': string;
       'aria-label'?: never;
+      title?: never;
+    })
+  | (BaseButtonProps & {
+      'aria-label'?: never;
+      'aria-labelledby'?: never;
+      title: string;
     });
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
