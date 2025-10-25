@@ -139,7 +139,7 @@ interface:
 # REGISTRATION (Optional)
 # ============================================
 # Configure user registration settings
-# registration:
-#   socialLogins: ["google", "github", "discord"]
-#   allowedDomains:
-#     - "example.com"
+registration:
+  # socialLogins: ["google", "github", "discord"]
+  allowedDomains:
+    - "umontana.edu"

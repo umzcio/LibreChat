@@ -62,6 +62,16 @@ const startServer = async () => {
   const indexPath = path.join(appConfig.paths.dist, 'index.html');
   let indexHTML = fs.readFileSync(indexPath, 'utf8');
 
+  // Load admin dashboard HTML
+  const adminIndexPath = path.join(__dirname, '../../admin/dist/index.html');
+  let adminIndexHTML = '';
+  if (fs.existsSync(adminIndexPath)) {
+    adminIndexHTML = fs.readFileSync(adminIndexPath, 'utf8');
+    logger.info('Admin dashboard loaded from', adminIndexPath);
+  } else {
+    logger.warn('Admin dashboard build not found. Run `npm run build:admin` to build it.');
+  }
+
   // In order to provide support to serving the application in a sub-directory
   // We need to update the base href if the DOMAIN_CLIENT is specified and not the root path
   if (process.env.DOMAIN_CLIENT) {
@@ -94,6 +104,12 @@ const startServer = async () => {
   app.use(staticCache(appConfig.paths.dist));
   app.use(staticCache(appConfig.paths.fonts));
   app.use(staticCache(appConfig.paths.assets));
+
+  // Serve admin dashboard static files
+  const adminDistPath = path.join(__dirname, '../../admin/dist');
+  if (fs.existsSync(adminDistPath)) {
+    app.use('/admin', staticCache(adminDistPath));
+  }
 
   if (!ALLOW_SOCIAL_LOGIN) {
     console.warn('Social logins are disabled. Set ALLOW_SOCIAL_LOGIN=true to enable them.');
@@ -144,9 +160,27 @@ const startServer = async () => {
 
   app.use('/api/tags', routes.tags);
   app.use('/api/mcp', routes.mcp);
+  app.use('/api/admin', routes.admin);
 
   app.use(ErrorController);
 
+  // Admin dashboard catch-all route
+  app.get('/admin*', (req, res) => {
+    if (!adminIndexHTML) {
+      return res.status(503).send('Admin dashboard not available. Please build it with `npm run build:admin`');
+    }
+
+    res.set({
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      Pragma: 'no-cache',
+      Expires: '0',
+    });
+
+    res.type('html');
+    res.send(adminIndexHTML);
+  });
+
+  // Main client app catch-all route
   app.use((req, res) => {
     res.set({
       'Cache-Control': process.env.INDEX_CACHE_CONTROL || 'no-cache, no-store, must-revalidate',
