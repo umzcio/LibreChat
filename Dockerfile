@@ -22,6 +22,7 @@ USER node
 COPY --chown=node:node package.json package-lock.json ./
 COPY --chown=node:node api/package.json ./api/package.json
 COPY --chown=node:node client/package.json ./client/package.json
+COPY --chown=node:node admin/package.json ./admin/package.json
 COPY --chown=node:node packages/data-provider/package.json ./packages/data-provider/package.json
 COPY --chown=node:node packages/data-schemas/package.json ./packages/data-schemas/package.json
 COPY --chown=node:node packages/api/package.json ./packages/api/package.json
@@ -39,8 +40,9 @@ RUN \
 COPY --chown=node:node . .
 
 RUN \
-    # React client build
+    # Build client and admin dashboard
     NODE_OPTIONS="--max-old-space-size=2048" npm run frontend; \
+    npm run build:admin; \
     npm prune --production; \
     npm cache clean --force
 
