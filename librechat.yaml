@@ -1,0 +1,125 @@
+# LibreChat Configuration File
+# Version: 1.2.8
+# Generated: 2025-10-24
+#
+# This file configures AI endpoints, models, and other LibreChat settings
+# Place this in your repository root and set CONFIG_PATH=/app/librechat.yaml in Render
+
+version: 1.2.8
+cache: true
+
+# ============================================
+# ENDPOINTS CONFIGURATION
+# ============================================
+# This section configures which AI providers are available
+
+endpoints:
+  # OpenAI Configuration
+  openAI:
+    # API key is loaded from environment variable OPENAI_API_KEY
+    # Uncomment and customize models if you want to limit available models
+    # models:
+    #   default:
+    #     - "gpt-4"
+    #     - "gpt-4-turbo-preview"
+    #     - "gpt-3.5-turbo"
+    titleConvo: true
+    titleModel: "gpt-3.5-turbo"
+    summarize: false
+    summaryModel: "gpt-3.5-turbo"
+
+  # Anthropic (Claude) Configuration
+  anthropic:
+    # API key is loaded from environment variable ANTHROPIC_API_KEY
+    # Uncomment and customize models if needed
+    # models:
+    #   default:
+    #     - "claude-3-opus-20240229"
+    #     - "claude-3-sonnet-20240229"
+    #     - "claude-3-haiku-20240307"
+    titleConvo: true
+    titleModel: "claude-3-haiku-20240307"
+
+  # Google AI Configuration
+  google:
+    # API key is loaded from environment variable GOOGLE_KEY
+    # Uncomment and customize models if needed
+    # models:
+    #   default:
+    #     - "gemini-pro"
+    #     - "gemini-pro-vision"
+    titleConvo: true
+
+  # ============================================
+  # CUSTOM ENDPOINTS (Optional)
+  # ============================================
+  # Example: OpenRouter configuration
+  # Uncomment and add OPENROUTER_KEY to your environment variables if using
+
+  # custom:
+  #   - name: "OpenRouter"
+  #     apiKey: "${OPENROUTER_KEY}"
+  #     baseURL: "https://openrouter.ai/api/v1"
+  #     models:
+  #       default:
+  #         - "openai/gpt-4"
+  #         - "anthropic/claude-3-opus"
+  #         - "meta-llama/llama-3-70b"
+  #     fetch: true
+  #     titleConvo: true
+  #     titleModel: "openai/gpt-3.5-turbo"
+  #     modelDisplayLabel: "OpenRouter"
+
+# ============================================
+# INTERFACE CONFIGURATION
+# ============================================
+interface:
+  # Privacy and data handling
+  privacyPolicy:
+    externalUrl: ""
+    openNewTab: true
+
+  # Terms of Service
+  termsOfService:
+    externalUrl: ""
+    openNewTab: true
+
+# ============================================
+# RATE LIMITING (Optional)
+# ============================================
+# Uncomment to enable rate limiting per user
+# rateLimits:
+#   fileUploads:
+#     ipMax: 100
+#     ipWindowInMinutes: 60
+#     userMax: 50
+#     userWindowInMinutes: 60
+#   conversationsImport:
+#     ipMax: 100
+#     ipWindowInMinutes: 60
+#     userMax: 50
+#     userWindowInMinutes: 60
+
+# ============================================
+# FILE HANDLING (Optional)
+# ============================================
+# Configure file upload settings
+# fileConfig:
+#   endpoints:
+#     openAI:
+#       fileLimit: 5
+#       fileSizeLimit: 10  # MB
+#       totalSizeLimit: 50  # MB
+#       supportedMimeTypes:
+#         - "image/png"
+#         - "image/jpeg"
+#         - "image/webp"
+
+# ============================================
+# REGISTRATION (Optional)
+# ============================================
+# Configure user registration settings
+# registration:
+#   socialLogins: ["google", "github", "discord"]
+#   allowedDomains:
+#     - "example.com"
