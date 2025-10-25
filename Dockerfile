@@ -41,9 +41,10 @@ COPY --chown=node:node . .
 
 RUN \
     # Build client and admin dashboard
-    NODE_OPTIONS="--max-old-space-size=2048" npm run frontend; \
-    npm run build:admin; \
-    npm prune --production; \
+    NODE_OPTIONS="--max-old-space-size=2048" npm run frontend && \
+    npm run build:admin && \
+    ls -la admin/dist && \
+    npm prune --production && \
     npm cache clean --force
 
 # Node API setup
