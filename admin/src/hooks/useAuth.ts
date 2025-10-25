@@ -47,9 +47,12 @@ export function useAuth() {
       withCredentials: true,
     });
 
-    if (response.data && response.data.role === 'ADMIN') {
+    // LibreChat login returns { token, user }
+    const userData = response.data.user || response.data;
+
+    if (userData && userData.role === 'ADMIN') {
       setIsAuthenticated(true);
-      setUser(response.data);
+      setUser(userData);
       return true;
     }
 
