@@ -69,7 +69,10 @@ endpoints:
           - "r1-1776"
         fetch: false
       titleConvo: true
+      titleModel: "sonar"
       summarize: false
+      summaryModel: "sonar"
+      forcePrompt: false
       dropParams: ["stop", "frequency_penalty"]
       modelDisplayLabel: "Perplexity"
 
