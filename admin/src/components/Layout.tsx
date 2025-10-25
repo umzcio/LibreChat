@@ -13,11 +13,11 @@ import { useAuth } from '~/hooks/useAuth';
 import { useState } from 'react';
 
 const navigation = [
-  { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
-  { name: 'Users', href: '/admin/users', icon: Users },
-  { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
-  { name: 'Governance', href: '/admin/governance', icon: Shield },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Users', href: '/users', icon: Users },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+  { name: 'Governance', href: '/governance', icon: Shield },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ];
 
 export default function Layout() {
@@ -27,7 +27,7 @@ export default function Layout() {
 
   const handleLogout = async () => {
     await logout();
-    window.location.href = '/admin/login';
+    window.location.href = '/login';
   };
 
   return (
