@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { getViolationsByUser, getRecentViolations } = require('~/cache');
-const { User } = require('~/models');
+const { User } = require('~/db/models');
 const { logger } = require('@librechat/data-schemas');
 
 /**

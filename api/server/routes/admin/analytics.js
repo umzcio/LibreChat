@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { Transaction, Message, User } = require('~/models');
+const { Transaction, Message, User } = require('~/db/models');
 const { logger } = require('@librechat/data-schemas');
 
 /**

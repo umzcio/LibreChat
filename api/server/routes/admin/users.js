@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { User, Balance } = require('~/models');
-const { updateBalance } = require('~/models/Balance');
+const { User, Balance } = require('~/db/models');
+const { createTransaction } = require('~/models/Transaction');
+const { isEnabled, getBalanceConfig } = require('@librechat/api');
+const { getAppConfig } = require('~/server/services/Config');
 const { logger } = require('@librechat/data-schemas');
 
 /**
@@ -143,13 +145,32 @@ router.post('/:userId/balance', async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    await updateBalance({
+    // Check if balance system is enabled
+    const appConfig = await getAppConfig();
+    const balanceConfig = getBalanceConfig(appConfig);
+
+    if (!isEnabled(balanceConfig?.enabled)) {
+      return res.status(400).json({ message: 'Balance system is not enabled' });
+    }
+
+    // Create transaction to update balance
+    const result = await createTransaction({
       user: userId,
-      incrementValue: amount,
+      tokenType: 'credits',
+      context: 'admin',
+      rawAmount: +amount,
+      balance: balanceConfig,
     });
 
-    logger.info(`[Admin] Added ${amount} tokens to user ${user.email} by ${req.user.email}`);
-    res.json({ message: 'Balance updated successfully' });
+    if (!result?.balance) {
+      throw new Error('Failed to update balance');
+    }
+
+    logger.info(`[Admin] Added ${amount} tokens to user ${user.email} by ${req.user.email}. New balance: ${result.balance}`);
+    res.json({
+      message: 'Balance updated successfully',
+      balance: result.balance,
+    });
   } catch (error) {
     logger.error('[Admin Users] Error updating balance:', error);
     res.status(500).json({ message: 'Error updating balance', error: error.message });
