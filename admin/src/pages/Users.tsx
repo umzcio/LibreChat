@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Ban, Trash2, RotateCcw, UserPlus, DollarSign } from 'lucide-react';
-import axios from 'axios';
+import axios from '~/utils/axios';
 import { format } from 'date-fns';
 
 interface User {

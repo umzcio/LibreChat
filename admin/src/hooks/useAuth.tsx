@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import axios from 'axios';
+import axios from '~/utils/axios';
 
 interface User {
   id: string;
@@ -58,9 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // LibreChat login returns { token, user }
-    const userData = response.data.user || response.data;
+    const { token, user: userData } = response.data;
 
     if (userData && userData.role === 'ADMIN') {
+      // Store token in localStorage
+      localStorage.setItem('adminToken', token);
+
       setIsAuthenticated(true);
       setUser(userData);
       return true;
@@ -71,6 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await axios.post('/api/auth/logout', {}, { withCredentials: true });
+    localStorage.removeItem('adminToken');
     setIsAuthenticated(false);
     setUser(null);
   };

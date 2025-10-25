@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Users, MessageSquare, Zap, TrendingUp, Activity, Database } from 'lucide-react';
-import axios from 'axios';
+import axios from '~/utils/axios';
 
 interface SystemStats {
   totalUsers: number;

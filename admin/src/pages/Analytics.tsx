@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import axios from '~/utils/axios';
 import { Bar, Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,

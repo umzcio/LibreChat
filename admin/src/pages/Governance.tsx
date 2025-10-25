@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import axios from '~/utils/axios';
 import { AlertTriangle, Shield, Ban, MessageSquare } from 'lucide-react';
 import { format } from 'date-fns';
 
