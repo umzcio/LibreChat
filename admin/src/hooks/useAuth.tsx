@@ -29,19 +29,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const response = await axios.get('/api/auth/user', {
+      // First check if we have a token
+      const token = localStorage.getItem('adminToken');
+
+      if (!token) {
+        setIsAuthenticated(false);
+        setUser(null);
+        setIsLoading(false);
+        return;
+      }
+
+      // Verify the token by calling an admin endpoint
+      await axios.get('/api/admin/stats', {
         withCredentials: true,
       });
 
-      // Check if user is admin
-      if (response.data && response.data.role === 'ADMIN') {
+      // If we got here, the token is valid and user is admin
+      // Try to get user details from localStorage or make another call
+      const storedUser = localStorage.getItem('adminUser');
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
         setIsAuthenticated(true);
-        setUser(response.data);
       } else {
-        setIsAuthenticated(false);
+        // Token is valid but we don't have user details
+        // This shouldn't happen but we'll stay authenticated
+        setIsAuthenticated(true);
         setUser(null);
       }
-    } catch (error) {
+    } catch (error: any) {
+      // If we get a 401, the token is invalid
+      if (error.response?.status === 401) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('adminUser');
+      }
       setIsAuthenticated(false);
       setUser(null);
     } finally {
@@ -61,8 +81,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { token, user: userData } = response.data;
 
     if (userData && userData.role === 'ADMIN') {
-      // Store token in localStorage
+      // Store token and user in localStorage for persistence
       localStorage.setItem('adminToken', token);
+      localStorage.setItem('adminUser', JSON.stringify(userData));
 
       setIsAuthenticated(true);
       setUser(userData);
@@ -73,8 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    await axios.post('/api/auth/logout', {}, { withCredentials: true });
+    try {
+      await axios.post('/api/auth/logout', {}, { withCredentials: true });
+    } catch (error) {
+      // Even if logout fails, clear local storage
+    }
     localStorage.removeItem('adminToken');
+    localStorage.removeItem('adminUser');
     setIsAuthenticated(false);
     setUser(null);
   };
