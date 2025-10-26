@@ -60,6 +60,40 @@ export default function Dashboard() {
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
+  // Fetch quick analytics for dashboard widgets
+  const { data: messageAnalytics } = useQuery({
+    queryKey: ['dashboard-messages'],
+    queryFn: async () => {
+      const response = await axios.get('/api/admin/detailed-analytics/messages', {
+        withCredentials: true,
+      });
+      return response.data;
+    },
+    refetchInterval: 60000,
+  });
+
+  const { data: modelAnalytics } = useQuery({
+    queryKey: ['dashboard-models'],
+    queryFn: async () => {
+      const response = await axios.get('/api/admin/detailed-analytics/models', {
+        withCredentials: true,
+      });
+      return response.data;
+    },
+    refetchInterval: 60000,
+  });
+
+  const { data: storageAnalytics } = useQuery({
+    queryKey: ['dashboard-storage'],
+    queryFn: async () => {
+      const response = await axios.get('/api/admin/detailed-analytics/storage', {
+        withCredentials: true,
+      });
+      return response.data;
+    },
+    refetchInterval: 60000,
+  });
+
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -161,6 +195,89 @@ export default function Dashboard() {
             icon={Zap}
             subtitle="All time"
           />
+        </div>
+      </div>
+
+      {/* Model Usage Overview */}
+      <div>
+        <h3 className="mb-4 text-lg font-semibold text-gray-900">Top AI Models</h3>
+        <div className="rounded-lg bg-white p-6 shadow">
+          <div className="space-y-4">
+            {modelAnalytics?.modelUsage?.slice(0, 5).map((model: any, index: number) => (
+              <div key={model.model} className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <span className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-sm font-semibold text-purple-600">
+                    #{index + 1}
+                  </span>
+                  <span className="font-medium text-gray-900">{model.model}</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-medium text-gray-900">
+                    {model.messageCount?.toLocaleString()} messages
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {model.totalTokens?.toLocaleString()} tokens
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Storage & Activity Insights */}
+      <div className="grid gap-6 md:grid-cols-2">
+        {/* Top Storage Users */}
+        <div>
+          <h3 className="mb-4 text-lg font-semibold text-gray-900">Storage Leaders</h3>
+          <div className="rounded-lg bg-white p-6 shadow">
+            <div className="space-y-3">
+              {storageAnalytics?.topUsers?.slice(0, 5).map((user: any) => (
+                <div key={user.userId} className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">{user.username}</div>
+                    <div className="text-xs text-gray-500">{user.fileCount} files</div>
+                  </div>
+                  <div className="text-sm font-semibold text-gray-900">{user.totalMB} MB</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Message Activity */}
+        <div>
+          <h3 className="mb-4 text-lg font-semibold text-gray-900">Message Activity</h3>
+          <div className="rounded-lg bg-white p-6 shadow">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">User Messages</span>
+                <span className="text-lg font-semibold text-gray-900">
+                  {messageAnalytics?.userMessages?.toLocaleString() || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">AI Responses</span>
+                <span className="text-lg font-semibold text-gray-900">
+                  {messageAnalytics?.aiMessages?.toLocaleString() || 0}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Error Rate</span>
+                <span className={`text-lg font-semibold ${
+                  parseFloat(messageAnalytics?.errorRate || '0') > 5 ? 'text-red-600' : 'text-green-600'
+                }`}>
+                  {messageAnalytics?.errorRate || 0}%
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Avg Tokens/Message</span>
+                <span className="text-lg font-semibold text-gray-900">
+                  {messageAnalytics?.tokenStats?.avgTokens?.toFixed(0) || 0}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

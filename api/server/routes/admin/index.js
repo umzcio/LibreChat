@@ -7,6 +7,7 @@ const middleware = require('~/server/middleware');
 const statsRouter = require('./stats');
 const usersRouter = require('./users');
 const analyticsRouter = require('./analytics');
+const detailedAnalyticsRouter = require('./detailed-analytics');
 const violationsRouter = require('./violations');
 
 // Apply JWT auth first (populates req.user), then admin check
@@ -17,6 +18,7 @@ router.use(requireAdmin);
 router.use('/stats', statsRouter);
 router.use('/users', usersRouter);
 router.use('/analytics', analyticsRouter);
+router.use('/detailed-analytics', detailedAnalyticsRouter);
 router.use('/violations', violationsRouter);
 
 module.exports = router;

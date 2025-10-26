@@ -15,6 +15,12 @@ interface User {
   balance?: {
     tokenCredits: number;
   };
+  metrics?: {
+    messageCount: number;
+    conversationCount: number;
+    totalTokens: number;
+    lastActivity: string | null;
+  };
 }
 
 export default function Users() {
@@ -31,7 +37,28 @@ export default function Users() {
         params: { search: searchQuery },
         withCredentials: true,
       });
-      return response.data;
+
+      // Fetch detailed analytics for each user
+      const usersWithMetrics = await Promise.all(
+        response.data.map(async (user: User) => {
+          try {
+            const analyticsResponse = await axios.get(`/api/admin/detailed-analytics/user/${user._id}`, {
+              withCredentials: true,
+            });
+            return {
+              ...user,
+              metrics: analyticsResponse.data,
+            };
+          } catch (error) {
+            return {
+              ...user,
+              metrics: null,
+            };
+          }
+        })
+      );
+
+      return usersWithMetrics;
     },
   });
 
@@ -143,13 +170,16 @@ export default function Users() {
                 Role
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Balance
+                Messages
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                Tokens
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                Last Active
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
                 Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
-                Joined
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
                 Actions
@@ -173,9 +203,24 @@ export default function Users() {
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-6 py-4">
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">
+                      {user.metrics?.messageCount?.toLocaleString() || 0}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {user.metrics?.conversationCount || 0} convos
+                    </div>
+                  </div>
+                </td>
+                <td className="whitespace-nowrap px-6 py-4">
                   <span className="text-sm text-gray-900">
-                    {user.balance?.tokenCredits?.toLocaleString() || 0}
+                    {user.metrics?.totalTokens ? (user.metrics.totalTokens / 1000).toFixed(1) + 'K' : '0'}
                   </span>
+                </td>
+                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                  {user.metrics?.lastActivity
+                    ? format(new Date(user.metrics.lastActivity), 'MMM d, h:mm a')
+                    : 'Never'}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4">
                   <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${
@@ -183,9 +228,6 @@ export default function Users() {
                   }`}>
                     {user.isEnabled ? 'Active' : 'Banned'}
                   </span>
-                </td>
-                <td className="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
-                  {format(new Date(user.createdAt), 'MMM d, yyyy')}
                 </td>
                 <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
                   <div className="flex justify-end space-x-2">
