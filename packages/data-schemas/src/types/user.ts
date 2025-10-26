@@ -10,6 +10,7 @@ export interface IUser extends Document {
   avatar?: string;
   provider: string;
   role?: string;
+  isEnabled?: boolean;
   googleId?: string;
   facebookId?: string;
   openidId?: string;
@@ -58,6 +59,7 @@ export interface UpdateUserRequest {
   username?: string;
   email?: string;
   role?: string;
+  isEnabled?: boolean;
   emailVerified?: boolean;
   avatar?: string;
   plugins?: string[];

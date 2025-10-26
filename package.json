@@ -87,7 +87,8 @@
     "migrate:prompt-permissions:dry-run": "node config/migrate-prompt-permissions.js --dry-run",
     "migrate:prompt-permissions": "node config/migrate-prompt-permissions.js",
     "migrate:prompt-permissions:batch": "node config/migrate-prompt-permissions.js --batch-size=50",
-    "make-admin": "node config/make-admin.js"
+    "make-admin": "node config/make-admin.js",
+    "migrate-enable-users": "node config/migrate-enable-users.js"
   },
   "repository": {
     "type": "git",
