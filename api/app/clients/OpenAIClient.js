@@ -1202,6 +1202,22 @@ ${convo}
         modelOptions.messages[0].role = 'user';
       }
 
+      /* Perplexity requires the last message to have role 'user' or 'tool' */
+      if (
+        opts.baseURL.includes('api.perplexity.ai') &&
+        modelOptions.messages &&
+        modelOptions.messages.length > 0
+      ) {
+        const lastMessage = modelOptions.messages[modelOptions.messages.length - 1];
+        if (lastMessage?.role === 'assistant') {
+          // Remove the last assistant message to comply with Perplexity's API requirements
+          modelOptions.messages.pop();
+          logger.debug(
+            '[OpenAIClient] Removed last assistant message for Perplexity API compliance',
+          );
+        }
+      }
+
       if (
         (this.options.endpoint === EModelEndpoint.openAI ||
           this.options.endpoint === EModelEndpoint.azureOpenAI) &&
