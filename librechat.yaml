@@ -76,6 +76,22 @@ endpoints:
       dropParams: ["stop", "frequency_penalty"]
       modelDisplayLabel: "Perplexity"
 
+    # xAI (Grok)
+    - name: "xai"
+      apiKey: "${XAI_API_KEY}"
+      baseURL: "https://api.x.ai/v1"
+      models:
+        default:
+          - "grok-beta"
+        fetch: false
+      titleConvo: true
+      titleMethod: "completion"
+      titleModel: "grok-beta"
+      summarize: false
+      summaryModel: "grok-beta"
+      forcePrompt: false
+      modelDisplayLabel: "Grok"
+
     # OpenRouter (optional - uncomment if needed)
     # - name: "OpenRouter"
     #   apiKey: "${OPENROUTER_KEY}"
