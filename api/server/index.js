@@ -194,7 +194,7 @@ const startServer = async () => {
   };
 
   app.get('/admin', serveAdminDashboard);
-  app.get('/admin/*', serveAdminDashboard);
+  app.get('/admin/:pathMatch(.*)', serveAdminDashboard);
 
   // Main client app catch-all route
   app.use((req, res) => {
