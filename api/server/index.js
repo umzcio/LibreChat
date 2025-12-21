@@ -177,25 +177,6 @@ const startServer = async () => {
 
   app.use(ErrorController);
 
-  // Admin dashboard catch-all route
-  const serveAdminDashboard = (req, res) => {
-    if (!adminIndexHTML) {
-      return res.status(503).send('Admin dashboard not available. Please build it with `npm run build:admin`');
-    }
-
-    res.set({
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      Pragma: 'no-cache',
-      Expires: '0',
-    });
-
-    res.type('html');
-    res.send(adminIndexHTML);
-  };
-
-  // Match /admin and /admin/* using Express 5 syntax
-  app.get('/admin{/:pathMatch*}?', serveAdminDashboard);
-
   // Main client app catch-all route
   app.use((req, res) => {
     res.set({
