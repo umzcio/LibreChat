@@ -177,8 +177,8 @@ const startServer = async () => {
 
   app.use(ErrorController);
 
-  // Admin dashboard catch-all route
-  app.get('/admin(.*)', (req, res) => {
+  // Admin dashboard catch-all route (matches /admin and /admin/*)
+  const serveAdminDashboard = (req, res) => {
     if (!adminIndexHTML) {
       return res.status(503).send('Admin dashboard not available. Please build it with `npm run build:admin`');
     }
@@ -191,7 +191,10 @@ const startServer = async () => {
 
     res.type('html');
     res.send(adminIndexHTML);
-  });
+  };
+
+  app.get('/admin', serveAdminDashboard);
+  app.get('/admin/*', serveAdminDashboard);
 
   // Main client app catch-all route
   app.use((req, res) => {
