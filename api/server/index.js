@@ -12,12 +12,14 @@ const { logger } = require('@librechat/data-schemas');
 const mongoSanitize = require('express-mongo-sanitize');
 const {
   isEnabled,
+  apiNotFound,
   ErrorController,
+  memoryDiagnostics,
   performStartupChecks,
   handleJsonParseError,
-  initializeFileStorage,
   GenerationJobManager,
   createStreamServices,
+  initializeFileStorage,
 } = require('@librechat/api');
 const { connectDb, indexSync } = require('~/db');
 const initializeOAuthReconnectManager = require('./services/initializeOAuthReconnectManager');
@@ -179,9 +181,10 @@ const startServer = async () => {
   app.use('/api/mcp', routes.mcp);
   app.use('/api/admin', routes.admin);
 
-  app.use(ErrorController);
+  /** 404 for unmatched API routes */
+  app.use('/api', apiNotFound);
 
-  // Main client app catch-all route
+  /** SPA fallback - serve index.html for all unmatched routes */
   app.use((req, res) => {
     res.set({
       'Cache-Control': process.env.INDEX_CACHE_CONTROL || 'no-cache, no-store, must-revalidate',
@@ -196,6 +199,9 @@ const startServer = async () => {
     res.type('html');
     res.send(updatedIndexHtml);
   });
+
+  /** Error handler (must be last - Express identifies error middleware by its 4-arg signature) */
+  app.use(ErrorController);
 
   app.listen(port, host, async (err) => {
     if (err) {
@@ -219,6 +225,11 @@ const startServer = async () => {
     const streamServices = createStreamServices();
     GenerationJobManager.configure(streamServices);
     GenerationJobManager.initialize();
+
+    const inspectFlags = process.execArgv.some((arg) => arg.startsWith('--inspect'));
+    if (inspectFlags || isEnabled(process.env.MEM_DIAG)) {
+      memoryDiagnostics.start();
+    }
   });
 };
 
@@ -266,6 +277,15 @@ process.on('uncaughtException', (err) => {
         stack: err.stack,
       },
     );
+    return;
+  }
+
+  if (isEnabled(process.env.CONTINUE_ON_UNCAUGHT_EXCEPTION)) {
+    logger.error('Unhandled error encountered. The app will continue running.', {
+      name: err?.name,
+      message: err?.message,
+      stack: err?.stack,
+    });
     return;
   }
 
