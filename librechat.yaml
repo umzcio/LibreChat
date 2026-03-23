@@ -60,6 +60,13 @@ endpoints:
       summaryModel: "deepseek/deepseek-v3.2"
       modelDisplayLabel: "OpenRouter"
 
+mcpServers:
+  deep-research:
+    type: streamable-http
+    url: http://zr-mcp-research:10000/mcp
+    timeout: 360000
+    initTimeout: 10000
+
 registration:
   allowedDomains:
     - "umontana.edu"
