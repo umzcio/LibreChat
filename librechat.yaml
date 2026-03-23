@@ -60,6 +60,10 @@ endpoints:
       summaryModel: "deepseek/deepseek-v3.2"
       modelDisplayLabel: "OpenRouter"
 
+mcpSettings:
+  allowedDomains:
+    - "zr-mcp-research"
+
 mcpServers:
   deep-research:
     type: streamable-http
