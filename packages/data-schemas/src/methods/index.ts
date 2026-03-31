@@ -1,9 +1,8 @@
 import { createSessionMethods, DEFAULT_REFRESH_TOKEN_EXPIRY, type SessionMethods } from './session';
 import { createTokenMethods, type TokenMethods } from './token';
-import { createRoleMethods, type RoleMethods, type RoleDeps } from './role';
+import { createRoleMethods, RoleConflictError } from './role';
+import type { RoleMethods, RoleDeps } from './role';
 import { createUserMethods, DEFAULT_SESSION_EXPIRY, type UserMethods } from './user';
-
-export { DEFAULT_REFRESH_TOKEN_EXPIRY, DEFAULT_SESSION_EXPIRY };
 import { createKeyMethods, type KeyMethods } from './key';
 import { createFileMethods, type FileMethods } from './file';
 /* Memories */
@@ -50,7 +49,10 @@ import { createPromptMethods, type PromptMethods, type PromptDeps } from './prom
 import { createProjectMethods, type ProjectMethods } from './project';
 /* Tier 5 — Agent */
 import { createAgentMethods, type AgentMethods, type AgentDeps } from './agent';
+/* Config */
+import { createConfigMethods, type ConfigMethods } from './config';
 
+export { RoleConflictError, DEFAULT_REFRESH_TOKEN_EXPIRY, DEFAULT_SESSION_EXPIRY };
 export { tokenValues, cacheTokenValues, premiumTokenValues, defaultRate };
 
 export type AllMethods = UserMethods &
@@ -83,7 +85,8 @@ export type AllMethods = UserMethods &
   SpendTokensMethods &
   PromptMethods &
   AgentMethods &
-  ProjectMethods;
+  ProjectMethods &
+  ConfigMethods;
 
 /** Dependencies injected from the api layer into createMethods */
 export interface CreateMethodsDeps {
@@ -206,6 +209,8 @@ export function createMethods(
     ...createProjectMethods(mongoose),
     /* Tier 5 */
     ...agentMethods,
+    /* Config */
+    ...createConfigMethods(mongoose),
   };
 }
 
@@ -241,4 +246,5 @@ export type {
   PromptMethods,
   AgentMethods,
   ProjectMethods,
+  ConfigMethods,
 };

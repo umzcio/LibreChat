@@ -79,6 +79,7 @@ const rolePermissionsSchema = new Schema(
 
 const roleSchema: Schema<IRole> = new Schema({
   name: { type: String, required: true, index: true },
+  description: { type: String, default: '' },
   permissions: {
     type: rolePermissionsSchema,
   },

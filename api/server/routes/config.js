@@ -1,10 +1,9 @@
 const express = require('express');
-const { logger } = require('@librechat/data-schemas');
 const { isEnabled, getBalanceConfig } = require('@librechat/api');
-const { CacheKeys, defaultSocialLogins } = require('librechat-data-provider');
+const { defaultSocialLogins } = require('librechat-data-provider');
+const { logger, getTenantId } = require('@librechat/data-schemas');
 const { getLdapConfig } = require('~/server/services/Config/ldap');
 const { getAppConfig } = require('~/server/services/Config/app');
-const { getLogStores } = require('~/cache');
 
 const router = express.Router();
 const emailLoginEnabled =
@@ -21,14 +20,6 @@ const sharePointFilePickerEnabled = isEnabled(process.env.ENABLE_SHAREPOINT_FILE
 const openidReuseTokens = isEnabled(process.env.OPENID_REUSE_TOKENS);
 
 router.get('/', async function (req, res) {
-  const cache = getLogStores(CacheKeys.CONFIG_STORE);
-
-  const cachedStartupConfig = await cache.get(CacheKeys.STARTUP_CONFIG);
-  if (cachedStartupConfig) {
-    res.send(cachedStartupConfig);
-    return;
-  }
-
   const isBirthday = () => {
     const today = new Date();
     return today.getMonth() === 1 && today.getDate() === 11;
@@ -37,7 +28,10 @@ router.get('/', async function (req, res) {
   const ldap = getLdapConfig();
 
   try {
-    const appConfig = await getAppConfig({ role: req.user?.role });
+    const appConfig = await getAppConfig({
+      role: req.user?.role,
+      tenantId: req.user?.tenantId || getTenantId(),
+    });
 
     const isOpenIdEnabled =
       !!process.env.OPENID_CLIENT_ID &&
@@ -141,7 +135,6 @@ router.get('/', async function (req, res) {
       payload.customFooter = process.env.CUSTOM_FOOTER;
     }
 
-    await cache.set(CacheKeys.STARTUP_CONFIG, payload);
     return res.status(200).send(payload);
   } catch (err) {
     logger.error('Error in startup config', err);
