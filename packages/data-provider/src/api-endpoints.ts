@@ -402,6 +402,16 @@ export const disableTwoFactor = () => `${BASE_URL}/api/auth/2fa/disable`;
 export const regenerateBackupCodes = () => `${BASE_URL}/api/auth/2fa/backup/regenerate`;
 export const verifyTwoFactorTemp = () => `${BASE_URL}/api/auth/2fa/verify-temp`;
 
+/* Projects */
+export const projects = () => `${BASE_URL}/api/projects`;
+export const project = (projectId: string) =>
+  `${projects()}/${encodeURIComponent(projectId)}`;
+export const projectFiles = (projectId: string) => `${project(projectId)}/files`;
+export const projectConversations = (projectId: string) =>
+  `${project(projectId)}/conversations`;
+export const projectConversation = (projectId: string, conversationId: string) =>
+  `${projectConversations(projectId)}/${encodeURIComponent(conversationId)}`;
+
 /* Memories */
 export const memories = () => `${BASE_URL}/api/memories`;
 export const memory = (key: string) => `${memories()}/${encodeURIComponent(key)}`;

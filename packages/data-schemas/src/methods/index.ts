@@ -46,6 +46,8 @@ import {
 import { createTransactionMethods, type TransactionMethods } from './transaction';
 import { createSpendTokensMethods, type SpendTokensMethods } from './spendTokens';
 import { createPromptMethods, type PromptMethods, type PromptDeps } from './prompt';
+/* Projects */
+import { createProjectMethods, type ProjectMethods } from './project';
 /* Tier 5 — Agent */
 import { createAgentMethods, type AgentMethods, type AgentDeps } from './agent';
 
@@ -80,7 +82,8 @@ export type AllMethods = UserMethods &
   TransactionMethods &
   SpendTokensMethods &
   PromptMethods &
-  AgentMethods;
+  AgentMethods &
+  ProjectMethods;
 
 /** Dependencies injected from the api layer into createMethods */
 export interface CreateMethodsDeps {
@@ -199,6 +202,8 @@ export function createMethods(
     ...transactionMethods,
     ...spendTokensMethods,
     ...promptMethods,
+    /* Projects */
+    ...createProjectMethods(mongoose),
     /* Tier 5 */
     ...agentMethods,
   };
@@ -235,4 +240,5 @@ export type {
   SpendTokensMethods,
   PromptMethods,
   AgentMethods,
+  ProjectMethods,
 };

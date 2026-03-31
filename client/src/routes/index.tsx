@@ -17,6 +17,7 @@ import StartupLayout from './Layouts/Startup';
 import LoginLayout from './Layouts/Login';
 import dashboardRoutes from './Dashboard';
 import ShareRoute from './ShareRoute';
+import ProjectView from '~/components/Projects/ProjectView';
 import ChatRoute from './ChatRoute';
 import Search from './Search';
 import Root from './Root';
@@ -105,6 +106,14 @@ export const router = createBrowserRouter(
             },
             {
               path: 'c/:conversationId?',
+              element: <ChatRoute />,
+            },
+            {
+              path: 'p/:projectId',
+              element: <ProjectView />,
+            },
+            {
+              path: 'p/:projectId/c/:conversationId?',
               element: <ChatRoute />,
             },
             {

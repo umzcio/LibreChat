@@ -47,6 +47,7 @@ export enum ResourceType {
   PROMPTGROUP = 'promptGroup',
   MCPSERVER = 'mcpServer',
   REMOTE_AGENT = 'remoteAgent',
+  PROJECT = 'project',
 }
 
 /**
@@ -79,6 +80,9 @@ export enum AccessRoleIds {
   REMOTE_AGENT_VIEWER = 'remoteAgent_viewer',
   REMOTE_AGENT_EDITOR = 'remoteAgent_editor',
   REMOTE_AGENT_OWNER = 'remoteAgent_owner',
+  PROJECT_VIEWER = 'project_viewer',
+  PROJECT_EDITOR = 'project_editor',
+  PROJECT_OWNER = 'project_owner',
 }
 
 // ===== ZOD SCHEMAS =====
@@ -327,9 +331,14 @@ export function accessRoleToPermBits(accessRoleId: string): number {
     case AccessRoleIds.PROMPTGROUP_OWNER:
     case AccessRoleIds.MCPSERVER_OWNER:
     case AccessRoleIds.REMOTE_AGENT_OWNER:
+    case AccessRoleIds.PROJECT_OWNER:
       return (
         PermissionBits.VIEW | PermissionBits.EDIT | PermissionBits.DELETE | PermissionBits.SHARE
       );
+    case AccessRoleIds.PROJECT_VIEWER:
+      return PermissionBits.VIEW;
+    case AccessRoleIds.PROJECT_EDITOR:
+      return PermissionBits.VIEW | PermissionBits.EDIT;
     default:
       return PermissionBits.VIEW;
   }

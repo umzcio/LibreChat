@@ -60,6 +60,11 @@ export enum QueryKeys {
   /* MCP Servers */
   mcpServers = 'mcpServers',
   mcpServer = 'mcpServer',
+  /* Projects */
+  projects = 'projects',
+  project = 'project',
+  projectConversations = 'projectConversations',
+  projectFiles = 'projectFiles',
   /* Active Jobs */
   activeJobs = 'activeJobs',
   /* Agent API Keys */
@@ -96,4 +101,7 @@ export enum MutationKeys {
   enableTwoFactor = 'enableTwoFactor',
   verifyTwoFactor = 'verifyTwoFactor',
   updateMemoryPreferences = 'updateMemoryPreferences',
+  createProject = 'createProject',
+  updateProject = 'updateProject',
+  deleteProject = 'deleteProject',
 }

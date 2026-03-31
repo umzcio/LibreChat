@@ -249,6 +249,7 @@ export function createConversationMethods(
       search,
       sortBy = 'updatedAt',
       sortDirection = 'desc',
+      projectId,
     }: {
       cursor?: string | null;
       limit?: number;
@@ -257,10 +258,16 @@ export function createConversationMethods(
       search?: string;
       sortBy?: string;
       sortDirection?: string;
+      projectId?: string;
     } = {},
   ) {
     const Conversation = mongoose.models.Conversation as Model<IConversation>;
     const filters: FilterQuery<IConversation>[] = [{ user } as FilterQuery<IConversation>];
+
+    if (projectId) {
+      filters.push({ projectId } as FilterQuery<IConversation>);
+    }
+
     if (isArchived) {
       filters.push({ isArchived: true } as FilterQuery<IConversation>);
     } else {

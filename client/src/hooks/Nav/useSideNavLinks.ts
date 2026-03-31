@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import { Blocks, MCPIcon, AttachmentIcon } from '@librechat/client';
-import { Database, Bookmark, Settings2, ArrowRightToLine, MessageSquareQuote } from 'lucide-react';
+import {
+  Database,
+  Bookmark,
+  Settings2,
+  ArrowRightToLine,
+  MessageSquareQuote,
+  FolderKanban,
+} from 'lucide-react';
 import {
   Permissions,
   EModelEndpoint,
@@ -17,6 +24,7 @@ import BookmarkPanel from '~/components/SidePanel/Bookmarks/BookmarkPanel';
 import PanelSwitch from '~/components/SidePanel/Builder/PanelSwitch';
 import Parameters from '~/components/SidePanel/Parameters/Panel';
 import { MemoryPanel } from '~/components/SidePanel/Memories';
+import { ProjectPanel } from '~/components/SidePanel/Projects';
 import FilesPanel from '~/components/SidePanel/Files/Panel';
 import { useHasAccess, useMCPServerManager } from '~/hooks';
 import { PromptsAccordion } from '~/components/Prompts';
@@ -61,6 +69,10 @@ export default function useSideNavLinks({
   const hasAccessToCreateAgents = useHasAccess({
     permissionType: PermissionTypes.AGENTS,
     permission: Permissions.CREATE,
+  });
+  const hasAccessToProjects = useHasAccess({
+    permissionType: PermissionTypes.PROJECTS,
+    permission: Permissions.USE,
   });
   const hasAccessToUseMCPSettings = useHasAccess({
     permissionType: PermissionTypes.MCP_SERVERS,
@@ -194,6 +206,7 @@ export default function useSideNavLinks({
     hasAccessToPrompts,
     hasAccessToMemories,
     hasAccessToReadMemories,
+    hasAccessToProjects,
     interfaceConfig.parameters,
     endpointType,
     hasAccessToBookmarks,

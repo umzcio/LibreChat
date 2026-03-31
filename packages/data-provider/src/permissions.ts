@@ -60,6 +60,10 @@ export enum PermissionTypes {
    * Type for Remote Agent (API) Permissions
    */
   REMOTE_AGENTS = 'REMOTE_AGENTS',
+  /**
+   * Type for Project Permissions
+   */
+  PROJECTS = 'PROJECTS',
 }
 
 /**
@@ -169,6 +173,14 @@ export const remoteAgentsPermissionsSchema = z.object({
 });
 export type TRemoteAgentsPermissions = z.infer<typeof remoteAgentsPermissionsSchema>;
 
+export const projectPermissionsSchema = z.object({
+  [Permissions.USE]: z.boolean().default(true),
+  [Permissions.CREATE]: z.boolean().default(true),
+  [Permissions.SHARE]: z.boolean().default(false),
+  [Permissions.SHARE_PUBLIC]: z.boolean().default(false),
+});
+export type TProjectPermissions = z.infer<typeof projectPermissionsSchema>;
+
 // Define a single permissions schema that holds all permission types.
 export const permissionsSchema = z.object({
   [PermissionTypes.PROMPTS]: promptPermissionsSchema,
@@ -185,4 +197,5 @@ export const permissionsSchema = z.object({
   [PermissionTypes.FILE_CITATIONS]: fileCitationsPermissionsSchema,
   [PermissionTypes.MCP_SERVERS]: mcpServersPermissionsSchema,
   [PermissionTypes.REMOTE_AGENTS]: remoteAgentsPermissionsSchema,
+  [PermissionTypes.PROJECTS]: projectPermissionsSchema,
 });

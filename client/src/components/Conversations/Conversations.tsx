@@ -1,13 +1,15 @@
-import { useMemo, memo, type FC, useCallback, useEffect, useRef } from 'react';
+import { useMemo, memo, useState, type FC, useCallback, useEffect, useRef } from 'react';
 import throttle from 'lodash/throttle';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, FolderKanban } from 'lucide-react';
 import { useRecoilValue } from 'recoil';
 import { Spinner, useMediaQuery } from '@librechat/client';
 import { List, AutoSizer, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import type { TConversation } from 'librechat-data-provider';
-import { useLocalize, TranslationKeys, useFavorites, useShowMarketplace } from '~/hooks';
+import { useLocalize, TranslationKeys, useFavorites, useShowMarketplace, useLocalStorage } from '~/hooks';
 import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
-import { useActiveJobs } from '~/data-provider';
+import ProjectCreateDialog from '~/components/SidePanel/Projects/ProjectCreateDialog';
+import { ProjectCard } from '~/components/SidePanel/Projects';
+import { useActiveJobs, useListProjectsQuery } from '~/data-provider';
 import { groupConversationsByDate, cn } from '~/utils';
 import Convo from './Convo';
 import store from '~/store';
@@ -169,6 +171,10 @@ const Conversations: FC<ConversationsProps> = ({
   const showAgentMarketplace = useShowMarketplace();
 
   const favoritesContentKeyRef = useRef('');
+  const [isProjectsExpanded, setIsProjectsExpanded] = useLocalStorage('projectsExpanded', true);
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const { data: projectsData } = useListProjectsQuery();
+  const projects = useMemo(() => projectsData?.projects ?? [], [projectsData]);
 
   // Fetch active job IDs for showing generation indicators
   const { data: activeJobsData } = useActiveJobs();
@@ -199,6 +205,7 @@ const Conversations: FC<ConversationsProps> = ({
     if (shouldShowFavorites) {
       items.push({ type: 'favorites' });
     }
+    items.push({ type: 'projects' });
     items.push({ type: 'chats-header' });
 
     if (isChatsExpanded) {
@@ -231,6 +238,9 @@ const Conversations: FC<ConversationsProps> = ({
           }
           if (item.type === 'favorites') {
             return `favorites-${favoritesContentKeyRef.current}`;
+          }
+          if (item.type === 'projects') {
+            return `projects-${projects.length}-${isProjectsExpanded ? 1 : 0}`;
           }
           if (item.type === 'chats-header') {
             return 'chats-header';
@@ -266,6 +276,13 @@ const Conversations: FC<ConversationsProps> = ({
     return () => cancelAnimationFrame(frameId);
   }, [favorites.length, isFavoritesLoading, showAgentMarketplace, clearFavoritesCache]);
 
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      clearFavoritesCache();
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [projects.length, isProjectsExpanded, clearFavoritesCache]);
+
   const rowRenderer = useCallback(
     ({ index, key, parent, style }) => {
       const item = flattenedItems[index];
@@ -283,6 +300,42 @@ const Conversations: FC<ConversationsProps> = ({
         return (
           <MeasuredRow key={key} {...rowProps}>
             <FavoritesList isSmallScreen={isSmallScreen} toggleNav={toggleNav} />
+          </MeasuredRow>
+        );
+      }
+
+      if (item.type === 'projects') {
+        return (
+          <MeasuredRow key={key} {...rowProps}>
+            <div className="px-1">
+              <button
+                onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
+                className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-xs font-bold text-text-secondary outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
+                type="button"
+              >
+                <span className="select-none">{localize('com_ui_projects')}</span>
+                <ChevronDown
+                  className={cn('h-3 w-3 transition-transform duration-200', isProjectsExpanded ? 'rotate-180' : '')}
+                />
+              </button>
+              {isProjectsExpanded && (
+                <div className="space-y-0.5 pb-1">
+                  <ProjectCreateDialog open={createProjectOpen} onOpenChange={setCreateProjectOpen}>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
+                      onClick={() => setCreateProjectOpen(true)}
+                    >
+                      <FolderKanban className="size-4" aria-hidden="true" />
+                      {localize('com_ui_new_project')}
+                    </button>
+                  </ProjectCreateDialog>
+                  {projects.map((proj) => (
+                    <ProjectCard key={proj.projectId} project={proj} />
+                  ))}
+                </div>
+              )}
+            </div>
           </MeasuredRow>
         );
       }
@@ -336,6 +389,10 @@ const Conversations: FC<ConversationsProps> = ({
       setIsChatsExpanded,
       shouldShowFavorites,
       activeJobIds,
+      isProjectsExpanded,
+      setIsProjectsExpanded,
+      createProjectOpen,
+      projects,
     ],
   );
 

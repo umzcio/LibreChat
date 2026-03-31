@@ -7,6 +7,7 @@ import * as m from './types/mutations';
 import * as q from './types/queries';
 import * as f from './types/files';
 import * as mcp from './types/mcpServers';
+import * as p from './types/projects';
 import * as config from './config';
 import request from './request';
 import * as s from './schemas';
@@ -1001,6 +1002,64 @@ export function verifyTwoFactorTemp(
 ): Promise<t.TVerify2FATempResponse> {
   return request.post(endpoints.verifyTwoFactorTemp(), payload);
 }
+
+/* Projects */
+export const listProjects = (
+  params?: p.TProjectListParams,
+): Promise<p.TProjectListResponse> => {
+  const searchParams = new URLSearchParams();
+  if (params?.cursor) {
+    searchParams.set('cursor', params.cursor);
+  }
+  if (params?.limit) {
+    searchParams.set('limit', String(params.limit));
+  }
+  if (params?.isArchived) {
+    searchParams.set('isArchived', 'true');
+  }
+  if (params?.search) {
+    searchParams.set('search', params.search);
+  }
+  const qs = searchParams.toString();
+  return request.get(`${endpoints.projects()}${qs ? `?${qs}` : ''}`);
+};
+
+export const getProject = (projectId: string): Promise<p.TProject> => {
+  return request.get(endpoints.project(projectId));
+};
+
+export const createProject = (data: p.TCreateProjectRequest): Promise<p.TProject> => {
+  return request.post(endpoints.projects(), data);
+};
+
+export const updateProject = (
+  projectId: string,
+  data: p.TUpdateProjectRequest,
+): Promise<p.TProject> => {
+  return request.patch(endpoints.project(projectId), data);
+};
+
+export const deleteProject = (projectId: string): Promise<{ message: string }> => {
+  return request.delete(endpoints.project(projectId));
+};
+
+export const getProjectFiles = (projectId: string): Promise<f.TFile[]> => {
+  return request.get(endpoints.projectFiles(projectId));
+};
+
+export const assignConversationsToProject = (
+  projectId: string,
+  conversationIds: string[],
+): Promise<{ message: string }> => {
+  return request.post(endpoints.projectConversations(projectId), { conversationIds });
+};
+
+export const removeConversationFromProject = (
+  projectId: string,
+  conversationId: string,
+): Promise<{ message: string }> => {
+  return request.delete(endpoints.projectConversation(projectId, conversationId));
+};
 
 /* Memories */
 export const getMemories = (): Promise<q.MemoriesResponse> => {
