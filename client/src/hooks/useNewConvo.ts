@@ -236,17 +236,22 @@ const useNewConvo = (index = 0) => {
         const searchParamsString = searchParams?.toString();
         const getParams = () => (searchParamsString ? `?${searchParamsString}` : '');
 
+        const projectPrefix = conversation.projectId
+          ? `/p/${conversation.projectId}`
+          : '';
+        console.log('[useNewConvo] navigation - projectId:', conversation.projectId, 'prefix:', projectPrefix);
+
         if (conversation.conversationId === Constants.NEW_CONVO && !modelsData) {
           const appTitle = localStorage.getItem(LocalStorageKeys.APP_TITLE) ?? '';
           if (appTitle) {
             document.title = appTitle;
           }
-          const path = `/c/${Constants.NEW_CONVO}${getParams()}`;
+          const path = `${projectPrefix}/c/${Constants.NEW_CONVO}${getParams()}`;
           navigate(path, { state: { focusChat: true } });
           return;
         }
 
-        const path = `/c/${conversation.conversationId}${getParams()}`;
+        const path = `${projectPrefix}/c/${conversation.conversationId}${getParams()}`;
         navigate(path, {
           replace: true,
           state: disableFocus ? {} : { focusChat: true },

@@ -83,6 +83,7 @@ export default function ProjectCreateDialog({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={localize('com_ui_project_name_placeholder')}
+              className="text-text-primary"
               autoFocus
             />
           </div>
@@ -93,6 +94,7 @@ export default function ProjectCreateDialog({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={localize('com_ui_project_description_placeholder')}
+              className="text-text-primary"
             />
           </div>
           <div className="space-y-1">
@@ -102,6 +104,7 @@ export default function ProjectCreateDialog({
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder={localize('com_ui_project_instructions_placeholder')}
+              className="text-text-primary"
               rows={4}
             />
           </div>

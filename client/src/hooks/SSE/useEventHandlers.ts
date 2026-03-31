@@ -448,8 +448,11 @@ export default function useEventHandlers({
           setShowStopButton(false);
           setIsSubmitting(false);
           // Navigate to new chat if not already there
-          if (location.pathname !== `/c/${Constants.NEW_CONVO}`) {
-            navigate(`/c/${Constants.NEW_CONVO}`, { replace: true });
+          if (!location.pathname.endsWith(`/c/${Constants.NEW_CONVO}`)) {
+            const pPrefix = submission.conversation?.projectId
+              ? `/p/${submission.conversation.projectId}`
+              : '';
+            navigate(`${pPrefix}/c/${Constants.NEW_CONVO}`, { replace: true });
           }
           return;
         }
@@ -506,13 +509,16 @@ export default function useEventHandlers({
           }
 
           const isNewChat =
-            location.pathname === `/c/${Constants.NEW_CONVO}` &&
+            location.pathname.endsWith(`/c/${Constants.NEW_CONVO}`) &&
             currentConvoId === Constants.NEW_CONVO;
 
           setFinalMessages(currentConvoId, isNewChat ? [] : [...messages]);
           setDraft({ id: currentConvoId, value: requestMessage?.text });
           if (isNewChat) {
-            navigate(`/c/${Constants.NEW_CONVO}`, { replace: true, state: { focusChat: true } });
+            const pPrefix = submission.conversation?.projectId
+              ? `/p/${submission.conversation.projectId}`
+              : '';
+            navigate(`${pPrefix}/c/${Constants.NEW_CONVO}`, { replace: true, state: { focusChat: true } });
           }
           return;
         }
@@ -592,8 +598,11 @@ export default function useEventHandlers({
             });
           }
 
-          if (location.pathname === `/c/${Constants.NEW_CONVO}`) {
-            navigate(`/c/${conversation.conversationId}`, { replace: true });
+          if (location.pathname.endsWith(`/c/${Constants.NEW_CONVO}`)) {
+            const projectPrefix = conversation.projectId
+              ? `/p/${conversation.projectId}`
+              : '';
+            navigate(`${projectPrefix}/c/${conversation.conversationId}`, { replace: true });
           }
         }
       } finally {

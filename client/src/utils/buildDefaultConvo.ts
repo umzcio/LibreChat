@@ -84,6 +84,11 @@ const buildDefaultConvo = ({
 
   defaultConvo.tools = lastConversationSetup?.tools ?? lastSelectedTools ?? defaultConvo.tools;
 
+  // Preserve projectId from original conversation
+  if (conversation.projectId && !defaultConvo.projectId) {
+    defaultConvo.projectId = conversation.projectId;
+  }
+
   return defaultConvo;
 };
 

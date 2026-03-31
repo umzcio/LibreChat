@@ -1061,6 +1061,20 @@ export const removeConversationFromProject = (
   return request.delete(endpoints.projectConversation(projectId, conversationId));
 };
 
+export const uploadProjectFile = (
+  projectId: string,
+  formData: FormData,
+): Promise<f.TFile> => {
+  return request.postMultiPart(endpoints.projectFiles(projectId), formData);
+};
+
+export const deleteProjectFile = (
+  projectId: string,
+  fileId: string,
+): Promise<{ message: string }> => {
+  return request.delete(`${endpoints.projectFiles(projectId)}/${encodeURIComponent(fileId)}`);
+};
+
 /* Memories */
 export const getMemories = (): Promise<q.MemoriesResponse> => {
   return request.get(endpoints.memories());

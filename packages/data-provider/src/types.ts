@@ -109,6 +109,7 @@ export type TPayload = Partial<TMessage> &
     isContinued: boolean;
     isRegenerate?: boolean;
     conversationId: string | null;
+    projectId?: string;
     messages?: TMessages;
     isTemporary: boolean;
     ephemeralAgent?: TEphemeralAgent | null;

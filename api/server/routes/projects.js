@@ -1,5 +1,11 @@
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const multer = require('multer');
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
+const { sanitizeFilename } = require('@librechat/api');
+const { FileSources } = require('librechat-data-provider');
 const { logger } = require('@librechat/data-schemas');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
 const db = require('~/models');
@@ -176,6 +182,97 @@ router.delete('/:projectId/conversations/:conversationId', async (req, res) => {
   } catch (error) {
     logger.error('[DELETE /projects/:projectId/conversations/:conversationId]', error);
     return res.status(500).json({ message: 'Error removing conversation from project' });
+  }
+});
+
+/**
+ * Upload a file to a project's knowledge base.
+ * @route POST /api/projects/:projectId/files
+ */
+const projectFileStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const outputPath = path.join(
+      req.config?.paths?.uploads || '/app/uploads',
+      'temp',
+      req.user.id,
+    );
+    if (!fs.existsSync(outputPath)) {
+      fs.mkdirSync(outputPath, { recursive: true });
+    }
+    cb(null, outputPath);
+  },
+  filename: function (req, file, cb) {
+    req.file_id = crypto.randomUUID();
+    file.originalname = decodeURIComponent(file.originalname);
+    cb(null, sanitizeFilename(file.originalname));
+  },
+});
+
+const projectUpload = multer({ storage: projectFileStorage });
+
+router.post('/:projectId/files', projectUpload.single('file'), async (req, res) => {
+  try {
+    const project = await db.getProject(req.params.projectId, req.user.id);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const filepath = req.file.path;
+    let text = '';
+
+    try {
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      if (['.txt', '.md', '.csv', '.json', '.xml', '.yaml', '.yml', '.html'].includes(ext)) {
+        text = fs.readFileSync(filepath, 'utf-8');
+      }
+    } catch (readErr) {
+      logger.warn('[POST /projects/:projectId/files] Could not extract text', readErr);
+    }
+
+    const fileDoc = await db.createFile(
+      {
+        user: req.user._id || req.user.id,
+        file_id: req.file_id,
+        filename: req.file.originalname,
+        filepath: filepath,
+        bytes: req.file.size,
+        type: req.file.mimetype,
+        source: FileSources.local,
+        projectId: req.params.projectId,
+        text: text || undefined,
+        object: 'file',
+        usage: 0,
+      },
+      true,
+    );
+
+    return res.status(201).json(fileDoc);
+  } catch (error) {
+    logger.error('[POST /projects/:projectId/files]', error);
+    return res.status(500).json({ message: 'Error uploading file' });
+  }
+});
+
+/**
+ * Delete a file from a project's knowledge base.
+ * @route DELETE /api/projects/:projectId/files/:fileId
+ */
+router.delete('/:projectId/files/:fileId', async (req, res) => {
+  try {
+    const project = await db.getProject(req.params.projectId, req.user.id);
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    await db.deleteFile({ file_id: req.params.fileId });
+    return res.status(200).json({ message: 'File deleted' });
+  } catch (error) {
+    logger.error('[DELETE /projects/:projectId/files/:fileId]', error);
+    return res.status(500).json({ message: 'Error deleting file' });
   }
 });
 

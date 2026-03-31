@@ -11,7 +11,7 @@ const azureAssistants = require('~/server/services/Endpoints/azureAssistants');
 const assistants = require('~/server/services/Endpoints/assistants');
 const { getEndpointsConfig } = require('~/server/services/Config');
 const agents = require('~/server/services/Endpoints/agents');
-const { updateFilesUsage } = require('~/models');
+const { updateFilesUsage, getProject, getProjectFiles } = require('~/models');
 
 const buildFunction = {
   [EModelEndpoint.agents]: agents.buildOptions,
@@ -21,6 +21,7 @@ const buildFunction = {
 
 async function buildEndpointOption(req, res, next) {
   const { endpoint, endpointType } = req.body;
+  logger.debug(`[buildEndpointOption] raw projectId: ${req.body.projectId}`);
 
   let endpointsConfig;
   try {
@@ -102,6 +103,20 @@ async function buildEndpointOption(req, res, next) {
 
     if (req.body.files && !isAgents) {
       req.body.endpointOption.attachments = updateFilesUsage(req.body.files);
+    }
+
+    /** Inject project context for non-agent endpoints */
+    if (req.body.projectId && !isAgents) {
+      try {
+        const project = await getProject(req.body.projectId);
+        if (project?.instructions) {
+          const existingSystem = req.body.endpointOption.promptPrefix || '';
+          req.body.endpointOption.promptPrefix = project.instructions +
+            (existingSystem ? '\n\n' + existingSystem : '');
+        }
+      } catch (err) {
+        logger.error('[buildEndpointOption] Error loading project context', err);
+      }
     }
 
     next();

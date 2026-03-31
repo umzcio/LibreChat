@@ -51,6 +51,12 @@ const useNavigateToConvo = (index = 0) => {
     [setConvo, queryClient, applyModelSpecEffects],
   );
 
+  const buildConvoPath = (convo?: Partial<TConversation>, convoId?: string) => {
+    const id = convoId ?? convo?.conversationId ?? Constants.NEW_CONVO;
+    const prefix = convo?.projectId ? `/p/${convo.projectId}` : '';
+    return `${prefix}/c/${id}`;
+  };
+
   const fetchFreshData = async (conversation?: Partial<TConversation>) => {
     const conversationId = conversation?.conversationId;
     if (!conversationId) {
@@ -65,12 +71,12 @@ const useNavigateToConvo = (index = 0) => {
       const convoData = { ...data };
       clearModelForNonEphemeralAgent(convoData);
       setConversation(convoData);
-      navigate(`/c/${conversationId ?? Constants.NEW_CONVO}`, { state: { focusChat: true } });
+      navigate(buildConvoPath(convoData, conversationId), { state: { focusChat: true } });
     } catch (error) {
       console.error('Error fetching conversation data on navigation', error);
       if (conversation) {
         setConversation(conversation as TConversation);
-        navigate(`/c/${conversationId}`, { state: { focusChat: true } });
+        navigate(buildConvoPath(conversation, conversationId), { state: { focusChat: true } });
       }
     }
   };
@@ -128,7 +134,7 @@ const useNavigateToConvo = (index = 0) => {
       fetchFreshData(convo);
     } else {
       setConversation(convo);
-      navigate(`/c/${convo.conversationId ?? Constants.NEW_CONVO}`, { state: { focusChat: true } });
+      navigate(buildConvoPath(convo), { state: { focusChat: true } });
     }
   };
 

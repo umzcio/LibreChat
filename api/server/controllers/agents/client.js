@@ -138,6 +138,7 @@ class AgentClient extends BaseClient {
           iconURL: this.options.iconURL,
           endpoint: this.options.endpoint,
           agent_id: this.options.agent.id,
+          projectId: this.options.req?.body?.projectId,
           modelLabel: this.options.modelLabel,
           resendFiles: this.options.resendFiles,
           imageDetail: this.options.imageDetail,
@@ -319,9 +320,29 @@ class AgentClient extends BaseClient {
 
     /**
      * Build shared run context - applies to ALL agents in the run.
-     * This includes: file context (latest message), augmented prompt (RAG), memory context.
+     * This includes: project context, file context (latest message), augmented prompt (RAG), memory context.
      */
     const sharedRunContextParts = [];
+
+    /** Project context (instructions + knowledge base) - stacks on top of everything */
+    const projectId = this.options.req?.body?.projectId;
+    logger.debug(`[AgentClient] projectId from req.body: ${projectId}`);
+    if (projectId) {
+      try {
+        const project = await db.getProject(projectId);
+        if (project?.instructions) {
+          sharedRunContextParts.push(`## Project Instructions\n${project.instructions}`);
+        }
+        const projectFiles = await db.getProjectFiles(projectId);
+        const filesWithText = projectFiles.filter((f) => f.text);
+        if (filesWithText.length > 0) {
+          const fileContextParts = filesWithText.map((f) => `### ${f.filename}\n${f.text}`);
+          sharedRunContextParts.push(`## Project Knowledge Base\n${fileContextParts.join('\n\n')}`);
+        }
+      } catch (error) {
+        logger.error('[AgentClient] Error loading project context', error);
+      }
+    }
 
     /** File context from the latest message (attachments) */
     const latestMessage = orderedMessages[orderedMessages.length - 1];

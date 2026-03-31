@@ -1135,6 +1135,7 @@ export const openAIBaseSchema = tConversationSchema.pick({
   modelLabel: true,
   chatGptLabel: true,
   promptPrefix: true,
+  projectId: true,
   temperature: true,
   top_p: true,
   presence_penalty: true,
@@ -1227,6 +1228,7 @@ export const compactAgentsBaseSchema = tConversationSchema.pick({
   iconURL: true,
   greeting: true,
   agent_id: true,
+  projectId: true,
   instructions: true,
   additional_instructions: true,
 });

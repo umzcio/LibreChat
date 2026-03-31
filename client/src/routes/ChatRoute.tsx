@@ -44,7 +44,7 @@ export default function ChatRoute() {
 
   const index = 0;
   const [searchParams] = useSearchParams();
-  const { conversationId = '' } = useParams();
+  const { conversationId = '', projectId } = useParams();
   useIdChangeEffect(conversationId);
   const { hasSetConversation, conversation } = store.useCreateConversationAtom(index);
   const { newConversation } = useNewConvo();
@@ -113,9 +113,14 @@ export default function ChatRoute() {
       const preset = getNewConvoPreset();
 
       logger.log('conversation', 'ChatRoute, new convo effect', conversation);
+      const convoTemplate = conversation
+        ? { ...conversation, ...(projectId ? { projectId } : {}) }
+        : projectId
+          ? ({ projectId } as Partial<TConversation>)
+          : undefined;
       newConversation({
         modelsData: modelsQuery.data,
-        template: conversation ? conversation : undefined,
+        template: convoTemplate,
         ...(preset ? { preset } : {}),
       });
 
@@ -123,7 +128,7 @@ export default function ChatRoute() {
     } else if (initialConvoQuery.data && endpointsQuery.data && modelsQuery.data) {
       logger.log('conversation', 'ChatRoute initialConvoQuery', initialConvoQuery.data);
       newConversation({
-        template: initialConvoQuery.data,
+        template: { ...initialConvoQuery.data, ...(projectId ? { projectId } : {}) },
         /* this is necessary to load all existing settings */
         preset: initialConvoQuery.data as TPreset,
         modelsData: modelsQuery.data,
