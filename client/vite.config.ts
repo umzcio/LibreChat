@@ -314,6 +314,7 @@ export default defineConfig(({ command }) => ({
       '~': path.join(__dirname, 'src/'),
       $fonts: path.resolve(__dirname, 'public/fonts'),
       'micromark-extension-math': 'micromark-extension-llm-math',
+      recoil: path.join(__dirname, 'src/recoil-shim.ts'),
     },
   },
 }));

@@ -95,6 +95,17 @@ Multi-line imports count total character length across all lines. Consolidate va
 
 ## Frontend Rules (`client/src/**/*`)
 
+### State Management (Jotai — NOT Recoil)
+
+This fork has **fully migrated from Recoil to Jotai**. Recoil is not installed.
+
+- All state uses Jotai: `atom`, `useAtom`, `useAtomValue`, `useSetAtom`, `atomFamily`, etc.
+- Store files are in `client/src/store/` using Jotai patterns.
+- Jotai utilities (localStorage persistence, tab isolation) are in `client/src/store/jotai-utils.ts`.
+- **Recoil compatibility shim:** `client/src/recoil-shim.ts` maps the full Recoil API to Jotai equivalents. It is aliased as `recoil` in both `client/vite.config.ts` and `client/jest.config.cjs`. This means upstream code that imports `from 'recoil'` will transparently resolve to Jotai after merges — no manual conversion needed.
+- **Never introduce Recoil imports directly.** Always use Jotai. The shim exists solely to absorb upstream merge artifacts.
+- When writing new atoms, use `atom(defaultValue)` (Jotai), not `atom({ key, default })` (Recoil).
+
 ### Localization
 
 - All user-facing text must use `useLocalize()`.
