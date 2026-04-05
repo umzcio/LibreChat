@@ -61,7 +61,6 @@ function MessagesViewContent({
                 <>
                   <div ref={screenshotTargetRef}>
                     <MultiMessage
-                      key={conversationId}
                       messagesTree={_messagesTree}
                       messageId={conversationId ?? null}
                       setCurrentEditId={setCurrentEditId}
