@@ -32,6 +32,7 @@ const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
 const projects = require('./projects');
+const code = require('./code');
 
 module.exports = {
   mcp,
@@ -68,4 +69,5 @@ module.exports = {
   staticRoute,
   accessPermissions,
   projects,
+  code,
 };

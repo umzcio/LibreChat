@@ -1,29 +1,22 @@
-import React from 'react';
-import { useRecoilValue } from 'recoil';
+import React, { useCallback } from 'react';
+import { useAtom, useAtomValue } from 'jotai';
 import { TooltipAnchor } from '@librechat/client';
 import { MessageCircleDashed } from 'lucide-react';
-import { useRecoilState, useRecoilCallback } from 'recoil';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 import store from '~/store';
 
 export function TemporaryChat() {
   const localize = useLocalize();
-  const [isTemporary, setIsTemporary] = useRecoilState(store.isTemporary);
-  const conversation = useRecoilValue(store.conversationByIndex(0));
-  const isSubmitting = useRecoilValue(store.isSubmittingFamily(0));
+  const [isTemporary, setIsTemporary] = useAtom(store.isTemporary);
+  const hasMessages = useAtomValue(store.conversationHasMessagesByIndex(0));
+  const isSubmitting = useAtomValue(store.isSubmittingFamily(0));
 
-  const handleBadgeToggle = useRecoilCallback(
-    () => () => {
-      setIsTemporary(!isTemporary);
-    },
-    [isTemporary],
-  );
+  const handleBadgeToggle = useCallback(() => {
+    setIsTemporary(!isTemporary);
+  }, [isTemporary, setIsTemporary]);
 
-  if (
-    (Array.isArray(conversation?.messages) && conversation.messages.length >= 1) ||
-    isSubmitting
-  ) {
+  if (hasMessages || isSubmitting) {
     return null;
   }
 

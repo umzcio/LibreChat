@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
 import DOMPurify from 'dompurify';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, Control, FieldErrors } from 'react-hook-form';
 import { Input, Label, Button } from '@librechat/client';
 import { useMCPAuthValuesQuery } from '~/data-provider/Tools/queries';
 import { useLocalize } from '~/hooks';
+import { logger } from '~/utils';
 
 export interface CustomUserVarConfig {
   title: string;
@@ -21,8 +22,8 @@ interface AuthFieldProps {
   name: string;
   config: CustomUserVarConfig;
   hasValue: boolean;
-  control: any;
-  errors: any;
+  control: Control<Record<string, string>>;
+  errors: FieldErrors<Record<string, string>>;
   autoFocus?: boolean;
 }
 
@@ -53,7 +54,7 @@ function AuthField({ name, config, hasValue, control, errors, autoFocus }: AuthF
         ALLOW_ARIA_ATTR: false,
       });
     } catch (error) {
-      console.error('Sanitization failed', error);
+      logger.error('MCP', 'Sanitization failed', error);
       return config.description;
     }
   }, [config.description, sanitizer]);

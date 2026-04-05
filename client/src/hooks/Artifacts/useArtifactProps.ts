@@ -2,8 +2,8 @@ import { useContext, useMemo } from 'react';
 import { ThemeContext, isDark } from '@librechat/client';
 import { removeNullishValues } from 'librechat-data-provider';
 import type { Artifact } from '~/common';
-import { getKey, getProps, getTemplate, getArtifactFilename } from '~/utils/artifacts';
-import { getMarkdownFiles } from '~/utils/markdown';
+import { getKey, getProps, getTemplate, getArtifactWorkspaceFilename } from '~/utils/artifacts';
+import { getMarkdownFiles, getPlainTextFiles } from '~/utils/markdown';
 import { getMermaidFiles } from '~/utils/mermaid';
 
 export default function useArtifactProps({ artifact }: { artifact: Artifact }) {
@@ -18,11 +18,15 @@ export default function useArtifactProps({ artifact }: { artifact: Artifact }) {
       return ['diagram.mmd', getMermaidFiles(artifact.content ?? '', isDarkMode)];
     }
 
-    if (type === 'text/markdown' || type === 'text/md' || type === 'text/plain') {
+    if (type === 'text/markdown' || type === 'text/md') {
       return ['content.md', getMarkdownFiles(artifact.content ?? '')];
     }
 
-    const fileKey = getArtifactFilename(artifact.type ?? '', artifact.language);
+    if (type === 'text/plain') {
+      return ['content.txt', getPlainTextFiles(artifact.content ?? '')];
+    }
+
+    const fileKey = getArtifactWorkspaceFilename(artifact.type ?? '', artifact.language);
     const files = removeNullishValues({
       [fileKey]: artifact.content,
     });

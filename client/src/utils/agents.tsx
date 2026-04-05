@@ -127,9 +127,9 @@ export const renderAgentAvatar = (
 export const getContactDisplayName = (agent: t.Agent | null | undefined): string | null => {
   if (!agent) return null;
 
-  const supportName = (agent as any).support_contact?.name;
-  const supportEmail = (agent as any).support_contact?.email;
-  const authorName = (agent as any).authorName;
+  const supportName = agent.support_contact?.name;
+  const supportEmail = agent.support_contact?.email;
+  const authorName = agent.authorName;
 
   return supportName || authorName || supportEmail || null;
 };

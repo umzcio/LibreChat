@@ -1,7 +1,6 @@
 import React, { createContext, PropsWithChildren, ReactElement, useContext, useMemo } from 'react';
 import type {
   Control,
-  // FieldErrors,
   FieldValues,
   UseFormReset,
   UseFormRegister,
@@ -13,7 +12,6 @@ import type {
 interface FormContextValue<TFieldValues extends FieldValues> {
   register: UseFormRegister<TFieldValues>;
   control: Control<TFieldValues>;
-  // errors: FieldErrors<TFieldValues>;
   getValues: UseFormGetValues<TFieldValues>;
   setValue: UseFormSetValue<TFieldValues>;
   handleSubmit: UseFormHandleSubmit<TFieldValues>;

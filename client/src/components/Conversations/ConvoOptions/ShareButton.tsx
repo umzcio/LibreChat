@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, CopyCheck } from 'lucide-react';
 import { useGetSharedLinkQuery } from 'librechat-data-provider/react-query';
@@ -35,7 +35,7 @@ export default function ShareButton({
       setAnnouncement('');
     }, 1000);
   };
-  const latestMessage = useRecoilValue(store.latestMessageFamily(0));
+  const latestMessageId = useAtomValue(store.latestMessageIdFamily(0));
   const { data: share, isLoading } = useGetSharedLinkQuery(conversationId);
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export default function ShareButton({
       <SharedLinkButton
         share={share}
         conversationId={conversationId}
-        targetMessageId={latestMessage?.messageId}
+        targetMessageId={latestMessageId ?? undefined}
         showQR={showQR}
         setShowQR={setShowQR}
         setSharedLink={setSharedLink}

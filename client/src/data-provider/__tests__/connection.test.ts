@@ -12,7 +12,7 @@ jest.mock('librechat-data-provider', () => ({
 }));
 
 jest.mock('~/utils', () => ({
-  logger: { log: jest.fn() },
+  logger: { log: jest.fn(), error: jest.fn(), warn: jest.fn(), info: jest.fn(), debug: jest.fn() },
 }));
 
 // Mock timers
@@ -237,7 +237,7 @@ describe('useHealthCheck', () => {
     });
 
     it('should handle API errors gracefully', async () => {
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+      const { logger } = require('~/utils');
       mockQueryClient.fetchQuery.mockRejectedValue(new Error('API Error'));
 
       renderHook(() => useHealthCheck(true));
@@ -246,8 +246,7 @@ describe('useHealthCheck', () => {
         jest.advanceTimersByTime(500);
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith('Health check failed:', expect.any(Error));
-      consoleSpy.mockRestore();
+      expect(logger.error).toHaveBeenCalledWith('HealthCheck', 'Health check failed:', expect.any(Error));
     });
   });
 

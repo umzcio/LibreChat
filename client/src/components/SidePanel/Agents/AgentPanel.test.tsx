@@ -21,13 +21,7 @@ jest.mock('~/common/types', () => ({
 }));
 
 // Mock store to prevent import errors
-jest.mock('~/store/toast', () => ({
-  default: () => ({
-    showToast: jest.fn(),
-  }),
-}));
-
-jest.mock('~/store', () => {});
+jest.mock('~/store', () => ({}));
 
 // Mock the data service to control network responses
 jest.mock('librechat-data-provider', () => {

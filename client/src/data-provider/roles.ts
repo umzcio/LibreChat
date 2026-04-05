@@ -15,6 +15,7 @@ import type {
   UseQueryOptions,
 } from '@tanstack/react-query';
 import type * as t from 'librechat-data-provider';
+import { logger } from '~/utils';
 
 export const useGetRole = (
   roleName: string,
@@ -54,7 +55,7 @@ export const useUpdatePromptPermissionsMutation = (
       onError: (...args) => {
         const error = args[0];
         if (error != null) {
-          console.error('Failed to update prompt permissions:', error);
+          logger.error('Roles', 'Failed to update prompt permissions:', error);
         }
         if (onError) {
           onError(...args);
@@ -90,7 +91,7 @@ export const useUpdateAgentPermissionsMutation = (
       onError: (...args) => {
         const error = args[0];
         if (error != null) {
-          console.error('Failed to update prompt permissions:', error);
+          logger.error('Roles', 'Failed to update prompt permissions:', error);
         }
         if (onError != null) {
           onError(...args);
@@ -126,7 +127,7 @@ export const useUpdateMemoryPermissionsMutation = (
       onError: (...args) => {
         const error = args[0];
         if (error != null) {
-          console.error('Failed to update memory permissions:', error);
+          logger.error('Roles', 'Failed to update memory permissions:', error);
         }
         if (onError) {
           onError(...args);
@@ -162,7 +163,7 @@ export const useUpdatePeoplePickerPermissionsMutation = (
       onError: (...args) => {
         const error = args[0];
         if (error != null) {
-          console.error('Failed to update people picker permissions:', error);
+          logger.error('Roles', 'Failed to update people picker permissions:', error);
         }
         if (onError) {
           onError(...args);
@@ -198,7 +199,7 @@ export const useUpdateMCPServersPermissionsMutation = (
       onError: (...args) => {
         const error = args[0];
         if (error != null) {
-          console.error('Failed to update MCP servers permissions:', error);
+          logger.error('Roles', 'Failed to update MCP servers permissions:', error);
         }
         if (onError) {
           onError(...args);
@@ -234,7 +235,7 @@ export const useUpdateMarketplacePermissionsMutation = (
       onError: (...args) => {
         const error = args[0];
         if (error != null) {
-          console.error('Failed to update marketplace permissions:', error);
+          logger.error('Roles', 'Failed to update marketplace permissions:', error);
         }
         if (onError) {
           onError(...args);
@@ -270,7 +271,7 @@ export const useUpdateRemoteAgentsPermissionsMutation = (
       onError: (...args) => {
         const error = args[0];
         if (error != null) {
-          console.error('Failed to update remote agents permissions:', error);
+          logger.error('Roles', 'Failed to update remote agents permissions:', error);
         }
         if (onError) {
           onError(...args);

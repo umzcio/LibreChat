@@ -3,7 +3,7 @@ import { useCombobox } from '@librechat/client';
 import { AutoSizer, List } from 'react-virtualized';
 import { EModelEndpoint } from 'librechat-data-provider';
 import type { MentionOption, ConvoGenerator } from '~/common';
-import type { SetterOrUpdater } from 'recoil';
+import type { AtomSetter } from '~/common';
 import { useGetConversation, useLocalize, TranslationKeys } from '~/hooks';
 import useSelectMention from '~/hooks/Input/useSelectMention';
 import { useAssistantsMapContext } from '~/Providers';
@@ -21,7 +21,7 @@ export default function Mention({
   placeholder = 'com_ui_mention',
   includeAssistants = true,
 }: {
-  setShowMentionPopover: SetterOrUpdater<boolean>;
+  setShowMentionPopover: AtomSetter<boolean>;
   newConversation: ConvoGenerator;
   textAreaRef: React.MutableRefObject<HTMLTextAreaElement | null>;
   commandChar?: string;

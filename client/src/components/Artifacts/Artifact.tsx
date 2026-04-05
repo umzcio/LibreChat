@@ -1,17 +1,44 @@
 import React, { useEffect, useCallback, useRef, useState } from 'react';
 import throttle from 'lodash/throttle';
 import { visit } from 'unist-util-visit';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { useLocation } from 'react-router-dom';
 import type { Pluggable } from 'unified';
 import type { Artifact } from '~/common';
-import { useMessageContext, useArtifactContext } from '~/Providers';
+import { useMessageContext } from '~/Providers';
 import { logger, extractContent, isArtifactRoute } from '~/utils';
 import { artifactsState } from '~/store/artifacts';
 import ArtifactButton from './ArtifactButton';
 
+interface AstNode {
+  type: string;
+  name?: string;
+  value?: string;
+  children?: AstNode[];
+  attributes?: Record<string, string>;
+  data?: Record<string, unknown>;
+}
+
+const blockTypes = new Set(['paragraph', 'html', 'heading', 'blockquote', 'code', 'thematicBreak']);
+
+function extractRawText(nodes: AstNode[]): string {
+  const parts: string[] = [];
+  for (const node of nodes) {
+    if (typeof node.value === 'string') {
+      parts.push(node.value);
+    } else if (Array.isArray(node.children)) {
+      parts.push(extractRawText(node.children));
+    }
+    if (blockTypes.has(node.type) && parts.length > 0) {
+      parts.push('\n');
+    }
+  }
+  return parts.join('');
+}
+
 export const artifactPlugin: Pluggable = () => {
   return (tree) => {
+    let artifactCounter = 0;
     visit(tree, ['textDirective', 'leafDirective', 'containerDirective'], (node, index, parent) => {
       if (node.type === 'textDirective') {
         const replacementText = `:${node.name}`;
@@ -22,12 +49,33 @@ export const artifactPlugin: Pluggable = () => {
           };
         }
       }
+      if (node.name === 'artifact-update') {
+        const rawContent = Array.isArray(node.children)
+          ? extractRawText(node.children as AstNode[])
+          : '';
+        node.data = {
+          hName: 'artifact-update',
+          hProperties: {
+            ...node.attributes,
+            rawContent,
+          },
+          ...node.data,
+        };
+        node.children = [];
+        return node;
+      }
       if (node.name !== 'artifact') {
         return;
       }
+      if (Array.isArray(node.children)) {
+        node.children = node.children.filter(
+          (child: { type: string }) => child.type === 'code',
+        );
+      }
+      const stableIndex = artifactCounter++;
       node.data = {
         hName: node.name,
-        hProperties: node.attributes,
+        hProperties: { ...node.attributes, stableIndex: String(stableIndex) },
         ...node.data,
       };
       return node;
@@ -43,15 +91,15 @@ export function Artifact({
   node: _node,
   ...props
 }: Artifact & {
+  stableIndex?: string;
   children: React.ReactNode | { props: { children: React.ReactNode } };
   node: unknown;
 }) {
   const location = useLocation();
   const { messageId } = useMessageContext();
-  const { getNextIndex, resetCounter } = useArtifactContext();
-  const artifactIndex = useRef(getNextIndex(false)).current;
+  const artifactIndex = props.stableIndex != null ? parseInt(props.stableIndex, 10) : 0;
 
-  const setArtifacts = useSetRecoilState(artifactsState);
+  const setArtifacts = useSetAtom(artifactsState);
   const [artifact, setArtifact] = useState<Artifact | null>(null);
 
   const throttledUpdateRef = useRef(
@@ -67,13 +115,13 @@ export function Artifact({
     const title = props.title ?? defaultTitle;
     const type = props.type ?? defaultType;
     const identifier = props.identifier ?? defaultIdentifier;
-    const artifactKey = `${identifier}_${type}_${title}_${messageId}`
+    const artifactKey = `${identifier}_${type}_${title}_${messageId}_${artifactIndex}`
       .replace(/\s+/g, '_')
       .toLowerCase();
 
     throttledUpdateRef.current(() => {
       const now = Date.now();
-      if (artifactKey === `${defaultIdentifier}_${defaultType}_${defaultTitle}_${messageId}`) {
+      if (artifactKey === `${defaultIdentifier}_${defaultType}_${defaultTitle}_${messageId}_${artifactIndex}`) {
         return;
       }
 
@@ -119,10 +167,11 @@ export function Artifact({
     location.pathname,
   ]);
 
+  useEffect(() => () => throttledUpdateRef.current.cancel(), []);
+
   useEffect(() => {
-    resetCounter();
     updateArtifact();
-  }, [updateArtifact, resetCounter]);
+  }, [updateArtifact]);
 
   return <ArtifactButton artifact={artifact} />;
 }

@@ -15,6 +15,7 @@ export * from './errors';
 export * from './agents';
 export * from './drafts';
 export * from './convos';
+export * from './conversationRoutes';
 export * from './routes';
 export * from './presets';
 export * from './prompts';
@@ -26,6 +27,7 @@ export * from './endpoints';
 export * from './resources';
 export * from './scaleImage';
 export * from './timestamps';
+export * from './sanitize';
 export * from './localStorage';
 export * from './promptGroups';
 export * from './previewCache';
@@ -84,10 +86,6 @@ export const optionText =
 
 export const defaultTextPropsLabel =
   'rounded-md border border-gray-300 bg-transparent text-sm shadow-[0_0_10px_rgba(0,0,0,0.10)] outline-none focus-within:placeholder:text-text-primary focus:placeholder:text-text-primary placeholder:text-text-secondary focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:border-gray-700 dark:bg-gray-700 dark:text-gray-50 dark:shadow-[0_0_15px_rgba(0,0,0,0.10)] dark:focus:border-gray-600 dark:focus:outline-none';
-
-export function capitalizeFirstLetter(string: string) {
-  return string.charAt(0).toUpperCase() + string.slice(1);
-}
 
 export const handleDoubleClick: React.MouseEventHandler<HTMLElement> = (event) => {
   const range = document.createRange();

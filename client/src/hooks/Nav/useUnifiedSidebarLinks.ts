@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { MessageSquare } from 'lucide-react';
 import { useUserKeyQuery } from 'librechat-data-provider/react-query';
 import { getConfigDefaults, getEndpointField } from 'librechat-data-provider';
@@ -13,8 +13,7 @@ import store from '~/store';
 const defaultInterface = getConfigDefaults().interface;
 
 export default function useUnifiedSidebarLinks() {
-  const conversation = useRecoilValue(store.conversationByIndex(0));
-  const endpoint = conversation?.endpoint;
+  const endpoint = useAtomValue(store.conversationEndpointByIndex(0));
   const { data: startupConfig } = useGetStartupConfig();
   const { data: endpointsConfig = {} as TEndpointsConfig } = useGetEndpointsQuery();
 

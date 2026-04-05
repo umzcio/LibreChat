@@ -13,6 +13,11 @@ import { createAgentCategoryMethods, type AgentCategoryMethods } from './agentCa
 import { createAgentApiKeyMethods, type AgentApiKeyMethods } from './agentApiKey';
 /* MCP Servers */
 import { createMCPServerMethods, type MCPServerMethods } from './mcpServer';
+/* MCP Cosmetic Overrides */
+import {
+  createMCPCosmeticOverrideMethods,
+  type MCPCosmeticOverrideMethods,
+} from './mcpCosmeticOverride';
 /* Plugin Auth */
 import { createPluginAuthMethods, type PluginAuthMethods } from './pluginAuth';
 /* Permissions */
@@ -47,6 +52,7 @@ import { createSpendTokensMethods, type SpendTokensMethods } from './spendTokens
 import { createPromptMethods, type PromptMethods, type PromptDeps } from './prompt';
 /* Projects */
 import { createProjectMethods, type ProjectMethods } from './project';
+import { createWorkspaceMethods, type WorkspaceMethods } from './workspace';
 /* Tier 5 — Agent */
 import { createAgentMethods, type AgentMethods, type AgentDeps } from './agent';
 /* Config */
@@ -65,6 +71,7 @@ export type AllMethods = UserMethods &
   AgentCategoryMethods &
   AgentApiKeyMethods &
   MCPServerMethods &
+  MCPCosmeticOverrideMethods &
   UserGroupMethods &
   AclEntryMethods &
   SystemGrantMethods &
@@ -86,6 +93,7 @@ export type AllMethods = UserMethods &
   PromptMethods &
   AgentMethods &
   ProjectMethods &
+  WorkspaceMethods &
   ConfigMethods;
 
 /** Dependencies injected from the api layer into createMethods */
@@ -183,6 +191,7 @@ export function createMethods(
     ...createAgentCategoryMethods(mongoose),
     ...createAgentApiKeyMethods(mongoose),
     ...createMCPServerMethods(mongoose),
+    ...createMCPCosmeticOverrideMethods(mongoose),
     ...createAccessRoleMethods(mongoose),
     ...createUserGroupMethods(mongoose),
     ...aclEntryMethods,
@@ -207,6 +216,7 @@ export function createMethods(
     ...promptMethods,
     /* Projects */
     ...createProjectMethods(mongoose),
+    ...createWorkspaceMethods(mongoose),
     /* Tier 5 */
     ...agentMethods,
     /* Config */
@@ -225,6 +235,7 @@ export type {
   AgentCategoryMethods,
   AgentApiKeyMethods,
   MCPServerMethods,
+  MCPCosmeticOverrideMethods,
   UserGroupMethods,
   AclEntryMethods,
   SystemGrantMethods,
@@ -246,5 +257,6 @@ export type {
   PromptMethods,
   AgentMethods,
   ProjectMethods,
+  WorkspaceMethods,
   ConfigMethods,
 };

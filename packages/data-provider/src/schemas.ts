@@ -1015,27 +1015,6 @@ export const googleSchema = googleBaseSchema
   - frequency_penalty -> frequencyPenalty
   - stop -> stopSequences
    */
-export const googleGenConfigSchema = z
-  .object({
-    maxOutputTokens: coerceNumber.optional(),
-    temperature: coerceNumber.optional(),
-    topP: coerceNumber.optional(),
-    topK: coerceNumber.optional(),
-    presencePenalty: coerceNumber.optional(),
-    frequencyPenalty: coerceNumber.optional(),
-    stopSequences: z.array(z.string()).optional(),
-    thinkingConfig: z
-      .object({
-        includeThoughts: z.boolean().optional(),
-        thinkingBudget: coerceNumber.optional(),
-        thinkingLevel: z.string().optional(),
-      })
-      .optional(),
-    web_search: z.boolean().optional(),
-  })
-  .strip()
-  .optional();
-
 export function removeNullishValues<T extends Record<string, unknown>>(
   obj: T,
   removeEmptyStrings?: boolean,

@@ -1,11 +1,10 @@
 import { createContext, useContext } from 'react';
 import type { TConversation } from 'librechat-data-provider';
-import type { SetterOrUpdater } from 'recoil';
-import type { ConvoGenerator } from '~/common';
+import type { ConvoGenerator, AtomSetter } from '~/common';
 
 type TAddedChatContext = {
   conversation: TConversation | null;
-  setConversation: SetterOrUpdater<TConversation | null>;
+  setConversation: AtomSetter<TConversation | null>;
   generateConversation: ConvoGenerator;
 };
 

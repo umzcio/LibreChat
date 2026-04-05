@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, useParams } from 'react-router-dom';
 import {
   Login,
   VerifyEmail,
@@ -10,6 +10,7 @@ import {
 } from '~/components/Auth';
 import { MarketplaceProvider } from '~/components/Agents/MarketplaceContext';
 import AgentMarketplace from '~/components/Agents/Marketplace';
+import CodePage from '~/components/Code/CodePage';
 import { OAuthSuccess, OAuthError } from '~/components/OAuth';
 import { AuthContextProvider } from '~/hooks/AuthContext';
 import RouteErrorBoundary from './RouteErrorBoundary';
@@ -31,6 +32,11 @@ const AuthLayout = () => (
 
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
+
+const CodeRedirect = () => {
+  const { projectId } = useParams();
+  return <Navigate to={projectId ? `/p/${projectId}/code/new` : '/code/new'} replace={true} />;
+};
 
 export const router = createBrowserRouter(
   [
@@ -109,12 +115,28 @@ export const router = createBrowserRouter(
               element: <ChatRoute />,
             },
             {
+              path: 'code',
+              element: <CodeRedirect />,
+            },
+            {
+              path: 'code/:conversationId?',
+              element: <CodePage />,
+            },
+            {
               path: 'p/:projectId',
               element: <ProjectView />,
             },
             {
               path: 'p/:projectId/c/:conversationId?',
               element: <ChatRoute />,
+            },
+            {
+              path: 'p/:projectId/code',
+              element: <CodeRedirect />,
+            },
+            {
+              path: 'p/:projectId/code/:conversationId?',
+              element: <CodePage />,
             },
             {
               path: 'search',

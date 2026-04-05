@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { dataService, QueryKeys, Constants } from 'librechat-data-provider';
 import type { UseMutationResult, UseMutationOptions } from '@tanstack/react-query';
 import type * as t from 'librechat-data-provider';
+import { logger } from '~/utils';
 
 type EditArtifactContext = {
   previousMessages: Record<string, t.TMessage[] | undefined>;
@@ -84,7 +85,8 @@ export const useEditArtifact = (
       };
       setMessageData(data.conversationId);
       if (targetNotFound) {
-        console.warn(
+        logger.warn(
+          'Messages',
           'Edited Artifact Message not found in cache, trying `new` as `conversationId`',
         );
         setMessageData(Constants.NEW_CONVO as string);

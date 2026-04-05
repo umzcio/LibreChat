@@ -1,5 +1,5 @@
 import React, { useRef, useState, useMemo } from 'react';
-import { useRecoilState } from 'recoil';
+import { useAtom } from 'jotai';
 import * as Ariakit from '@ariakit/react';
 import {
   FileSearch,
@@ -24,6 +24,7 @@ import {
   isDocumentSupportedProvider,
 } from 'librechat-data-provider';
 import type { EndpointFileConfig, TConversation } from 'librechat-data-provider';
+import type { SharePointFile } from '~/data-provider/Files/sharepoint';
 import type { ExtendedFile, FileSetter } from '~/common';
 import {
   useAgentToolPermissions,
@@ -77,7 +78,7 @@ const AttachFileMenu = ({
   const isUploadDisabled = disabled ?? false;
   const inputRef = useRef<HTMLInputElement>(null);
   const [isPopoverActive, setIsPopoverActive] = useState(false);
-  const [ephemeralAgent, setEphemeralAgent] = useRecoilState(
+  const [ephemeralAgent, setEphemeralAgent] = useAtom(
     ephemeralAgentByConvoId(conversationId),
   );
   const [toolResource, setToolResource] = useState<EToolResources | undefined>();
@@ -277,7 +278,7 @@ const AttachFileMenu = ({
       disabled={isUploadDisabled}
     />
   );
-  const handleSharePointFilesSelected = async (sharePointFiles: any[]) => {
+  const handleSharePointFilesSelected = async (sharePointFiles: SharePointFile[]) => {
     try {
       await handleSharePointFiles(sharePointFiles);
       setIsSharePointDialogOpen(false);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useRecoilState } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { useToastContext } from '@librechat/client';
 import { useSpeechToTextMutation } from '~/data-provider';
 import useGetAudioSettings from './useGetAudioSettings';
@@ -23,11 +23,11 @@ const useSpeechToTextExternal = (
   const [isRequestBeingMade, setIsRequestBeingMade] = useState(false);
   const [audioMimeType, setAudioMimeType] = useState<string>(() => getBestSupportedMimeType());
 
-  const [minDecibels] = useRecoilState(store.decibelValue);
-  const [autoSendText] = useRecoilState(store.autoSendText);
-  const [languageSTT] = useRecoilState<string>(store.languageSTT);
-  const [speechToText] = useRecoilState<boolean>(store.speechToText);
-  const [autoTranscribeAudio] = useRecoilState<boolean>(store.autoTranscribeAudio);
+  const minDecibels = useAtomValue(store.decibelValue);
+  const autoSendText = useAtomValue(store.autoSendText);
+  const languageSTT = useAtomValue(store.languageSTT);
+  const speechToText = useAtomValue(store.speechToText);
+  const autoTranscribeAudio = useAtomValue(store.autoTranscribeAudio);
 
   const { mutate: processAudio, isLoading: isProcessing } = useSpeechToTextMutation({
     onSuccess: (data) => {

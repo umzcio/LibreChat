@@ -18,7 +18,7 @@ const DownloadArtifact = ({ artifact }: { artifact: Artifact }) => {
       if (!content) {
         return;
       }
-      const blob = new Blob([content], { type: 'text/plain' });
+      const blob = new Blob([content], { type: artifact.type ?? 'text/plain' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

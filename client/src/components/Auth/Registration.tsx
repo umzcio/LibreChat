@@ -1,5 +1,5 @@
 import { useForm } from 'react-hook-form';
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useRef, useState } from 'react';
 import { Turnstile } from '@marsidev/react-turnstile';
 import { ThemeContext, Spinner, Button, isDark } from '@librechat/client';
 import { useNavigate, useOutletContext, useLocation } from 'react-router-dom';
@@ -28,6 +28,15 @@ const Registration: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [countdown, setCountdown] = useState<number>(3);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+    };
+  }, []);
 
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -44,15 +53,19 @@ const Registration: React.FC = () => {
     onSuccess: () => {
       setIsSubmitting(false);
       setCountdown(3);
-      const timer = setInterval(() => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+      countdownRef.current = setInterval(() => {
         setCountdown((prevCountdown) => {
           if (prevCountdown <= 1) {
-            clearInterval(timer);
+            if (countdownRef.current) {
+              clearInterval(countdownRef.current);
+            }
             navigate('/c/new', { replace: true });
             return 0;
-          } else {
-            return prevCountdown - 1;
           }
+          return prevCountdown - 1;
         });
       }, 1000);
     },

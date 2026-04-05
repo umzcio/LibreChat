@@ -1,7 +1,6 @@
 import React from 'react';
-import { Provider, createStore } from 'jotai';
+import { Provider, createStore, useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { RecoilRoot, useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 import { Constants, LocalStorageKeys } from 'librechat-data-provider';
 import { ephemeralAgentByConvoId } from '~/store';
 import { setTimestamp } from '~/utils/timestamps';
@@ -32,9 +31,7 @@ const createWrapper = (mcpServers: string[] = []) => {
   const servers = createMCPServers(mcpServers);
 
   const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <RecoilRoot>
-      <Provider store={store}>{children}</Provider>
-    </RecoilRoot>
+    <Provider store={store}>{children}</Provider>
   );
   return { Wrapper, servers };
 };
@@ -172,7 +169,7 @@ describe('useMCPSelect', () => {
   });
 
   describe('Race Conditions and Infinite Loops Prevention', () => {
-    it('should not create infinite loop when syncing between Jotai and Recoil states', async () => {
+    it('should not create infinite loop when syncing between Jotai states', async () => {
       const { Wrapper, servers } = createWrapper();
       const { result, rerender } = renderHook(() => useMCPSelect({ servers }), {
         wrapper: Wrapper,
@@ -295,13 +292,13 @@ describe('useMCPSelect', () => {
 
   describe('Ephemeral Agent Synchronization', () => {
     it('should sync mcpValues when ephemeralAgent is updated externally', async () => {
-      // Create a shared wrapper for both hooks to share the same Recoil/Jotai context
+      // Create a shared wrapper for both hooks to share the same Jotai context
       const { Wrapper, servers } = createWrapper(['external-value1', 'external-value2']);
 
       // Create a component that uses both hooks to ensure they share state
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ servers });
-        const [ephemeralAgent, setEphemeralAgent] = useRecoilState(
+        const [ephemeralAgent, setEphemeralAgent] = useAtom(
           ephemeralAgentByConvoId(Constants.NEW_CONVO),
         );
         return { mcpHook, ephemeralAgent, setEphemeralAgent };
@@ -328,7 +325,7 @@ describe('useMCPSelect', () => {
 
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ servers });
-        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, setEphemeralAgent };
       };
 
@@ -350,7 +347,7 @@ describe('useMCPSelect', () => {
 
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ servers });
-        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, setEphemeralAgent };
       };
 
@@ -372,7 +369,7 @@ describe('useMCPSelect', () => {
 
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ servers });
-        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, setEphemeralAgent };
       };
 
@@ -393,10 +390,10 @@ describe('useMCPSelect', () => {
       // Create a shared wrapper for both hooks
       const { Wrapper, servers } = createWrapper(['hook-value1', 'hook-value2']);
 
-      // Create a component that uses both the hook and accesses Recoil state
+      // Create a component that uses both the hook and accesses Jotai state
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ servers });
-        const ephemeralAgent = useRecoilValue(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const ephemeralAgent = useAtomValue(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, ephemeralAgent };
       };
 
@@ -422,7 +419,7 @@ describe('useMCPSelect', () => {
       // Create a component that uses both hooks
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ servers });
-        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, setEphemeralAgent };
       };
 
@@ -458,7 +455,7 @@ describe('useMCPSelect', () => {
       // Create a component that uses both hooks
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ servers });
-        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, setEphemeralAgent };
       };
 
@@ -497,7 +494,7 @@ describe('useMCPSelect', () => {
 
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ servers });
-        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, setEphemeralAgent };
       };
 
@@ -611,12 +608,14 @@ describe('useMCPSelect', () => {
       });
 
       // Hook B: new conversation WITHOUT storageContextKey (different environment)
+      // Use a separate store to avoid ephemeral agent cross-contamination
+      const { Wrapper: WrapperB, servers: serversB } = createWrapper(['server1', 'server2']);
       const { result: resultB } = renderHook(
-        () => useMCPSelect({ conversationId: null, servers }),
-        { wrapper: Wrapper },
+        () => useMCPSelect({ conversationId: null, servers: serversB }),
+        { wrapper: WrapperB },
       );
 
-      // Should NOT see server1 since it's a different atom (NEW_CONVO vs __defaults__)
+      // Should NOT see server1 since it's a different store with its own atom state
       expect(resultB.current.mcpValues).toEqual([]);
     });
 
@@ -733,7 +732,7 @@ describe('useMCPSelect', () => {
 
       const TestComponent = ({ ctxKey }: { ctxKey?: string }) => {
         const mcpHook = useMCPSelect({ conversationId: null, storageContextKey: ctxKey, servers });
-        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, setEphemeralAgent };
       };
 
@@ -766,7 +765,7 @@ describe('useMCPSelect', () => {
 
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ conversationId: null, servers });
-        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, setEphemeralAgent };
       };
 
@@ -790,7 +789,7 @@ describe('useMCPSelect', () => {
 
       const TestComponent = () => {
         const mcpHook = useMCPSelect({ servers });
-        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(Constants.NEW_CONVO));
+        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(Constants.NEW_CONVO));
         return { mcpHook, setEphemeralAgent };
       };
 

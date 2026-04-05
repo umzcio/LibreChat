@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, useMemo, memo, lazy, Suspense, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useSetRecoilState, useRecoilValue } from 'recoil';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useMediaQuery, NewChatIcon } from '@librechat/client';
 import { PermissionTypes, Permissions, QueryKeys } from 'librechat-data-provider';
 import type { InfiniteQueryObserverResult } from '@tanstack/react-query';
@@ -27,8 +27,8 @@ const ConversationsSection = memo(() => {
   const queryClient = useQueryClient();
   const { newConversation } = useNewConvo();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
-  const setSidebarExpanded = useSetRecoilState(store.sidebarExpanded);
-  const conversation = useRecoilValue(store.conversationByIndex(0));
+  const setSidebarExpanded = useSetAtom(store.sidebarExpanded);
+  const conversationId = useAtomValue(store.conversationIdByIndex(0));
   const { isAuthenticated } = useAuthContext();
   useTitleGeneration(isAuthenticated);
 
@@ -41,7 +41,7 @@ const ConversationsSection = memo(() => {
     permission: Permissions.USE,
   });
 
-  const search = useRecoilValue(store.search);
+  const search = useAtomValue(store.search);
 
   const { data, fetchNextPage, isFetchingNextPage, isLoading, isFetching } =
     useConversationsInfiniteQuery(
@@ -129,7 +129,7 @@ const ConversationsSection = memo(() => {
           aria-label={localize('com_ui_new_chat')}
           className="flex w-full cursor-pointer items-center rounded-lg px-2.5 py-2 text-sm text-text-primary outline-none hover:bg-surface-active-alt focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
           onClick={() => {
-            clearMessagesCache(queryClient, conversation?.conversationId);
+            clearMessagesCache(queryClient, conversationId);
             queryClient.invalidateQueries([QueryKeys.messages]);
             newConversation();
             setSidebarExpanded(false);
@@ -137,7 +137,7 @@ const ConversationsSection = memo(() => {
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
-              clearMessagesCache(queryClient, conversation?.conversationId);
+              clearMessagesCache(queryClient, conversationId);
               queryClient.invalidateQueries([QueryKeys.messages]);
               newConversation();
               setSidebarExpanded(false);

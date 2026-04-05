@@ -206,6 +206,7 @@ describe('formatAgentMessages', () => {
     ]);
   });
 
+  /** Skipped: consecutive assistant message merging is not yet implemented in formatAgentMessages. */
   it.skip('should not produce two consecutive assistant messages and format content correctly', () => {
     const payload = [
       { role: 'user', content: 'Hello' },

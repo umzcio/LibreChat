@@ -14,4 +14,6 @@ export interface IProject extends Document {
   createdAt?: Date;
   updatedAt?: Date;
   tenantId?: string;
+  memory?: string[];
+  memoryUpdatedAt?: Date | string;
 }

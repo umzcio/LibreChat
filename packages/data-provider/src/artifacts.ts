@@ -3087,18 +3087,3 @@ export const shadcnComponents = {
   useToast: useToast,
 };
 
-export const essentialShadcnComponents = {
-  utils: utils,
-  avatar: avatar,
-  button: button,
-  card: card,
-  checkbox: checkbox,
-  input: input,
-  label: label,
-  radioGroup: radioGroup,
-  select: select,
-  textarea: textarea,
-  // badge: badge,
-  // dialog: dialog,
-  // table: table,
-};

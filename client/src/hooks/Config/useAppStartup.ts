@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useRecoilState } from 'recoil';
+import { useAtom } from 'jotai';
 import TagManager from 'react-gtm-module';
 import { LocalStorageKeys, PermissionTypes, Permissions } from 'librechat-data-provider';
 import type { TStartupConfig, TUser } from 'librechat-data-provider';
@@ -16,7 +16,7 @@ export default function useAppStartup({
   startupConfig?: TStartupConfig;
   user?: TUser;
 }) {
-  const [defaultPreset, setDefaultPreset] = useRecoilState(store.defaultPreset);
+  const [defaultPreset, setDefaultPreset] = useAtom(store.defaultPreset);
   const canUseMcp = useHasAccess({
     permissionType: PermissionTypes.MCP_SERVERS,
     permission: Permissions.USE,
@@ -50,6 +50,22 @@ export default function useAppStartup({
     document.title = appTitle;
     localStorage.setItem(LocalStorageKeys.APP_TITLE, appTitle);
   }, [startupConfig]);
+
+  /** Set custom favicon from branding config */
+  useEffect(() => {
+    const favicon = startupConfig?.branding?.favicon;
+    if (!favicon) {
+      return;
+    }
+    const link32 = document.querySelector<HTMLLinkElement>('link[sizes="32x32"]');
+    const link16 = document.querySelector<HTMLLinkElement>('link[sizes="16x16"]');
+    if (link32) {
+      link32.href = favicon;
+    }
+    if (link16) {
+      link16.href = favicon;
+    }
+  }, [startupConfig?.branding?.favicon]);
 
   /** Set the default spec's preset as default */
   useEffect(() => {

@@ -9,7 +9,21 @@ import type {
   TMessage,
   Agents,
 } from 'librechat-data-provider';
+import { logger } from '~/utils';
 import useStepHandler from '~/hooks/SSE/useStepHandler';
+
+jest.mock('~/utils', () => ({
+  logger: {
+    log: jest.fn(),
+    warn: jest.fn(),
+    error: jest.fn(),
+    info: jest.fn(),
+    debug: jest.fn(),
+    dir: jest.fn(),
+  },
+}));
+
+const mockLogger = logger as unknown as Record<string, jest.Mock>;
 
 type TSubmissionForTest = {
   userMessage: TMessage;
@@ -167,7 +181,7 @@ describe('useStepHandler', () => {
     });
 
     it('should warn and return early when no responseMessageId', () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      mockLogger.warn.mockClear();
 
       const { result } = renderHook(() => useStepHandler(createHookParams()));
 
@@ -178,9 +192,8 @@ describe('useStepHandler', () => {
         result.current.stepHandler({ event: StepEvents.ON_RUN_STEP, data: runStep }, submission);
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith('No message id found in run step event');
+      expect(mockLogger.warn).toHaveBeenCalledWith('StepHandler', 'No message id found in run step event');
       expect(mockSetMessages).not.toHaveBeenCalled();
-      consoleSpy.mockRestore();
     });
 
     it('should handle USE_PRELIM_RESPONSE_MESSAGE_ID by using initialResponse', () => {
@@ -341,7 +354,7 @@ describe('useStepHandler', () => {
     });
 
     it('should warn when no responseMessageId for agent update', () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      mockLogger.warn.mockClear();
 
       const { result } = renderHook(() => useStepHandler(createHookParams()));
 
@@ -362,8 +375,7 @@ describe('useStepHandler', () => {
         );
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith('No message id found in agent update event');
-      consoleSpy.mockRestore();
+      expect(mockLogger.warn).toHaveBeenCalledWith('StepHandler', 'No message id found in agent update event');
     });
   });
 
@@ -714,7 +726,7 @@ describe('useStepHandler', () => {
     });
 
     it('should warn when step not found for completed event', () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      mockLogger.warn.mockClear();
 
       const { result } = renderHook(() => useStepHandler(createHookParams()));
 
@@ -742,10 +754,10 @@ describe('useStepHandler', () => {
         );
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'StepHandler',
         'No run step or runId found for completed tool call event',
       );
-      consoleSpy.mockRestore();
     });
   });
 
@@ -982,7 +994,7 @@ describe('useStepHandler', () => {
 
   describe('content type mismatch handling', () => {
     it('should warn on content type mismatch and not overwrite', () => {
-      const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
+      mockLogger.warn.mockClear();
 
       const responseMessage = createResponseMessage({
         content: [{ type: ContentTypes.THINK, think: 'Existing thought' }],
@@ -1014,14 +1026,14 @@ describe('useStepHandler', () => {
         );
       });
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'StepHandler',
         'Content type mismatch',
         expect.objectContaining({
           existingType: ContentTypes.THINK,
           contentType: ContentTypes.TEXT,
         }),
       );
-      consoleSpy.mockRestore();
     });
   });
 

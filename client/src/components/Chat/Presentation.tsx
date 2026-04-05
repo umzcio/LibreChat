@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { FileSources, LocalStorageKeys } from 'librechat-data-provider';
 import type { ExtendedFile } from '~/common';
 import DragDropWrapper from '~/components/Chat/Input/Files/DragDropWrapper';
@@ -10,9 +10,15 @@ import { SidePanelGroup } from '~/components/SidePanel';
 import { useSetFilesToDelete } from '~/hooks';
 import store from '~/store';
 
-export default function Presentation({ children }: { children: React.ReactNode }) {
-  const artifacts = useRecoilValue(store.artifactsState);
-  const artifactsVisibility = useRecoilValue(store.artifactsVisibility);
+export default function Presentation({
+  children,
+  showArtifactsPanel = true,
+}: {
+  children: React.ReactNode;
+  showArtifactsPanel?: boolean;
+}) {
+  const artifacts = useAtomValue(store.artifactsState);
+  const artifactsVisibility = useAtomValue(store.artifactsVisibility);
 
   const setFilesToDelete = useSetFilesToDelete();
 
@@ -48,6 +54,10 @@ export default function Presentation({ children }: { children: React.ReactNode }
   }, [mutateAsync]);
 
   const artifactsElement = useMemo(() => {
+    if (!showArtifactsPanel) {
+      return null;
+    }
+
     if (artifactsVisibility === true && Object.keys(artifacts ?? {}).length > 0) {
       return (
         <ArtifactsProvider>
@@ -58,7 +68,7 @@ export default function Presentation({ children }: { children: React.ReactNode }
       );
     }
     return null;
-  }, [artifactsVisibility, artifacts]);
+  }, [showArtifactsPanel, artifactsVisibility, artifacts]);
 
   return (
     <DragDropWrapper className="relative flex w-full grow overflow-hidden bg-presentation">

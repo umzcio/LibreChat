@@ -1,5 +1,4 @@
 import React from 'react';
-import { RecoilRoot } from 'recoil';
 import { render, screen } from '@testing-library/react';
 import ImageGen from '../Parts/OpenAIImageGen/OpenAIImageGen';
 
@@ -89,9 +88,7 @@ const defaultProps = {
 
 const renderImageGen = (props: Partial<typeof defaultProps> = {}) =>
   render(
-    <RecoilRoot>
-      <ImageGen {...defaultProps} {...props} />
-    </RecoilRoot>,
+    <ImageGen {...defaultProps} {...props} />,
   );
 
 describe('ImageGen - LGCY-01: Modern visual patterns', () => {
@@ -141,15 +138,13 @@ describe('ImageGen - LGCY-01: Modern visual patterns', () => {
 describe('ImageGen - LGCY-01: Legacy and agent-style unification', () => {
   it('accepts legacy props (initialProgress + args only)', () => {
     const { container } = render(
-      <RecoilRoot>
-        <ImageGen
-          initialProgress={1}
-          isSubmitting={false}
-          toolName=""
-          args='{"prompt":"a cat"}'
-          output=""
-        />
-      </RecoilRoot>,
+      <ImageGen
+        initialProgress={1}
+        isSubmitting={false}
+        toolName=""
+        args='{"prompt":"a cat"}'
+        output=""
+      />,
     );
 
     expect(container).toBeTruthy();

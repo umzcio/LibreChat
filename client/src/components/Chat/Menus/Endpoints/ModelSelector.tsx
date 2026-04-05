@@ -84,12 +84,16 @@ function ModelSelectorContent() {
   return (
     <div className="relative flex w-full max-w-md flex-col items-center gap-2">
       <Menu
-        values={selectedValues}
-        onValuesChange={(values: Record<string, any>) => {
+        values={{
+          endpoint: selectedValues.endpoint ?? '',
+          model: selectedValues.model ?? '',
+          modelSpec: selectedValues.modelSpec ?? '',
+        }}
+        onValuesChange={(values) => {
           setSelectedValues({
-            endpoint: values.endpoint || '',
-            model: values.model || '',
-            modelSpec: values.modelSpec || '',
+            endpoint: String(values.endpoint || ''),
+            model: String(values.model || ''),
+            modelSpec: String(values.modelSpec || ''),
           });
         }}
         onSearch={(value) => setSearchValue(value)}

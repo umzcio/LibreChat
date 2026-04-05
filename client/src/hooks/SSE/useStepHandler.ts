@@ -16,16 +16,16 @@ import type {
   SummaryContentPart,
   TMessageContentParts,
 } from 'librechat-data-provider';
-import type { SetterOrUpdater } from 'recoil';
-import type { AnnounceOptions } from '~/common';
+import type { AnnounceOptions, AtomSetter } from '~/common';
 import { MESSAGE_UPDATE_INTERVAL } from '~/common';
+import { logger } from '~/utils';
 
 type TUseStepHandler = {
   announcePolite: (options: AnnounceOptions) => void;
   setMessages: (messages: TMessage[]) => void;
   getMessages: () => TMessage[] | undefined;
   /** @deprecated - isSubmitting should be derived from submission state */
-  setIsSubmitting?: SetterOrUpdater<boolean>;
+  setIsSubmitting?: AtomSetter<boolean>;
   lastAnnouncementTimeRef: React.MutableRefObject<number>;
 };
 
@@ -105,7 +105,7 @@ export default function useStepHandler({
   ) => {
     const contentType = contentPart.type ?? '';
     if (!contentType) {
-      console.warn('No content type found in content part');
+      logger.warn('StepHandler','No content type found in content part');
       return message;
     }
 
@@ -124,7 +124,7 @@ export default function useStepHandler({
       !contentType.startsWith(existingType) &&
       !existingType.startsWith(contentType)
     ) {
-      console.warn('Content type mismatch', { existingType, contentType, index });
+      logger.warn('StepHandler','Content type mismatch', { existingType, contentType, index });
       return message;
     }
 
@@ -276,7 +276,7 @@ export default function useStepHandler({
           parentMessageId = submission?.initialResponse?.parentMessageId ?? '';
         }
         if (!responseMessageId) {
-          console.warn('No message id found in run step event');
+          logger.warn('StepHandler','No message id found in run step event');
           return;
         }
 
@@ -401,7 +401,7 @@ export default function useStepHandler({
           parentMessageId = submission?.initialResponse?.parentMessageId ?? '';
         }
         if (!responseMessageId) {
-          console.warn('No message id found in agent update event');
+          logger.warn('StepHandler','No message id found in agent update event');
           return;
         }
 
@@ -582,7 +582,7 @@ export default function useStepHandler({
         }
 
         if (!runStep || !responseMessageId) {
-          console.warn('No run step or runId found for completed tool call event');
+          logger.warn('StepHandler','No run step or runId found for completed tool call event');
           return;
         }
 
@@ -711,7 +711,7 @@ export default function useStepHandler({
         }
       } else {
         const _exhaustive: never = stepEvent;
-        console.warn('Unhandled step event', (_exhaustive as TStepEvent).event);
+        logger.warn('StepHandler','Unhandled step event', (_exhaustive as TStepEvent).event);
       }
     },
     [getMessages, lastAnnouncementTimeRef, announcePolite, setMessages, calculateContentIndex],

@@ -14,7 +14,7 @@ class ShareServiceError extends Error {
   }
 }
 
-function memoizedAnonymizeId(prefix: string) {
+function createAnonymizer(prefix: string) {
   const memo = new Map<string, string>();
   return (id: string) => {
     if (!memo.has(id)) {
@@ -24,31 +24,32 @@ function memoizedAnonymizeId(prefix: string) {
   };
 }
 
-const anonymizeConvoId = memoizedAnonymizeId('convo');
-const anonymizeAssistantId = memoizedAnonymizeId('a');
-const anonymizeMessageId = (id: string) =>
-  id === Constants.NO_PARENT ? id : memoizedAnonymizeId('msg')(id);
-
-function anonymizeConvo(conversation: Partial<t.IConversation> & Partial<t.ISharedLink>) {
-  if (!conversation) {
-    return null;
-  }
-
-  const newConvo = { ...conversation };
-  if (newConvo.assistant_id) {
-    newConvo.assistant_id = anonymizeAssistantId(newConvo.assistant_id);
-  }
-  return newConvo;
+interface Anonymizers {
+  convoId: (id: string) => string;
+  assistantId: (id: string) => string;
+  messageId: (id: string) => string;
 }
 
-function anonymizeMessages(messages: t.IMessage[], newConvoId: string): t.IMessage[] {
+function createRequestAnonymizers(): Anonymizers {
+  const convoId = createAnonymizer('convo');
+  const assistantId = createAnonymizer('a');
+  const msgAnonymizer = createAnonymizer('msg');
+  const messageId = (id: string) => (id === Constants.NO_PARENT ? id : msgAnonymizer(id));
+  return { convoId, assistantId, messageId };
+}
+
+function anonymizeMessages(
+  messages: t.IMessage[],
+  newConvoId: string,
+  anon: Anonymizers,
+): t.IMessage[] {
   if (!Array.isArray(messages)) {
     return [];
   }
 
   const idMap = new Map<string, string>();
   return messages.map((message) => {
-    const newMessageId = anonymizeMessageId(message.messageId);
+    const newMessageId = anon.messageId(message.messageId);
     idMap.set(message.messageId, newMessageId);
 
     type MessageAttachment = {
@@ -72,10 +73,10 @@ function anonymizeMessages(messages: t.IMessage[], newConvoId: string): t.IMessa
       messageId: newMessageId,
       parentMessageId:
         idMap.get(message.parentMessageId || '') ||
-        anonymizeMessageId(message.parentMessageId || ''),
+        anon.messageId(message.parentMessageId || ''),
       conversationId: newConvoId,
       model: message.model?.startsWith('asst_')
-        ? anonymizeAssistantId(message.model)
+        ? anon.assistantId(message.model)
         : message.model,
       attachments: anonymizedAttachments,
     } as t.IMessage;
@@ -179,7 +180,8 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         messagesToShare = getMessagesUpToTarget(share.messages, share.targetMessageId);
       }
 
-      const newConvoId = anonymizeConvoId(share.conversationId);
+      const anon = createRequestAnonymizers();
+      const newConvoId = anon.convoId(share.conversationId);
       const result: t.SharedMessagesResult = {
         shareId: share.shareId || shareId,
         title: share.title,
@@ -187,7 +189,7 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         createdAt: share.createdAt,
         updatedAt: share.updatedAt,
         conversationId: newConvoId,
-        messages: anonymizeMessages(messagesToShare, newConvoId),
+        messages: anonymizeMessages(messagesToShare, newConvoId, anon),
       };
 
       return result;
@@ -496,8 +498,6 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
       if (!updatedShare) {
         throw new ShareServiceError('Share update failed', 'SHARE_UPDATE_ERROR');
       }
-
-      anonymizeConvo(updatedShare);
 
       return { shareId: newShareId, conversationId: updatedShare.conversationId };
     } catch (error) {

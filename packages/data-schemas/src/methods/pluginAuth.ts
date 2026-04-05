@@ -114,7 +114,11 @@ export function createPluginAuthMethods(mongoose: typeof import('mongoose')) {
         throw new Error('authField is required when all is false');
       }
 
-      return await PluginAuth.deleteOne({ userId, authField });
+      const singleFilter: Record<string, string> = { userId, authField };
+      if (pluginKey) {
+        singleFilter.pluginKey = pluginKey;
+      }
+      return await PluginAuth.deleteOne(singleFilter);
     } catch (error) {
       throw new Error(
         `Failed to delete plugin auth: ${error instanceof Error ? error.message : 'Unknown error'}`,

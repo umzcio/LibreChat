@@ -12,6 +12,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@librechat/client';
+import type { SharePointFile } from '~/data-provider/Files/sharepoint';
 import type { ExtendedFile } from '~/common';
 import { useSharePointFileHandlingNoChatContext } from '~/hooks/Files/useSharePointFileHandling';
 import { useFileHandlingNoChatContext } from '~/hooks/Files/useFileHandling';
@@ -68,7 +69,7 @@ function FileContext({
     750,
   );
   const isUploadDisabled = endpointFileConfig?.disabled ?? false;
-  const handleSharePointFilesSelected = async (sharePointFiles: any[]) => {
+  const handleSharePointFilesSelected = async (sharePointFiles: SharePointFile[]) => {
     try {
       await handleSharePointFiles(sharePointFiles);
       setIsSharePointDialogOpen(false);

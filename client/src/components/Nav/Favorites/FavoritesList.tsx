@@ -1,10 +1,10 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react';
-import { LayoutGrid } from 'lucide-react';
+import { LayoutGrid, Code } from 'lucide-react';
 import { useDrag, useDrop } from 'react-dnd';
 import { Skeleton } from '@librechat/client';
 import { useNavigate } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { QueryKeys, dataService } from 'librechat-data-provider';
 import type t from 'librechat-data-provider';
 import type { AgentQueryResult } from '~/common';
@@ -52,7 +52,7 @@ const DraggableFavoriteItem = ({
   children,
 }: DraggableFavoriteItemProps) => {
   const ref = useRef<HTMLDivElement>(null);
-  const [{ handlerId }, drop] = useDrop<{ index: number; id: string }, unknown, { handlerId: any }>(
+  const [{ handlerId }, drop] = useDrop<{ index: number; id: string }, unknown, { handlerId: string | symbol | null }>(
     {
       accept: 'favorite-item',
       collect(monitor) {
@@ -125,7 +125,7 @@ export default function FavoritesList({
 }) {
   const navigate = useNavigate();
   const localize = useLocalize();
-  const search = useRecoilValue(store.search);
+  const search = useAtomValue(store.search);
   const getConversation = useGetConversation(0);
   const { favorites, reorderFavorites, isLoading: isFavoritesLoading } = useFavorites();
   const showAgentMarketplace = useShowMarketplace();
@@ -347,6 +347,28 @@ export default function FavoritesList({
                 </div>
               </div>
             )}
+            {/* Code environment button */}
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label={localize('com_ui_code')}
+              className="group relative flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm text-text-primary outline-none hover:bg-surface-active-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
+              onClick={() => navigate('/code')}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  navigate('/code');
+                }
+              }}
+              data-testid="nav-code-button"
+            >
+              <div className="flex flex-1 items-center truncate pr-6">
+                <div className="mr-2 h-5 w-5">
+                  <Code className="h-5 w-5 text-text-primary" />
+                </div>
+                <span className="truncate">{localize('com_ui_code')}</span>
+              </div>
+            </div>
             {safeFavorites.map((fav, index) => {
               if (fav.agentId) {
                 const agent = combinedAgentsMap?.[fav.agentId];

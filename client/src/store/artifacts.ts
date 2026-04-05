@@ -1,63 +1,28 @@
-import { atom } from 'recoil';
-import { logger } from '~/utils';
+import { atom } from 'jotai';
+import { atomWithReset } from 'jotai/utils';
 import type { Artifact } from '~/common';
 
-export const artifactsState = atom<Record<string, Artifact | undefined> | null>({
-  key: 'artifactsState',
-  default: null,
-  effects: [
-    ({ onSet, node }) => {
-      onSet(async (newValue) => {
-        logger.log('artifacts', 'Recoil Effect: Setting artifactsState', {
-          key: node.key,
-          newValue,
-        });
-      });
-    },
-  ] as const,
-});
+export type ArtifactPanelMode = 'side' | 'fullscreen';
 
-export const currentArtifactId = atom<string | null>({
-  key: 'currentArtifactId',
-  default: null,
-  effects: [
-    ({ onSet, node }) => {
-      onSet(async (newValue) => {
-        logger.log('artifacts', 'Recoil Effect: Setting currentArtifactId', {
-          key: node.key,
-          newValue,
-        });
-      });
-    },
-  ] as const,
-});
+const artifactsPanelMode = atom<ArtifactPanelMode>('side');
+artifactsPanelMode.debugLabel = 'artifactsPanelMode';
 
-export const artifactsVisibility = atom<boolean>({
-  key: 'artifactsVisibility',
-  default: true,
-  effects: [
-    ({ onSet, node }) => {
-      onSet(async (newValue) => {
-        logger.log('artifacts', 'Recoil Effect: Setting artifactsVisibility', {
-          key: node.key,
-          newValue,
-        });
-      });
-    },
-  ] as const,
-});
+const artifactsState = atomWithReset<Record<string, Artifact | undefined> | null>(null);
+artifactsState.debugLabel = 'artifactsState';
 
-export const visibleArtifacts = atom<Record<string, Artifact | undefined> | null>({
-  key: 'visibleArtifacts',
-  default: null,
-  effects: [
-    ({ onSet, node }) => {
-      onSet(async (newValue) => {
-        logger.log('artifacts', 'Recoil Effect: Setting `visibleArtifacts`', {
-          key: node.key,
-          newValue,
-        });
-      });
-    },
-  ] as const,
-});
+const currentArtifactId = atomWithReset<string | null>(null);
+currentArtifactId.debugLabel = 'currentArtifactId';
+
+const artifactsVisibility = atom<boolean>(true);
+artifactsVisibility.debugLabel = 'artifactsVisibility';
+
+const visibleArtifacts = atomWithReset<Record<string, Artifact | undefined> | null>(null);
+visibleArtifacts.debugLabel = 'visibleArtifacts';
+
+export {
+  artifactsPanelMode,
+  artifactsState,
+  currentArtifactId,
+  artifactsVisibility,
+  visibleArtifacts,
+};

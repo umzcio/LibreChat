@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useId, useEffect, useRef, useState, useCallback } from 'react';
 import mermaid from 'mermaid';
 import { Button } from '@librechat/client';
 import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import type { ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
 import { artifactFlowchartConfig } from '~/utils/mermaid';
+import { logger } from '~/utils';
 
 interface MermaidDiagramProps {
   content: string;
@@ -12,6 +13,8 @@ interface MermaidDiagramProps {
 }
 
 const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ content, isDarkMode = true }) => {
+  const uniqueId = useId();
+  const mermaidId = `mermaid-${uniqueId.replace(/:/g, '')}`;
   const mermaidRef = useRef<HTMLDivElement>(null);
   const transformRef = useRef<ReactZoomPanPinchRef>(null);
   const [isRendered, setIsRendered] = useState(false);
@@ -32,7 +35,7 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ content, isDarkMode = t
       }
 
       try {
-        const { svg } = await mermaid.render('mermaid-diagram', content);
+        const { svg } = await mermaid.render(mermaidId, content);
         mermaidRef.current.innerHTML = svg;
 
         const svgElement = mermaidRef.current.querySelector('svg');
@@ -42,7 +45,7 @@ const MermaidDiagram: React.FC<MermaidDiagramProps> = ({ content, isDarkMode = t
         }
         setIsRendered(true);
       } catch (error) {
-        console.error('Mermaid rendering error:', error);
+        logger.error('Mermaid', 'rendering error:', error);
         if (mermaidRef.current) {
           mermaidRef.current.innerHTML = 'Error rendering diagram';
         }

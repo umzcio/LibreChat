@@ -92,6 +92,8 @@ export const AppService = async (params?: {
   const turnstileConfig = loadTurnstileConfig(config, configDefaults);
   const speech = config.speech;
 
+  const branding = config.branding;
+
   const defaultConfig = {
     ocr,
     paths,
@@ -100,6 +102,7 @@ export const AppService = async (params?: {
     speech,
     balance,
     actions,
+    branding,
     webSearch,
     mcpSettings,
     transactions,

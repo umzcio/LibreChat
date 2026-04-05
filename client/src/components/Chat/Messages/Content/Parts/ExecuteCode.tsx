@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback, useRef } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { SquareTerminal } from 'lucide-react';
 import type { TAttachment } from 'librechat-data-provider';
 import ProgressText from '~/components/Chat/Messages/Content/ProgressText';
@@ -169,7 +169,7 @@ export default function ExecuteCode({
 }) {
   const localize = useLocalize();
   const hasOutput = output.length > 0;
-  const autoExpand = useRecoilValue(store.autoExpandTools);
+  const autoExpand = useAtomValue(store.autoExpandTools);
 
   const { lang = 'py', code } = useParseArgs(args) ?? ({} as ParsedArgs);
   const hasContent = !!code || hasOutput;

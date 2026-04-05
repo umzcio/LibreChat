@@ -61,11 +61,11 @@ class MarkdownErrorBoundary extends React.Component<
         <CodeBlockProvider>
           <ReactMarkdown
             remarkPlugins={[
-              /** @ts-ignore */
+              // @ts-expect-error - remark plugin types incompatible with unified v11
               supersub,
               remarkGfm,
             ]}
-            /** @ts-ignore */
+            // @ts-expect-error - rehype plugin types incompatible with unified v11
             rehypePlugins={rehypePlugins}
             components={
               {

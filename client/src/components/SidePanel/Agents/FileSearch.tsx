@@ -4,6 +4,7 @@ import * as Ariakit from '@ariakit/react';
 import { useFormContext } from 'react-hook-form';
 import { SharePointIcon, AttachmentIcon, DropdownPopup } from '@librechat/client';
 import { EModelEndpoint, EToolResources, AgentCapabilities } from 'librechat-data-provider';
+import type { SharePointFile } from '~/data-provider/Files/sharepoint';
 import type { ExtendedFile, AgentForm } from '~/common';
 import { useSharePointFileHandlingNoChatContext } from '~/hooks/Files/useSharePointFileHandling';
 import { useFileHandlingNoChatContext } from '~/hooks/Files/useFileHandling';
@@ -71,7 +72,7 @@ function FileSearch({
   const sharePointEnabled = startupConfig?.sharePointFilePickerEnabled;
   const disabledUploadButton = isEphemeralAgent(agent_id) || fileSearchChecked === false;
 
-  const handleSharePointFilesSelected = async (sharePointFiles: any[]) => {
+  const handleSharePointFilesSelected = async (sharePointFiles: SharePointFile[]) => {
     try {
       await handleSharePointFiles(sharePointFiles);
       setIsSharePointDialogOpen(false);

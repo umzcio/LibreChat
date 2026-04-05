@@ -1,18 +1,20 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { QueryKeys, isAssistantsEndpoint } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useRecoilState, useResetRecoilState, useSetRecoilState } from 'recoil';
+import { useAtom, useSetAtom } from 'jotai';
+import { RESET } from 'jotai/utils';
 import type { TMessage } from 'librechat-data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import useChatFunctions from '~/hooks/Chat/useChatFunctions';
 import { useAbortStreamMutation } from '~/data-provider';
 import useNewConvo from '~/hooks/useNewConvo';
+import { logger } from '~/utils';
 import store from '~/store';
 
 // this to be set somewhere else
 export default function useChatHelpers(index = 0, paramId?: string) {
   const clearAllSubmissions = store.useClearSubmissionState();
-  const [files, setFiles] = useRecoilState(store.filesByIndex(index));
+  const [files, setFiles] = useAtom(store.filesByIndex(index));
   const [filesLoading, setFilesLoading] = useState(false);
 
   const queryClient = useQueryClient();
@@ -24,19 +26,20 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const { conversationId, endpoint, endpointType } = conversation ?? {};
 
   /** Use paramId (from URL) as primary source for query key - this must match what ChatView uses
-  Falling back to conversationId (Recoil) only if paramId is not available */
+  Falling back to conversationId (Jotai) only if paramId is not available */
   const queryParam = paramId === 'new' ? paramId : (paramId ?? conversationId ?? '');
 
-  const resetLatestMessage = useResetRecoilState(store.latestMessageFamily(index));
-  const [isSubmitting, setIsSubmitting] = useRecoilState(store.isSubmittingFamily(index));
-  const [latestMessage, setLatestMessage] = useRecoilState(store.latestMessageFamily(index));
+  const setResetLatestMessage = useSetAtom(store.latestMessageFamily(index));
+  const resetLatestMessage = () => setResetLatestMessage(RESET);
+  const [isSubmitting, setIsSubmitting] = useAtom(store.isSubmittingFamily(index));
+  const [latestMessage, setLatestMessage] = useAtom(store.latestMessageFamily(index));
 
   const latestMessageId = latestMessage?.messageId;
   const latestMessageDepth = latestMessage?.depth;
   const latestMessageRef = useRef(latestMessage);
   latestMessageRef.current = latestMessage;
 
-  const setSiblingIdx = useSetRecoilState(
+  const setSiblingIdx = useSetAtom(
     store.messagesSiblingIdxFamily(latestMessage?.parentMessageId ?? null),
   );
 
@@ -55,7 +58,6 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   }, [queryParam, queryClient]);
 
   /* Conversation */
-  // const setActiveConvos = useSetRecoilState(store.activeConversations);
 
   // const setConversation = useCallback(
   //   (convoUpdate: TConversation) => {
@@ -73,7 +75,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   //   [_setConversation, setActiveConvos],
   // );
 
-  const setSubmission = useSetRecoilState(store.submissionByIndex(index));
+  const setSubmission = useSetAtom(store.submissionByIndex(index));
 
   const { ask: _ask, regenerate: _regenerate } = useChatFunctions({
     index,
@@ -102,7 +104,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const continueGeneration = useCallback(() => {
     const currentLatest = latestMessageRef.current;
     if (!currentLatest) {
-      console.error('Failed to regenerate the message: latestMessage not found.');
+      logger.error('useChatHelpers', 'Failed to regenerate the message: latestMessage not found.');
       return;
     }
 
@@ -115,7 +117,8 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     if (parentMessage && parentMessage.isCreatedByUser) {
       ask({ ...parentMessage }, { isContinued: true, isRegenerate: true, isEdited: true });
     } else {
-      console.error(
+      logger.error(
+        'useChatHelpers',
         'Failed to regenerate the message: parentMessage not found, or not created by user.',
       );
     }
@@ -130,7 +133,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const stopGenerating = useCallback(async () => {
     const actualEndpoint = endpointType ?? endpoint;
     const isAssistants = isAssistantsEndpoint(actualEndpoint);
-    console.log('[useChatHelpers] stopGenerating called', {
+    logger.log('useChatHelpers', 'stopGenerating called', {
       conversationId,
       endpoint,
       endpointType,
@@ -145,20 +148,20 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       }));
 
       try {
-        console.log('[useChatHelpers] Calling abort mutation for:', conversationId);
+        logger.log('useChatHelpers', 'Calling abort mutation for:', conversationId);
         await abortMutation.mutateAsync({ conversationId });
-        console.log('[useChatHelpers] Abort mutation succeeded');
+        logger.log('useChatHelpers', 'Abort mutation succeeded');
         // The SSE will receive a `done` event with `aborted: true` and clean up
         // We still clear submissions as a fallback
         clearAllSubmissions();
       } catch (error) {
-        console.error('[useChatHelpers] Abort failed:', error);
+        logger.error('useChatHelpers', 'Abort failed:', error);
         // Fall back to clearing submissions
         clearAllSubmissions();
       }
     } else {
       // For assistants endpoints, just clear submissions (existing behavior)
-      console.log('[useChatHelpers] Assistants endpoint, just clearing submissions');
+      logger.log('useChatHelpers', 'Assistants endpoint, just clearing submissions');
       clearAllSubmissions();
     }
   }, [conversationId, endpoint, endpointType, abortMutation, clearAllSubmissions, queryClient]);
@@ -176,7 +179,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       e.preventDefault();
       const parentMessageId = latestMessageRef.current?.parentMessageId ?? '';
       if (!parentMessageId) {
-        console.error('Failed to regenerate the message: parentMessageId not found.');
+        logger.error('useChatHelpers', 'Failed to regenerate the message: parentMessageId not found.');
         return;
       }
       regenerate({ parentMessageId });
@@ -193,10 +196,10 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     [continueGeneration, setSiblingIdx],
   );
 
-  const [preset, setPreset] = useRecoilState(store.presetByIndex(index));
-  const [showPopover, setShowPopover] = useRecoilState(store.showPopoverFamily(index));
-  const [abortScroll, setAbortScroll] = useRecoilState(store.abortScrollFamily(index));
-  const [optionSettings, setOptionSettings] = useRecoilState(store.optionSettingsFamily(index));
+  const [preset, setPreset] = useAtom(store.presetByIndex(index));
+  const [showPopover, setShowPopover] = useAtom(store.showPopoverFamily(index));
+  const [abortScroll, setAbortScroll] = useAtom(store.abortScrollFamily(index));
+  const [optionSettings, setOptionSettings] = useAtom(store.optionSettingsFamily(index));
 
   return useMemo(
     () => ({

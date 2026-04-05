@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { logger } from '~/utils';
 
 export default function useLocalStorage<T>(
   key: string,
@@ -62,7 +63,7 @@ export default function useLocalStorage<T>(
         }
         globalSetState?.(value);
       } catch (e) {
-        console.error(e);
+        logger.error('localStorage', e);
       }
     },
     [key, globalSetState, storageCondition],

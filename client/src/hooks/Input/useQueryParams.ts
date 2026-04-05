@@ -1,9 +1,10 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { useSearchParams } from 'react-router-dom';
 import { QueryClient, useQueryClient } from '@tanstack/react-query';
 import { QueryKeys, EModelEndpoint, PermissionBits } from 'librechat-data-provider';
 import type {
+  Agent,
   AgentListResponse,
   TEndpointsConfig,
   TStartupConfig,
@@ -23,7 +24,7 @@ import { startupConfigKey, useGetAgentByIdQuery } from '~/data-provider';
 import { useChatContext, useChatFormContext } from '~/Providers';
 import store from '~/store';
 
-const injectAgentIntoAgentsMap = (queryClient: QueryClient, agent: any) => {
+const injectAgentIntoAgentsMap = (queryClient: QueryClient, agent: Agent) => {
   const editCacheKey = [QueryKeys.agents, { requiredPermission: PermissionBits.EDIT }];
   const editCache = queryClient.getQueryData<AgentListResponse>(editCacheKey);
 
@@ -62,8 +63,8 @@ export default function useQueryParams({
   const methods = useChatFormContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const getDefaultConversation = useDefaultConvo();
-  const modularChat = useRecoilValue(store.modularChat);
-  const availableTools = useRecoilValue(store.availableTools);
+  const modularChat = useAtomValue(store.modularChat);
+  const availableTools = useAtomValue(store.availableTools);
   const { submitMessage } = useSubmitMessage();
 
   const queryClient = useQueryClient();
@@ -248,7 +249,7 @@ export default function useQueryParams({
       if (processedRef.current || attemptsRef.current >= maxAttempts) {
         clearInterval(intervalId);
         if (attemptsRef.current >= maxAttempts) {
-          console.warn('Max attempts reached, failed to process parameters');
+          logger.warn('QueryParams', 'Max attempts reached, failed to process parameters');
         }
         return;
       }

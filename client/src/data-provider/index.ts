@@ -2,6 +2,7 @@ export * from './Auth';
 export * from './Agents';
 export * from './Endpoints';
 export * from './Files';
+export * from './Code';
 /* Memories */
 export * from './Memories';
 /* Projects */

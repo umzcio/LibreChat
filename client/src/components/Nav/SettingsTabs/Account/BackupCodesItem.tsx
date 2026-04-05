@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { RefreshCcw } from 'lucide-react';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { motion, AnimatePresence } from 'framer-motion';
 import { REGEXP_ONLY_DIGITS, REGEXP_ONLY_DIGITS_AND_CHARS } from 'input-otp';
 import type {
@@ -32,7 +32,7 @@ const BackupCodesItem: React.FC = () => {
   const localize = useLocalize();
   const { user } = useAuthContext();
   const { showToast } = useToastContext();
-  const setUser = useSetRecoilState(store.user);
+  const setUser = useSetAtom(store.user);
   const [isDialogOpen, setDialogOpen] = useState<boolean>(false);
   const [otpToken, setOtpToken] = useState('');
   const [useBackup, setUseBackup] = useState(false);

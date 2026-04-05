@@ -42,7 +42,7 @@ describe('Environment Variable Extraction', () => {
       expect(extractEnvVariable('no_var_here')).toBe('no_var_here');
     });
 
-    /** No longer the expected behavior; keeping for reference */
+    /** Obsolete: extractEnvVariable now supports multiple variables in a single string. Kept for reference. */
     test.skip('should not process multiple variable formats', () => {
       process.env.FIRST_VAR = 'first';
       process.env.SECOND_VAR = 'second';

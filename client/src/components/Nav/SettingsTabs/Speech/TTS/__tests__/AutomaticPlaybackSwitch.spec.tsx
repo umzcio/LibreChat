@@ -2,7 +2,6 @@ import React from 'react';
 import '@testing-library/jest-dom/extend-expect';
 import { render, fireEvent } from 'test/layout-test-utils';
 import AutomaticPlaybackSwitch from '../AutomaticPlaybackSwitch';
-import { RecoilRoot } from 'recoil';
 
 describe('AutomaticPlaybackSwitch', () => {
   /**
@@ -16,9 +15,7 @@ describe('AutomaticPlaybackSwitch', () => {
 
   it('renders correctly', () => {
     const { getByTestId } = render(
-      <RecoilRoot>
-        <AutomaticPlaybackSwitch />
-      </RecoilRoot>,
+      <AutomaticPlaybackSwitch />,
     );
 
     expect(getByTestId('AutomaticPlayback')).toBeInTheDocument();
@@ -26,9 +23,7 @@ describe('AutomaticPlaybackSwitch', () => {
 
   it('calls onCheckedChange when the switch is toggled', () => {
     const { getByTestId } = render(
-      <RecoilRoot>
-        <AutomaticPlaybackSwitch onCheckedChange={mockSetAutomaticPlayback} />
-      </RecoilRoot>,
+      <AutomaticPlaybackSwitch onCheckedChange={mockSetAutomaticPlayback} />,
     );
     const switchElement = getByTestId('AutomaticPlayback');
     fireEvent.click(switchElement);

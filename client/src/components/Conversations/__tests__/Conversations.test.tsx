@@ -1,13 +1,14 @@
 import React, { createRef } from 'react';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { RecoilRoot } from 'recoil';
+import type { TConversation } from 'librechat-data-provider';
 import type { CellMeasurerCache, List } from 'react-virtualized';
 
 let mockCapturedCache: CellMeasurerCache | null = null;
 
 jest.mock('react-virtualized', () => {
   const actual = jest.requireActual('react-virtualized');
+  const mockReact = jest.requireActual('react');
   return {
     ...actual,
     AutoSizer: ({
@@ -20,55 +21,78 @@ jest.mock('react-virtualized', () => {
     }: {
       children: (opts: { registerChild: () => void }) => React.ReactNode;
     }) => children({ registerChild: () => {} }),
-    List: ({
-      rowRenderer,
-      rowCount,
-      deferredMeasurementCache,
-    }: {
-      rowRenderer: (opts: {
-        index: number;
-        key: string;
-        style: object;
-        parent: object;
-      }) => React.ReactNode;
-      rowCount: number;
-      deferredMeasurementCache: CellMeasurerCache;
-      [key: string]: unknown;
-    }) => {
-      mockCapturedCache = deferredMeasurementCache;
-      return (
-        <div data-testid="virtual-list" data-row-count={rowCount}>
-          {Array.from({ length: Math.min(rowCount, 10) }, (_, i) =>
-            rowRenderer({ index: i, key: `row-${i}`, style: {}, parent: {} }),
-          )}
-        </div>
-      );
-    },
+    List: mockReact.forwardRef(
+      (
+        {
+          rowRenderer,
+          rowCount,
+          deferredMeasurementCache,
+        }: {
+          rowRenderer: (opts: {
+            index: number;
+            key: string;
+            style: object;
+            parent: object;
+          }) => React.ReactNode;
+          rowCount: number;
+          deferredMeasurementCache: CellMeasurerCache;
+          [key: string]: unknown;
+        },
+        ref,
+      ) => {
+        mockCapturedCache = deferredMeasurementCache;
+
+        return (
+          <div ref={ref} data-testid="virtual-list" data-row-count={rowCount}>
+            {Array.from({ length: Math.min(rowCount, 10) }, (_, i) =>
+              rowRenderer({ index: i, key: `row-${i}`, style: {}, parent: {} }),
+            )}
+          </div>
+        );
+      },
+    ),
   };
 });
 
 jest.mock('~/store', () => {
-  const { atom } = jest.requireActual('recoil');
+  const { atom } = jest.requireActual('jotai');
   return {
     __esModule: true,
     default: {
-      search: atom({ key: 'test-conversations-search', default: { query: '' } }),
+      search: atom({ query: '' }),
     },
   };
 });
 
 type FavoriteEntry = { agentId?: string; model?: string; endpoint?: string };
+type ProjectEntry = { projectId: string; name: string };
 
 const mockFavoritesState: { favorites: FavoriteEntry[]; isLoading: boolean } = {
   favorites: [],
   isLoading: false,
 };
 
+let mockProjects: ProjectEntry[] = [];
+let mockProjectsExpanded = true;
 let mockShowMarketplace = true;
+let mockGroupedConversations: Array<[string, TConversation[]]> = [];
 
 jest.mock('~/hooks', () => ({
   useFavorites: () => mockFavoritesState,
-  useLocalize: () => (key: string) => key,
+  useLocalize: () => (key: string, params?: { date?: string }) => {
+    if (key === 'com_a11y_chats_date_section') {
+      return `Chats from ${params?.date ?? ''}`;
+    }
+
+    return key;
+  },
+  useLocalStorage: (key: string, defaultValue: boolean) => {
+    if (key === 'projectsExpanded') {
+      return [mockProjectsExpanded, jest.fn()];
+    }
+
+    return [defaultValue, jest.fn()];
+  },
   useShowMarketplace: () => mockShowMarketplace,
   TranslationKeys: {},
 }));
@@ -80,16 +104,26 @@ jest.mock('@librechat/client', () => ({
 
 jest.mock('~/data-provider', () => ({
   useActiveJobs: () => ({ data: undefined }),
+  useListProjectsQuery: () => ({ data: { projects: mockProjects } }),
 }));
 
 jest.mock('~/utils', () => ({
-  groupConversationsByDate: () => [],
+  groupConversationsByDate: () => mockGroupedConversations,
   cn: (...args: unknown[]) => args.filter(Boolean).join(' '),
 }));
 
 jest.mock('~/components/Nav/Favorites/FavoritesList', () => ({
   __esModule: true,
   default: () => <div data-testid="favorites-list" />,
+}));
+
+jest.mock('~/components/SidePanel/Projects/ProjectCreateDialog', () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
+jest.mock('~/components/SidePanel/Projects', () => ({
+  ProjectCard: ({ project }: { project: ProjectEntry }) => <div>{project.name}</div>,
 }));
 
 jest.mock('../Convo', () => ({
@@ -106,23 +140,31 @@ describe('Conversations – favorites CellMeasurerCache key invalidation', () =>
     mockCapturedCache = null;
     mockFavoritesState.favorites = [];
     mockFavoritesState.isLoading = false;
+    mockProjects = [];
+    mockProjectsExpanded = true;
     mockShowMarketplace = true;
+    mockGroupedConversations = [];
   });
 
+  const createConversation = (conversationId: string): TConversation =>
+    ({
+      conversationId,
+      title: conversationId,
+      endpoint: 'openAI',
+    }) as TConversation;
+
   const Wrapper = () => (
-    <RecoilRoot>
-      <Conversations
-        conversations={[]}
-        moveToTop={jest.fn()}
-        toggleNav={jest.fn()}
-        containerRef={containerRef}
-        loadMoreConversations={jest.fn()}
-        isLoading={false}
-        isSearchLoading={false}
-        isChatsExpanded={true}
-        setIsChatsExpanded={jest.fn()}
-      />
-    </RecoilRoot>
+    <Conversations
+      conversations={[]}
+      moveToTop={jest.fn()}
+      toggleNav={jest.fn()}
+      containerRef={containerRef}
+      loadMoreConversations={jest.fn()}
+      isLoading={false}
+      isSearchLoading={false}
+      isChatsExpanded={true}
+      setIsChatsExpanded={jest.fn()}
+    />
   );
 
   it('should invalidate the cached favorites height when favorites count changes', () => {
@@ -181,5 +223,41 @@ describe('Conversations – favorites CellMeasurerCache key invalidation', () =>
 
     expect(cache.has(0, 0)).toBe(true);
     expect(cache.getHeight(0, 0)).toBe(88);
+  });
+
+  it('should invalidate the cached projects height when project count changes', () => {
+    const { rerender } = render(<Wrapper />);
+    const cache = mockCapturedCache!;
+
+    cache.set(1, 0, 300, 72);
+    expect(cache.has(1, 0)).toBe(true);
+
+    mockProjects = [{ projectId: 'project-1', name: 'Test New' }];
+    rerender(<Wrapper />);
+
+    expect(cache.has(1, 0)).toBe(false);
+  });
+
+  it('should invalidate the cached projects height when projects expanded state changes', () => {
+    mockProjects = [{ projectId: 'project-1', name: 'Test New' }];
+    const { rerender } = render(<Wrapper />);
+    const cache = mockCapturedCache!;
+
+    cache.set(1, 0, 300, 72);
+    expect(cache.has(1, 0)).toBe(true);
+
+    mockProjectsExpanded = false;
+    rerender(<Wrapper />);
+
+    expect(cache.has(1, 0)).toBe(false);
+  });
+
+  it('should keep the first date header flush after favorites, projects, and chats header rows', () => {
+    mockProjects = [{ projectId: 'project-1', name: 'Test New' }];
+    mockGroupedConversations = [['Today', [createConversation('conversation-1')]]];
+
+    render(<Wrapper />);
+
+    expect(screen.getByText('Today')).toHaveClass('mt-0');
   });
 });

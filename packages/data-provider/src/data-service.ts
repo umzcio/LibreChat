@@ -7,6 +7,7 @@ import * as m from './types/mutations';
 import * as q from './types/queries';
 import * as f from './types/files';
 import * as mcp from './types/mcpServers';
+import * as code from './types/code';
 import * as p from './types/projects';
 import * as config from './config';
 import request from './request';
@@ -622,6 +623,16 @@ export const deleteMCPServer = async (serverName: string): Promise<{ success: bo
 };
 
 /**
+ * Update cosmetic metadata (title, description, icon) on a yaml/config-defined MCP server
+ */
+export const updateMCPServerCosmetics = async (
+  serverName: string,
+  data: mcp.MCPServerCosmeticUpdateParams,
+): Promise<mcp.MCPServerDBObjectResponse> => {
+  return request.patch(endpoints.mcpServerCosmetics(serverName), data);
+};
+
+/**
  * Imports a conversations file.
  *
  * @param data - The FormData containing the file to import.
@@ -1054,6 +1065,21 @@ export const assignConversationsToProject = (
   return request.post(endpoints.projectConversations(projectId), { conversationIds });
 };
 
+export const getProjectConversations = (
+  projectId: string,
+  params?: { cursor?: string; limit?: number },
+): Promise<q.ConversationListResponse> => {
+  const query = new URLSearchParams();
+  if (params?.cursor) {
+    query.set('cursor', params.cursor);
+  }
+  if (params?.limit) {
+    query.set('limit', String(params.limit));
+  }
+  const qs = query.toString();
+  return request.get(`${endpoints.projectConversations(projectId)}${qs ? `?${qs}` : ''}`);
+};
+
 export const removeConversationFromProject = (
   projectId: string,
   conversationId: string,
@@ -1073,6 +1099,135 @@ export const deleteProjectFile = (
   fileId: string,
 ): Promise<{ message: string }> => {
   return request.delete(`${endpoints.projectFiles(projectId)}/${encodeURIComponent(fileId)}`);
+};
+
+/* Project Memory */
+export const getProjectMemory = (
+  projectId: string,
+): Promise<{ memory: string[]; memoryUpdatedAt?: string }> => {
+  return request.get(`${endpoints.project(projectId)}/memory`);
+};
+
+export const deleteProjectMemoryEntry = (
+  projectId: string,
+  index: number,
+): Promise<{ message: string }> => {
+  return request.delete(`${endpoints.project(projectId)}/memory/${index}`);
+};
+
+export const clearProjectMemory = (
+  projectId: string,
+): Promise<{ message: string }> => {
+  return request.delete(`${endpoints.project(projectId)}/memory`);
+};
+
+/* Code */
+export const getCodeWorkspaceSession = (
+  conversationId: string,
+): Promise<code.TCodeWorkspaceSession> => {
+  return request.get(
+    `${endpoints.codeSession()}?conversationId=${encodeURIComponent(conversationId)}`,
+  );
+};
+
+export const updateCodeWorkspaceSession = (payload: {
+  activeFile?: string;
+  conversationId: string;
+  openFiles?: string[];
+}): Promise<
+  Pick<code.TCodeWorkspaceSession, 'activeFile' | 'conversationId' | 'mode' | 'openFiles'>
+> => {
+  return request.patch(endpoints.codeSession(), payload);
+};
+
+export const listCodeFiles = (
+  conversationId: string,
+  filePath = '/',
+): Promise<code.TCodeDirectoryResponse> => {
+  return request.get(
+    `${endpoints.codeFiles()}?conversationId=${encodeURIComponent(conversationId)}&path=${encodeURIComponent(filePath)}`,
+  );
+};
+
+export const getCodeFileContent = (
+  conversationId: string,
+  filePath: string,
+): Promise<code.TCodeFileResponse> => {
+  return request.get(
+    `${endpoints.codeFileContent()}?conversationId=${encodeURIComponent(conversationId)}&path=${encodeURIComponent(filePath)}`,
+  );
+};
+
+export const saveCodeFileContent = (payload: {
+  content: string;
+  conversationId: string;
+  path: string;
+}): Promise<{ path: string; saved: boolean }> => {
+  return request.put(endpoints.codeFileContent(), payload);
+};
+
+export const createCodeFile = (payload: {
+  conversationId: string;
+  path: string;
+  type: 'directory' | 'file';
+}): Promise<code.TCodeCreateItemResponse> => {
+  return request.post(endpoints.codeFiles(), payload);
+};
+
+export const deleteCodeFile = (
+  conversationId: string,
+  filePath: string,
+): Promise<code.TCodeDeleteItemResponse> => {
+  return request.delete(
+    `${endpoints.codeFiles()}?conversationId=${encodeURIComponent(conversationId)}&path=${encodeURIComponent(filePath)}`,
+  );
+};
+
+export const renameCodeFile = (payload: {
+  conversationId: string;
+  path: string;
+  newPath: string;
+}): Promise<code.TCodeRenameResponse> => {
+  return request.patch(endpoints.codeRename(), payload);
+};
+
+export const getCodeChanges = (
+  conversationId: string,
+): Promise<code.TCodeChangesResponse> => {
+  return request.get(
+    `${endpoints.codeChanges()}?conversationId=${encodeURIComponent(conversationId)}`,
+  );
+};
+
+export const getCodeDiff = (
+  conversationId: string,
+  filePath: string,
+): Promise<code.TCodeDiff> => {
+  return request.get(
+    `${endpoints.codeDiff()}?conversationId=${encodeURIComponent(conversationId)}&path=${encodeURIComponent(filePath)}`,
+  );
+};
+
+export const applyCodeChanges = (payload: {
+  conversationId: string;
+  paths?: string[];
+}): Promise<code.TCodeWorkspaceSession> => {
+  return request.post(endpoints.codeApply(), payload);
+};
+
+export const discardCodeChanges = (payload: {
+  conversationId: string;
+  paths?: string[];
+}): Promise<{ discarded: boolean }> => {
+  return request.post(endpoints.codeDiscard(), payload);
+};
+
+export const promoteCodeWorkspace = (payload: {
+  conversationId: string;
+  projectId?: string;
+  projectName?: string;
+}): Promise<code.TCodeWorkspaceSession> => {
+  return request.post(endpoints.codePromote(), payload);
 };
 
 /* Memories */

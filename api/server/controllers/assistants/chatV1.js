@@ -1,22 +1,14 @@
 const { v4 } = require('uuid');
 const { sleep } = require('@librechat/agents');
 const { logger } = require('@librechat/data-schemas');
-const {
-  sendEvent,
-  countTokens,
-  checkBalance,
-  getBalanceConfig,
-  getModelMaxTokens,
-} = require('@librechat/api');
+const { sendEvent } = require('@librechat/api');
 const {
   Time,
   Constants,
   RunStatus,
   CacheKeys,
   VisionModes,
-  ContentTypes,
   EModelEndpoint,
-  ViolationTypes,
   ImageVisionTool,
   checkOpenAIStorage,
   AssistantStreamEvents,
@@ -25,27 +17,20 @@ const {
   initThread,
   recordUsage,
   saveUserMessage,
-  checkMessageGaps,
   addThreadMetadata,
   saveAssistantMessage,
 } = require('~/server/services/Threads');
 const { runAssistant, createOnTextProgress } = require('~/server/services/AssistantService');
-const validateAuthor = require('~/server/middleware/assistants/validateAuthor');
+const { createErrorHandler } = require('~/server/controllers/assistants/errors');
+const { validateAuthor } = require('~/server/middleware/assistants/validateAuthor');
 const { formatMessage, createVisionPrompt } = require('~/app/clients/prompts');
 const { encodeAndFormat } = require('~/server/services/Files/images/encode');
 const { createRun, StreamRunManager } = require('~/server/services/Runs');
 const { addTitle } = require('~/server/services/Endpoints/assistants');
 const { createRunBody } = require('~/server/services/createRunBody');
-const { sendResponse } = require('~/server/middleware/error');
-const {
-  createAutoRefillTransaction,
-  findBalanceByUser,
-  upsertBalanceFields,
-  getTransactions,
-  getMultiplier,
-  getConvo,
-} = require('~/models');
-const { logViolation, getLogStores } = require('~/cache');
+const { checkBalanceBeforeRun } = require('./shared');
+const { getConvo } = require('~/models');
+const { getLogStores } = require('~/cache');
 const { getOpenAIClient } = require('./helpers');
 
 /**
@@ -110,140 +95,20 @@ const chatV1 = async (req, res) => {
   /** @type {Run | undefined} - The completed run, undefined if incomplete */
   let completedRun;
 
-  const handleError = async (error) => {
-    const defaultErrorMessage =
-      'The Assistant run failed to initialize. Try sending a message in a new conversation.';
-    const messageData = {
-      thread_id,
-      assistant_id,
-      conversationId,
-      parentMessageId,
-      sender: 'System',
-      user: req.user.id,
-      shouldSaveMessage: false,
-      messageId: responseMessageId,
-      endpoint,
-    };
+  const getContext = () => ({
+    openai,
+    run_id,
+    endpoint,
+    cacheKey,
+    thread_id,
+    completedRun,
+    assistant_id,
+    conversationId,
+    parentMessageId,
+    responseMessageId,
+  });
 
-    if (error.message === 'Run cancelled') {
-      return res.end();
-    } else if (error.message === 'Request closed' && completedRun) {
-      return;
-    } else if (error.message === 'Request closed') {
-      logger.debug('[/assistants/chat/] Request aborted on close');
-    } else if (/Files.*are invalid/.test(error.message)) {
-      const errorMessage = `Files are invalid, or may not have uploaded yet.${
-        endpoint === EModelEndpoint.azureAssistants
-          ? " If using Azure OpenAI, files are only available in the region of the assistant's model at the time of upload."
-          : ''
-      }`;
-      return sendResponse(req, res, messageData, errorMessage);
-    } else if (error?.message?.includes('string too long')) {
-      return sendResponse(
-        req,
-        res,
-        messageData,
-        'Message too long. The Assistants API has a limit of 32,768 characters per message. Please shorten it and try again.',
-      );
-    } else if (error?.message?.includes(ViolationTypes.TOKEN_BALANCE)) {
-      return sendResponse(req, res, messageData, error.message);
-    } else {
-      logger.error('[/assistants/chat/]', error);
-    }
-
-    if (!openai || !thread_id || !run_id) {
-      return sendResponse(req, res, messageData, defaultErrorMessage);
-    }
-
-    await sleep(2000);
-
-    try {
-      const status = await cache.get(cacheKey);
-      if (status === 'cancelled') {
-        logger.debug('[/assistants/chat/] Run already cancelled');
-        return res.end();
-      }
-      await cache.delete(cacheKey);
-      const cancelledRun = await openai.beta.threads.runs.cancel(run_id, { thread_id });
-      logger.debug('[/assistants/chat/] Cancelled run:', cancelledRun);
-    } catch (error) {
-      logger.error('[/assistants/chat/] Error cancelling run', error);
-    }
-
-    await sleep(2000);
-
-    let run;
-    try {
-      run = await openai.beta.threads.runs.retrieve(run_id, { thread_id });
-      await recordUsage({
-        ...run.usage,
-        model: run.model,
-        user: req.user.id,
-        conversationId,
-      });
-    } catch (error) {
-      logger.error('[/assistants/chat/] Error fetching or processing run', error);
-    }
-
-    let finalEvent;
-    try {
-      const runMessages = await checkMessageGaps({
-        openai,
-        run_id,
-        endpoint,
-        thread_id,
-        conversationId,
-        latestMessageId: responseMessageId,
-      });
-
-      const errorContentPart = {
-        text: {
-          value:
-            error?.message ?? 'There was an error processing your request. Please try again later.',
-        },
-        type: ContentTypes.ERROR,
-      };
-
-      if (!Array.isArray(runMessages[runMessages.length - 1]?.content)) {
-        runMessages[runMessages.length - 1].content = [errorContentPart];
-      } else {
-        const contentParts = runMessages[runMessages.length - 1].content;
-        for (let i = 0; i < contentParts.length; i++) {
-          const currentPart = contentParts[i];
-          /** @type {CodeToolCall | RetrievalToolCall | FunctionToolCall | undefined} */
-          const toolCall = currentPart?.[ContentTypes.TOOL_CALL];
-          if (
-            toolCall &&
-            toolCall?.function &&
-            !(toolCall?.function?.output || toolCall?.function?.output?.length)
-          ) {
-            contentParts[i] = {
-              ...currentPart,
-              [ContentTypes.TOOL_CALL]: {
-                ...toolCall,
-                function: {
-                  ...toolCall.function,
-                  output: 'error processing tool',
-                },
-              },
-            };
-          }
-        }
-        runMessages[runMessages.length - 1].content.push(errorContentPart);
-      }
-
-      finalEvent = {
-        final: true,
-        conversation: await getConvo(req.user.id, conversationId),
-        runMessages,
-      };
-    } catch (error) {
-      logger.error('[/assistants/chat/] Error finalizing error process', error);
-      return sendResponse(req, res, messageData, 'The Assistant run failed');
-    }
-
-    return sendResponse(req, res, finalEvent);
-  };
+  const handleError = createErrorHandler({ req, res, getContext });
 
   try {
     res.on('close', async () => {
@@ -261,52 +126,6 @@ const chatV1 = async (req, res) => {
       completedRun = true;
       throw new Error('Missing assistant_id');
     }
-
-    const checkBalanceBeforeRun = async () => {
-      const balanceConfig = getBalanceConfig(appConfig);
-      if (!balanceConfig?.enabled) {
-        return;
-      }
-      const transactions =
-        (await getTransactions({
-          user: req.user.id,
-          context: 'message',
-          conversationId,
-        })) ?? [];
-
-      const totalPreviousTokens = Math.abs(
-        transactions.reduce((acc, curr) => acc + curr.rawAmount, 0),
-      );
-
-      // TODO: make promptBuffer a config option; buffer for titles, needs buffer for system instructions
-      const promptBuffer = parentMessageId === Constants.NO_PARENT && !_thread_id ? 200 : 0;
-      // 5 is added for labels
-      let promptTokens = (await countTokens(text + (promptPrefix ?? ''))) + 5;
-      promptTokens += totalPreviousTokens + promptBuffer;
-      // Count tokens up to the current context window
-      promptTokens = Math.min(promptTokens, getModelMaxTokens(model));
-
-      await checkBalance(
-        {
-          req,
-          res,
-          txData: {
-            model,
-            user: req.user.id,
-            tokenType: 'prompt',
-            amount: promptTokens,
-          },
-        },
-        {
-          findBalanceByUser,
-          getMultiplier,
-          createAutoRefillTransaction,
-          logViolation,
-          balanceConfig,
-          upsertBalanceFields,
-        },
-      );
-    };
 
     const { openai: _openai } = await getOpenAIClient({
       req,
@@ -499,7 +318,20 @@ const chatV1 = async (req, res) => {
       }
     };
 
-    const promises = [initializeThread(), checkBalanceBeforeRun()];
+    const promises = [
+      initializeThread(),
+      checkBalanceBeforeRun({
+        appConfig,
+        req,
+        res,
+        model,
+        text,
+        promptPrefix,
+        parentMessageId,
+        _thread_id,
+        conversationId,
+      }),
+    ];
     await Promise.all(promises);
 
     const sendInitialResponse = () => {

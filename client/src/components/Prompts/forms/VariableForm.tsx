@@ -147,15 +147,15 @@ export default function VariableForm({
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="mb-6 max-h-screen max-w-[80vw] overflow-auto rounded-md bg-surface-tertiary p-4 text-text-secondary dark:bg-surface-primary sm:max-w-full md:max-h-96">
           <ReactMarkdown
-            /** @ts-ignore */
+            // @ts-expect-error - remark plugin types incompatible with unified v11
             remarkPlugins={[supersub, remarkGfm, [remarkMath, { singleDollarTextMath: false }]]}
             rehypePlugins={[
-              /** @ts-ignore */
+              // @ts-expect-error - rehype plugin types incompatible with unified v11
               [rehypeKatex],
-              /** @ts-ignore */
+              // @ts-expect-error - rehype plugin types incompatible with unified v11
               [rehypeHighlight, { ignoreMissing: true }],
             ]}
-            /** @ts-ignore */
+            // @ts-expect-error - custom component types don't match react-markdown expected signatures
             components={{ code: codeNoExecution, p: PromptVariableGfm }}
             className="markdown prose dark:prose-invert light my-1 max-h-[50vh] max-w-full break-words dark:text-text-secondary"
           >

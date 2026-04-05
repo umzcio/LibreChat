@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { Sparkles, Layers } from 'lucide-react';
-import { useRecoilState, useSetRecoilState } from 'recoil';
+import { useAtom, useSetAtom } from 'jotai';
 import { PromptsEditorMode } from '~/common';
 import { Radio } from '@librechat/client';
 import { useLocalize } from '~/hooks';
@@ -10,8 +10,8 @@ const { promptsEditorMode, alwaysMakeProd } = store;
 
 const AdvancedSwitch = () => {
   const localize = useLocalize();
-  const [mode, setMode] = useRecoilState(promptsEditorMode);
-  const setAlwaysMakeProd = useSetRecoilState(alwaysMakeProd);
+  const [mode, setMode] = useAtom(promptsEditorMode);
+  const setAlwaysMakeProd = useSetAtom(alwaysMakeProd);
 
   const options = useMemo(
     () => [

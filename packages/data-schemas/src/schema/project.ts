@@ -52,6 +52,13 @@ const projectSchema = new Schema<IProject>(
       type: String,
       index: true,
     },
+    memory: {
+      type: [{ type: String }],
+      default: [],
+    },
+    memoryUpdatedAt: {
+      type: Date,
+    },
   },
   { timestamps: true },
 );

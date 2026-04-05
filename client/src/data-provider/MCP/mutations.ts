@@ -106,6 +106,41 @@ export const useUpdateMCPServerMutation = (options?: {
 };
 
 /**
+ * Hook for updating cosmetic metadata on yaml/config-defined MCP servers (admin-only)
+ */
+export const useUpdateMCPServerCosmeticsMutation = (options?: {
+  onSuccess?: (
+    data: t.MCPServerDBObjectResponse,
+    variables: { serverName: string; data: t.MCPServerCosmeticUpdateParams },
+    context: unknown,
+  ) => void;
+  onError?: (
+    error: Error,
+    variables: { serverName: string; data: t.MCPServerCosmeticUpdateParams },
+    context: unknown,
+  ) => void;
+}): UseMutationResult<
+  t.MCPServerDBObjectResponse,
+  Error,
+  { serverName: string; data: t.MCPServerCosmeticUpdateParams }
+> => {
+  const queryClient = useQueryClient();
+
+  return useMutation(
+    ({ serverName, data }: { serverName: string; data: t.MCPServerCosmeticUpdateParams }) =>
+      dataService.updateMCPServerCosmetics(serverName, data),
+    {
+      onError: (error, variables, context) => options?.onError?.(error, variables, context),
+      onSuccess: (updatedServer, variables, context) => {
+        queryClient.invalidateQueries([QueryKeys.mcpServers]);
+        queryClient.invalidateQueries([QueryKeys.mcpTools]);
+        return options?.onSuccess?.(updatedServer, variables, context);
+      },
+    },
+  );
+};
+
+/**
  * Hook for deleting an MCP server
  */
 export const useDeleteMCPServerMutation = (options?: {

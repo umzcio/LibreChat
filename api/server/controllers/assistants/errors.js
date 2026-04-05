@@ -9,7 +9,7 @@ const { getConvo } = require('~/models');
 /**
  * @typedef {Object} ErrorHandlerContext
  * @property {OpenAIClient} openai - The OpenAI client
- * @property {string} thread_id - The thread ID
+ * @property {string} [thread_id] - The thread ID (required for assistants, optional for agents)
  * @property {string} run_id - The run ID
  * @property {boolean} completedRun - Whether the run has completed
  * @property {string} assistant_id - The assistant ID
@@ -29,7 +29,10 @@ const { getConvo } = require('~/models');
  */
 
 /**
- * Creates an error handler function with the given dependencies
+ * Creates an error handler function with the given dependencies.
+ * Supports both assistant and agent error handling flows.
+ * When `thread_id` is present in context, performs thread-level run cancellation,
+ * usage recording, and message gap checking. Otherwise, uses a simpler cache-only cleanup.
  * @param {ErrorHandlerDependencies} dependencies - The dependencies for the error handler
  * @returns {(error: Error) => Promise<void>} The error handler function
  */
@@ -95,7 +98,7 @@ const createErrorHandler = ({ req, res, getContext, originPath = '/assistants/ch
       logger.error(`[${originPath}]`, error);
     }
 
-    if (!openai || !thread_id || !run_id) {
+    if (!openai || !run_id || (thread_id !== undefined && !thread_id)) {
       return sendResponse(req, res, messageData, defaultErrorMessage);
     }
 
@@ -108,79 +111,90 @@ const createErrorHandler = ({ req, res, getContext, originPath = '/assistants/ch
         return res.end();
       }
       await cache.delete(cacheKey);
-      const cancelledRun = await openai.beta.threads.runs.cancel(run_id, { thread_id });
-      logger.debug(`[${originPath}] Cancelled run:`, cancelledRun);
+      if (thread_id) {
+        const cancelledRun = await openai.beta.threads.runs.cancel(run_id, { thread_id });
+        logger.debug(`[${originPath}] Cancelled run:`, cancelledRun);
+      }
     } catch (error) {
       logger.error(`[${originPath}] Error cancelling run`, error);
     }
 
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    let run;
-    try {
-      run = await openai.beta.threads.runs.retrieve(run_id, { thread_id });
-      await recordUsage({
-        ...run.usage,
-        model: run.model,
-        user: req.user.id,
-        conversationId,
-      });
-    } catch (error) {
-      logger.error(`[${originPath}] Error fetching or processing run`, error);
+    if (thread_id) {
+      try {
+        const run = await openai.beta.threads.runs.retrieve(run_id, { thread_id });
+        await recordUsage({
+          ...run.usage,
+          model: run.model,
+          user: req.user.id,
+          conversationId,
+        });
+      } catch (error) {
+        logger.error(`[${originPath}] Error fetching or processing run`, error);
+      }
     }
 
     let finalEvent;
     try {
-      const runMessages = await checkMessageGaps({
-        openai,
-        run_id,
-        endpoint,
-        thread_id,
-        conversationId,
-        latestMessageId: responseMessageId,
-      });
+      if (thread_id) {
+        const runMessages = await checkMessageGaps({
+          openai,
+          run_id,
+          endpoint,
+          thread_id,
+          conversationId,
+          latestMessageId: responseMessageId,
+        });
 
-      const errorContentPart = {
-        text: {
-          value:
-            error?.message ?? 'There was an error processing your request. Please try again later.',
-        },
-        type: ContentTypes.ERROR,
-      };
+        const errorContentPart = {
+          text: {
+            value:
+              error?.message ??
+              'There was an error processing your request. Please try again later.',
+          },
+          type: ContentTypes.ERROR,
+        };
 
-      if (!Array.isArray(runMessages[runMessages.length - 1]?.content)) {
-        runMessages[runMessages.length - 1].content = [errorContentPart];
-      } else {
-        const contentParts = runMessages[runMessages.length - 1].content;
-        for (let i = 0; i < contentParts.length; i++) {
-          const currentPart = contentParts[i];
-          /** @type {CodeToolCall | RetrievalToolCall | FunctionToolCall | undefined} */
-          const toolCall = currentPart?.[ContentTypes.TOOL_CALL];
-          if (
-            toolCall &&
-            toolCall?.function &&
-            !(toolCall?.function?.output || toolCall?.function?.output?.length)
-          ) {
-            contentParts[i] = {
-              ...currentPart,
-              [ContentTypes.TOOL_CALL]: {
-                ...toolCall,
-                function: {
-                  ...toolCall.function,
-                  output: 'error processing tool',
+        if (!Array.isArray(runMessages[runMessages.length - 1]?.content)) {
+          runMessages[runMessages.length - 1].content = [errorContentPart];
+        } else {
+          const contentParts = runMessages[runMessages.length - 1].content;
+          for (let i = 0; i < contentParts.length; i++) {
+            const currentPart = contentParts[i];
+            /** @type {CodeToolCall | RetrievalToolCall | FunctionToolCall | undefined} */
+            const toolCall = currentPart?.[ContentTypes.TOOL_CALL];
+            if (
+              toolCall &&
+              toolCall?.function &&
+              !(toolCall?.function?.output || toolCall?.function?.output?.length)
+            ) {
+              contentParts[i] = {
+                ...currentPart,
+                [ContentTypes.TOOL_CALL]: {
+                  ...toolCall,
+                  function: {
+                    ...toolCall.function,
+                    output: 'error processing tool',
+                  },
                 },
-              },
-            };
+              };
+            }
           }
+          runMessages[runMessages.length - 1].content.push(errorContentPart);
         }
-        runMessages[runMessages.length - 1].content.push(errorContentPart);
-      }
 
-      finalEvent = {
-        final: true,
-        conversation: await getConvo(req.user.id, conversationId),
-        runMessages,
-      };
+        finalEvent = {
+          final: true,
+          conversation: await getConvo(req.user.id, conversationId),
+          runMessages,
+        };
+      } else {
+        finalEvent = {
+          final: true,
+          conversation: await getConvo(req.user.id, conversationId),
+        };
+      }
     } catch (error) {
       logger.error(`[${originPath}] Error finalizing error process`, error);
       return sendResponse(req, res, messageData, 'The Assistant run failed');

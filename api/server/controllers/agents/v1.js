@@ -544,11 +544,7 @@ const duplicateAgentHandler = async (req, res) => {
     };
 
     for (const action of originalActions) {
-      promises.push(
-        duplicateAction(action).catch((error) => {
-          logger.error('[/agents/:id/duplicate] Error duplicating Action:', error);
-        }),
-      );
+      promises.push(duplicateAction(action));
     }
 
     const agentActions = await Promise.all(promises);
@@ -597,6 +593,9 @@ const duplicateAgentHandler = async (req, res) => {
         `[duplicateAgent] Failed to grant owner permissions for duplicated agent ${newAgent.id}:`,
         permissionError,
       );
+      await db.deleteAgent({ id: newAgent.id });
+      await db.deleteActions({ agent_id: newAgentId });
+      throw permissionError;
     }
 
     return res.status(201).json({

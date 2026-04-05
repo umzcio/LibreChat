@@ -115,7 +115,7 @@ export function errorsToString(errors: ZodIssue[]) {
     .join(' ');
 }
 
-export function getFirstDefinedValue(possibleValues: string[]) {
+function getFirstDefinedValue(possibleValues: string[]) {
   let returnValue;
   for (const value of possibleValues) {
     if (value) {

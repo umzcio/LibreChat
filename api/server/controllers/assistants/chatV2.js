@@ -1,13 +1,7 @@
 const { v4 } = require('uuid');
 const { sleep } = require('@librechat/agents');
 const { logger } = require('@librechat/data-schemas');
-const {
-  sendEvent,
-  countTokens,
-  checkBalance,
-  getBalanceConfig,
-  getModelMaxTokens,
-} = require('@librechat/api');
+const { sendEvent } = require('@librechat/api');
 const {
   Time,
   Constants,
@@ -28,19 +22,13 @@ const {
 } = require('~/server/services/Threads');
 const { runAssistant, createOnTextProgress } = require('~/server/services/AssistantService');
 const { createErrorHandler } = require('~/server/controllers/assistants/errors');
-const validateAuthor = require('~/server/middleware/assistants/validateAuthor');
+const { validateAuthor } = require('~/server/middleware/assistants/validateAuthor');
 const { createRun, StreamRunManager } = require('~/server/services/Runs');
 const { addTitle } = require('~/server/services/Endpoints/assistants');
 const { createRunBody } = require('~/server/services/createRunBody');
-const {
-  getConvo,
-  getMultiplier,
-  getTransactions,
-  findBalanceByUser,
-  upsertBalanceFields,
-  createAutoRefillTransaction,
-} = require('~/models');
-const { logViolation, getLogStores } = require('~/cache');
+const { checkBalanceBeforeRun } = require('./shared');
+const { getConvo } = require('~/models');
+const { getLogStores } = require('~/cache');
 const { getOpenAIClient } = require('./helpers');
 
 /**
@@ -134,52 +122,6 @@ const chatV2 = async (req, res) => {
       completedRun = true;
       throw new Error('Missing assistant_id');
     }
-
-    const checkBalanceBeforeRun = async () => {
-      const balanceConfig = getBalanceConfig(appConfig);
-      if (!balanceConfig?.enabled) {
-        return;
-      }
-      const transactions =
-        (await getTransactions({
-          user: req.user.id,
-          context: 'message',
-          conversationId,
-        })) ?? [];
-
-      const totalPreviousTokens = Math.abs(
-        transactions.reduce((acc, curr) => acc + curr.rawAmount, 0),
-      );
-
-      // TODO: make promptBuffer a config option; buffer for titles, needs buffer for system instructions
-      const promptBuffer = parentMessageId === Constants.NO_PARENT && !_thread_id ? 200 : 0;
-      // 5 is added for labels
-      let promptTokens = (await countTokens(text + (promptPrefix ?? ''))) + 5;
-      promptTokens += totalPreviousTokens + promptBuffer;
-      // Count tokens up to the current context window
-      promptTokens = Math.min(promptTokens, getModelMaxTokens(model));
-
-      await checkBalance(
-        {
-          req,
-          res,
-          txData: {
-            model,
-            user: req.user.id,
-            tokenType: 'prompt',
-            amount: promptTokens,
-          },
-        },
-        {
-          findBalanceByUser,
-          getMultiplier,
-          createAutoRefillTransaction,
-          logViolation,
-          balanceConfig,
-          upsertBalanceFields,
-        },
-      );
-    };
 
     const { openai: _openai } = await getOpenAIClient({
       req,
@@ -326,7 +268,20 @@ const chatV2 = async (req, res) => {
       }
     };
 
-    const promises = [initializeThread(), checkBalanceBeforeRun()];
+    const promises = [
+      initializeThread(),
+      checkBalanceBeforeRun({
+        appConfig,
+        req,
+        res,
+        model,
+        text,
+        promptPrefix,
+        parentMessageId,
+        _thread_id,
+        conversationId,
+      }),
+    ];
     await Promise.all(promises);
 
     const sendInitialResponse = () => {

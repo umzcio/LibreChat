@@ -1,4 +1,4 @@
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { QueryKeys, dataService } from 'librechat-data-provider';
 import { useQuery } from '@tanstack/react-query';
 import type { QueryObserverResult, UseQueryOptions } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import store from '~/store';
 export const useGetUserQuery = (
   config?: UseQueryOptions<t.TUser>,
 ): QueryObserverResult<t.TUser> => {
-  const queriesEnabled = useRecoilValue<boolean>(store.queriesEnabled);
+  const queriesEnabled = useAtomValue(store.queriesEnabled);
   return useQuery<t.TUser>([QueryKeys.user], () => dataService.getUser(), {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -26,13 +26,13 @@ export interface UseGraphTokenQueryOptions {
 
 export const useGraphTokenQuery = (
   options: UseGraphTokenQueryOptions = {},
-  config?: UseQueryOptions<any>,
-): QueryObserverResult<any> => {
+  config?: UseQueryOptions<t.GraphTokenResponse>,
+): QueryObserverResult<t.GraphTokenResponse> => {
   const { scopes, enabled = false } = options;
 
   return useQuery({
     queryKey: [QueryKeys.graphToken, scopes],
-    queryFn: () => dataService.getGraphApiToken({ scopes }),
+    queryFn: () => dataService.getGraphApiToken({ scopes: scopes ?? '' }),
     enabled,
     staleTime: 50 * 60 * 1000, // 50 minutes (tokens expire in 60 minutes)
     retry: 1,

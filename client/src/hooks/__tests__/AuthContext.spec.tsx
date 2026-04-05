@@ -3,7 +3,6 @@
  */
 import React from 'react';
 import { render, act } from '@testing-library/react';
-import { RecoilRoot } from 'recoil';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -80,13 +79,11 @@ function renderProvider() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <RecoilRoot>
-        <MemoryRouter>
-          <AuthContextProvider authConfig={authConfig}>
-            <TestConsumer />
-          </AuthContextProvider>
-        </MemoryRouter>
-      </RecoilRoot>
+      <MemoryRouter>
+        <AuthContextProvider authConfig={authConfig}>
+          <TestConsumer />
+        </AuthContextProvider>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
@@ -99,13 +96,11 @@ function renderProviderLive() {
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <RecoilRoot>
-        <MemoryRouter>
-          <AuthContextProvider authConfig={{ loginRedirect: '/login' }}>
-            <TestConsumer />
-          </AuthContextProvider>
-        </MemoryRouter>
-      </RecoilRoot>
+      <MemoryRouter>
+        <AuthContextProvider authConfig={{ loginRedirect: '/login' }}>
+          <TestConsumer />
+        </AuthContextProvider>
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { Button, Input, Label, OGDialog, OGDialogTemplate } from '@librechat/client';
 import type { ConfigFieldDetail } from '~/common';
+import { sanitizeHtml } from '~/utils';
 import { useLocalize } from '~/hooks';
 
 interface MCPConfigDialogProps {
@@ -83,7 +84,7 @@ export default function MCPConfigDialog({
                 {details.description && (
                   <p
                     className="text-xs text-text-secondary [&_a]:text-blue-500 [&_a]:hover:text-blue-600 dark:[&_a]:text-blue-400 dark:[&_a]:hover:text-blue-300"
-                    dangerouslySetInnerHTML={{ __html: details.description }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeHtml(details.description) }}
                   />
                 )}
                 {errors[key] && <p className="text-xs text-red-500">{errors[key]?.message}</p>}

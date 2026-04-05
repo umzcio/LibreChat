@@ -1,6 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { Constants } from 'librechat-data-provider';
-import { useRecoilState, useRecoilValue, useResetRecoilState } from 'recoil';
+import { RESET } from 'jotai/utils';
 import { useArtifactsContext } from '~/Providers';
 import { logger } from '~/utils';
 import store from '~/store';
@@ -10,10 +11,10 @@ export default function useArtifacts() {
   const { isSubmitting, latestMessageId, latestMessageText, conversationId } =
     useArtifactsContext();
 
-  const artifacts = useRecoilValue(store.artifactsState);
-  const resetArtifacts = useResetRecoilState(store.artifactsState);
-  const resetCurrentArtifactId = useResetRecoilState(store.currentArtifactId);
-  const [currentArtifactId, setCurrentArtifactId] = useRecoilState(store.currentArtifactId);
+  const artifacts = useAtomValue(store.artifactsState);
+  const setArtifacts = useSetAtom(store.artifactsState);
+  const setCurrentArtifactIdReset = useSetAtom(store.currentArtifactId);
+  const [currentArtifactId, setCurrentArtifactId] = useAtom(store.currentArtifactId);
 
   const orderedArtifactIds = useMemo(() => {
     return Object.keys(artifacts ?? {}).sort(
@@ -30,8 +31,8 @@ export default function useArtifacts() {
 
   useEffect(() => {
     const resetState = () => {
-      resetArtifacts();
-      resetCurrentArtifactId();
+      setArtifacts(RESET);
+      setCurrentArtifactIdReset(RESET);
       prevConversationIdRef.current = conversationId;
       lastRunMessageIdRef.current = null;
       lastContentRef.current = null;
@@ -49,7 +50,7 @@ export default function useArtifacts() {
       logger.log('artifacts_visibility', 'Unmounting artifacts');
       resetState();
     };
-  }, [conversationId, resetArtifacts, resetCurrentArtifactId]);
+  }, [conversationId, setArtifacts, setCurrentArtifactIdReset]);
 
   useEffect(() => {
     if (orderedArtifactIds.length > 0) {
@@ -113,7 +114,7 @@ export default function useArtifacts() {
     }
 
     const hasEnclosedArtifact =
-      /:::artifact(?:\{[^}]*\})?(?:\s|\n)*(?:```[\s\S]*?```(?:\s|\n)*)?:::/m.test(
+      /:::artifact(?:-update)?(?:\{[^}]*\})?(?:\s|\n)*(?:```[\s\S]*?```(?:\s|\n)*)?:::/m.test(
         latestMessageText.trim(),
       );
 
@@ -138,6 +139,7 @@ export default function useArtifacts() {
   const currentIndex = orderedArtifactIds.indexOf(currentArtifactId ?? '');
 
   return {
+    artifacts,
     activeTab,
     setActiveTab,
     currentIndex,

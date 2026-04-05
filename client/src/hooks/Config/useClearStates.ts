@@ -1,49 +1,52 @@
-import { useRecoilCallback } from 'recoil';
+import { useCallback } from 'react';
+import { useStore } from 'jotai';
+import { RESET } from 'jotai/utils';
 import { clearLocalStorage } from '~/utils/localStorage';
 import store from '~/store';
 
 export default function useClearStates() {
+  const jotaiStore = useStore();
   const clearConversations = store.useClearConvoState();
   const clearSubmissions = store.useClearSubmissionState();
   const clearLatestMessages = store.useClearLatestMessages();
 
-  const clearStates = useRecoilCallback(
-    ({ reset, snapshot }) =>
-      async (skipFirst?: boolean) => {
-        await clearSubmissions(skipFirst);
-        await clearConversations(skipFirst);
-        await clearLatestMessages(skipFirst);
+  const clearStates = useCallback(
+    (skipFirst?: boolean) => {
+      clearSubmissions(skipFirst);
+      clearConversations(skipFirst);
+      clearLatestMessages(skipFirst);
 
-        const keys = await snapshot.getPromise(store.conversationKeysAtom);
+      const keys = jotaiStore.get(store.conversationKeysAtom);
 
-        for (const key of keys) {
-          if (skipFirst === true && key === 0) {
-            continue;
-          }
-
-          reset(store.filesByIndex(key));
-          reset(store.presetByIndex(key));
-          reset(store.textByIndex(key));
-          reset(store.showStopButtonByIndex(key));
-          reset(store.abortScrollFamily(key));
-          reset(store.isSubmittingFamily(key));
-          reset(store.optionSettingsFamily(key));
-          reset(store.showPopoverFamily(key));
-          reset(store.showMentionPopoverFamily(key));
-          reset(store.showPlusPopoverFamily(key));
-          reset(store.showPromptsPopoverFamily(key));
-          reset(store.activePromptByIndex(key));
-          reset(store.globalAudioURLFamily(key));
-          reset(store.globalAudioFetchingFamily(key));
-          reset(store.globalAudioPlayingFamily(key));
-          reset(store.activeRunFamily(key));
-          reset(store.audioRunFamily(key));
-          reset(store.messagesSiblingIdxFamily(key.toString()));
+      for (const key of keys) {
+        if (skipFirst === true && key === 0) {
+          continue;
         }
 
-        clearLocalStorage(skipFirst);
-      },
-    [],
+        jotaiStore.set(store.filesByIndex(key), new Map());
+        jotaiStore.set(store.presetByIndex(key), null);
+        jotaiStore.set(store.textByIndex(key), '');
+        jotaiStore.set(store.showStopButtonByIndex(key), false);
+        jotaiStore.set(store.abortScrollFamily(key), RESET);
+        jotaiStore.set(store.isSubmittingFamily(key), RESET);
+        jotaiStore.set(store.optionSettingsFamily(key), {});
+        jotaiStore.set(store.showPopoverFamily(key), false);
+
+        jotaiStore.set(store.showMentionPopoverFamily(key), false);
+        jotaiStore.set(store.showPlusPopoverFamily(key), false);
+        jotaiStore.set(store.showPromptsPopoverFamily(key), false);
+        jotaiStore.set(store.activePromptByIndex(key), undefined);
+        jotaiStore.set(store.globalAudioURLFamily(key), null);
+        jotaiStore.set(store.globalAudioFetchingFamily(key), false);
+        jotaiStore.set(store.globalAudioPlayingFamily(key), false);
+        jotaiStore.set(store.activeRunFamily(key), null);
+        jotaiStore.set(store.audioRunFamily(key), null);
+        jotaiStore.set(store.messagesSiblingIdxFamily(key.toString()), 0);
+      }
+
+      clearLocalStorage(skipFirst);
+    },
+    [jotaiStore, clearSubmissions, clearConversations, clearLatestMessages],
   );
 
   return clearStates;

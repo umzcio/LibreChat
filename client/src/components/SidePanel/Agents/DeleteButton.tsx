@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { useFormContext } from 'react-hook-form';
-import { useRecoilValue, useSetRecoilState } from 'recoil';
+import { useAtomValue, useSetAtom } from 'jotai';
 import {
   Label,
   Button,
@@ -30,8 +30,8 @@ function DeleteButton({
   const localize = useLocalize();
   const { reset } = useFormContext();
   const { showToast } = useToastContext();
-  const setConversation = useSetRecoilState(store.conversationByIndex(0));
-  const conversationAgentId = useRecoilValue(store.conversationAgentIdByIndex(0));
+  const setConversation = useSetAtom(store.conversationByIndex(0));
+  const conversationAgentId = useAtomValue(store.conversationAgentIdByIndex(0));
 
   const deleteAgent = useDeleteAgentMutation({
     onSuccess: (_, vars, context) => {

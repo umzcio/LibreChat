@@ -1,7 +1,7 @@
 import { memo, useRef, useMemo, useEffect, useState, useCallback } from 'react';
 import { useWatch } from 'react-hook-form';
 import { TextareaAutosize } from '@librechat/client';
-import { useRecoilState, useRecoilValue } from 'recoil';
+import { useAtom, useAtomValue } from 'jotai';
 import { Constants, isAssistantsEndpoint, isAgentsEndpoint } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
 import type { ExtendedFile, FileSetter, ConvoGenerator } from '~/common';
@@ -72,19 +72,19 @@ const ChatForm = memo(function ChatForm({
   const [isTextAreaFocused, setIsTextAreaFocused] = useState(false);
   const [backupBadges, setBackupBadges] = useState<Pick<BadgeItem, 'id'>[]>([]);
 
-  const SpeechToText = useRecoilValue(store.speechToText);
-  const TextToSpeech = useRecoilValue(store.textToSpeech);
-  const chatDirection = useRecoilValue(store.chatDirection);
-  const automaticPlayback = useRecoilValue(store.automaticPlayback);
-  const maximizeChatSpace = useRecoilValue(store.maximizeChatSpace);
-  const centerFormOnLanding = useRecoilValue(store.centerFormOnLanding);
-  const isTemporary = useRecoilValue(store.isTemporary);
+  const SpeechToText = useAtomValue(store.speechToText);
+  const TextToSpeech = useAtomValue(store.textToSpeech);
+  const chatDirection = useAtomValue(store.chatDirection);
+  const automaticPlayback = useAtomValue(store.automaticPlayback);
+  const maximizeChatSpace = useAtomValue(store.maximizeChatSpace);
+  const centerFormOnLanding = useAtomValue(store.centerFormOnLanding);
+  const isTemporary = useAtomValue(store.isTemporary);
 
-  const [badges, setBadges] = useRecoilState(store.chatBadges);
-  const [isEditingBadges, setIsEditingBadges] = useRecoilState(store.isEditingBadges);
-  const [showStopButton, setShowStopButton] = useRecoilState(store.showStopButtonByIndex(index));
-  const [showPlusPopover, setShowPlusPopover] = useRecoilState(store.showPlusPopoverFamily(index));
-  const [showMentionPopover, setShowMentionPopover] = useRecoilState(
+  const [badges, setBadges] = useAtom(store.chatBadges);
+  const [isEditingBadges, setIsEditingBadges] = useAtom(store.isEditingBadges);
+  const [showStopButton, setShowStopButton] = useAtom(store.showStopButtonByIndex(index));
+  const [showPlusPopover, setShowPlusPopover] = useAtom(store.showPlusPopoverFamily(index));
+  const [showMentionPopover, setShowMentionPopover] = useAtom(
     store.showMentionPopoverFamily(index),
   );
 

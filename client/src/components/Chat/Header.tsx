@@ -1,5 +1,5 @@
 import { memo, useMemo } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { useMediaQuery } from '@librechat/client';
 import { getConfigDefaults, PermissionTypes, Permissions } from 'librechat-data-provider';
 import ModelSelector from './Menus/Endpoints/ModelSelector';
@@ -17,7 +17,7 @@ const defaultInterface = getConfigDefaults().interface;
 
 function Header() {
   const { data: startupConfig } = useGetStartupConfig();
-  const navVisible = useRecoilValue(store.sidebarExpanded);
+  const navVisible = useAtomValue(store.sidebarExpanded);
 
   const interfaceConfig = useMemo(
     () => startupConfig?.interface ?? defaultInterface,

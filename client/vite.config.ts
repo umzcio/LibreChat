@@ -12,7 +12,7 @@ const require = createRequire(import.meta.url);
 /**
  * vite-plugin-node-polyfills uses @rollup/plugin-inject to replace bare globals (e.g. `process`)
  * with imports like `import process from 'vite-plugin-node-polyfills/shims/process'`. When the
- * consuming module (e.g. recoil) is hoisted to the monorepo root, Vite 7's ESM resolver walks up
+ * consuming module (e.g. jotai) is hoisted to the monorepo root, Vite 7's ESM resolver walks up
  * from there and never finds the shims (installed only in client/node_modules). This map resolves
  * the shim specifiers to absolute paths via CJS require.resolve anchored to the client directory.
  */

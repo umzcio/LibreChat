@@ -1,4 +1,6 @@
+import React from 'react';
 import { renderHook, act } from '@testing-library/react';
+import { Provider } from 'jotai';
 import { Constants, LocalStorageKeys } from 'librechat-data-provider';
 import type { TSubmission } from 'librechat-data-provider';
 
@@ -47,19 +49,17 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
 }));
 
-jest.mock('recoil', () => ({
-  ...jest.requireActual('recoil'),
-  useSetRecoilState: () => jest.fn(),
-}));
-
-jest.mock('~/store', () => ({
-  __esModule: true,
-  default: {
-    activeRunFamily: jest.fn(),
-    abortScrollFamily: jest.fn(),
-    showStopButtonByIndex: jest.fn(),
-  },
-}));
+jest.mock('~/store', () => {
+  const { atom } = require('jotai');
+  return {
+    __esModule: true,
+    default: {
+      activeRunFamily: () => atom<string | null>(null),
+      abortScrollFamily: () => atom(false),
+      showStopButtonByIndex: () => atom(false),
+    },
+  };
+});
 
 jest.mock('~/hooks/AuthContext', () => ({
   useAuthContext: () => ({ token: 'test-token', isAuthenticated: true }),
@@ -112,6 +112,9 @@ jest.mock('librechat-data-provider', () => {
 });
 
 import useResumableSSE from '~/hooks/SSE/useResumableSSE';
+
+const jotaiWrapper = ({ children }: { children: React.ReactNode }) =>
+  React.createElement(Provider, null, children);
 
 const CONV_ID = 'conv-abc-123';
 
@@ -185,7 +188,7 @@ describe('useResumableSSE - 404 error path', () => {
     const submission = buildSubmission({ conversation: { conversationId } });
     const chatHelpers = buildChatHelpers();
 
-    const { unmount } = renderHook(() => useResumableSSE(submission, chatHelpers));
+    const { unmount } = renderHook(() => useResumableSSE(submission, chatHelpers), { wrapper: jotaiWrapper });
 
     await act(async () => {
       await Promise.resolve();
@@ -234,7 +237,7 @@ describe('useResumableSSE - 404 error path', () => {
     const submission = buildSubmission({ conversation: {} });
     const chatHelpers = buildChatHelpers();
 
-    const { unmount } = renderHook(() => useResumableSSE(submission, chatHelpers));
+    const { unmount } = renderHook(() => useResumableSSE(submission, chatHelpers), { wrapper: jotaiWrapper });
 
     await act(async () => {
       await Promise.resolve();
@@ -265,7 +268,7 @@ describe('useResumableSSE - 404 error path', () => {
       const submission = buildSubmission();
       const chatHelpers = buildChatHelpers();
 
-      const { unmount } = renderHook(() => useResumableSSE(submission, chatHelpers));
+      const { unmount } = renderHook(() => useResumableSSE(submission, chatHelpers), { wrapper: jotaiWrapper });
 
       await act(async () => {
         await Promise.resolve();

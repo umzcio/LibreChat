@@ -1,4 +1,4 @@
-import type { QueryOptions } from 'mongoose';
+import type { FilterQuery, QueryOptions } from 'mongoose';
 import { IToken, TokenCreateData, TokenQuery, TokenUpdateData, TokenDeleteResult } from '~/types';
 import logger from '~/config/winston';
 
@@ -90,7 +90,7 @@ export function createTokenMethods(mongoose: typeof import('mongoose')) {
   async function findToken(query: TokenQuery, options?: QueryOptions): Promise<IToken | null> {
     try {
       const Token = mongoose.models.Token;
-      const conditions = [];
+      const conditions: FilterQuery<IToken>[] = [{ expiresAt: { $gt: new Date() } }];
 
       if (query.userId) {
         conditions.push({ userId: query.userId });

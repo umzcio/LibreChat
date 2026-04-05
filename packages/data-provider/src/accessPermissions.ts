@@ -305,7 +305,7 @@ export interface TPermissionCheck {
 /**
  * Convert permission bits to access level
  */
-export function permBitsToAccessLevel(permBits: number): TAccessLevel {
+function permBitsToAccessLevel(permBits: number): TAccessLevel {
   if ((permBits & PermissionBits.DELETE) > 0) return 'owner';
   if ((permBits & PermissionBits.EDIT) > 0) return 'editor';
   if ((permBits & PermissionBits.VIEW) > 0) return 'viewer';
@@ -315,7 +315,7 @@ export function permBitsToAccessLevel(permBits: number): TAccessLevel {
 /**
  * Convert access role ID to permission bits
  */
-export function accessRoleToPermBits(accessRoleId: string): number {
+function accessRoleToPermBits(accessRoleId: string): number {
   switch (accessRoleId) {
     case AccessRoleIds.AGENT_VIEWER:
     case AccessRoleIds.PROMPTGROUP_VIEWER:

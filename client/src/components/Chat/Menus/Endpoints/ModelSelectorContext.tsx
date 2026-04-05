@@ -144,7 +144,7 @@ export function ModelSelectorProvider({ children, startupConfig }: ModelSelector
           spec: spec ?? null,
           agent_id: agent_id ?? null,
           assistant_id: assistant_id ?? null,
-        } as any)
+        } as Partial<t.TConversation> as t.TConversation)
       : null,
     assistantsMap,
     setSelectedValues,

@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
+import { logger } from '~/utils';
 import type { SyncStorage } from 'jotai/vanilla/utils/atomWithStorage';
 
 /**
@@ -133,13 +134,13 @@ export function initializeFromStorage<T>(
 
     return value;
   } catch (error) {
-    console.error(`Error initializing ${key} from localStorage, using default. Error:`, error);
+    logger.error('localStorage', `Error initializing ${key} from localStorage, using default. Error:`, error);
 
     // Reset corrupted value
     try {
       localStorage.setItem(key, JSON.stringify(defaultValue));
     } catch (setError) {
-      console.error(`Error resetting corrupted ${key} in localStorage:`, setError);
+      logger.error('localStorage', `Error resetting corrupted ${key} in localStorage:`, setError);
     }
 
     if (onInit) {

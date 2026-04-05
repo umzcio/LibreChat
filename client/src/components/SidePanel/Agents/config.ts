@@ -19,7 +19,7 @@ export type ExtFilters =
   | `.${string}`;
 
 //NOTE: IItem type references the following docs: https://learn.microsoft.com/en-us/graph/api/resources/driveitem?view=graph-rest-1.0#properties
-export type IItem = Record<string, any>;
+export type IItem = Record<string, unknown>;
 export type SPPickerConfig = {
   sdk: '8.0';
   /**

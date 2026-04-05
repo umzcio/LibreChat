@@ -1,5 +1,6 @@
 import { parseConvo } from 'librechat-data-provider';
 import type { TPreset } from 'librechat-data-provider';
+import logger from './logger';
 
 type UIPreset = Partial<TPreset> & { presetOverride?: Partial<TPreset> };
 type TCleanupPreset = {
@@ -10,7 +11,7 @@ type TCleanupPreset = {
 const cleanupPreset = ({ preset: _preset, defaultParamsEndpoint }: TCleanupPreset): TPreset => {
   const { endpoint, endpointType } = _preset ?? ({} as UIPreset);
   if (endpoint == null || endpoint === '') {
-    console.error(`Unknown endpoint ${endpoint}`, _preset);
+    logger.error('Preset', `Unknown endpoint ${endpoint}`, _preset);
     return {
       endpoint: null,
       presetId: _preset?.presetId ?? null,
@@ -37,7 +38,7 @@ const cleanupPreset = ({ preset: _preset, defaultParamsEndpoint }: TCleanupPrese
   }
 
   const parsedPreset = parseConvo({
-    /* @ts-ignore: endpoint can be a custom defined name */
+    // @ts-expect-error - endpoint can be a custom defined name outside EModelEndpoint enum
     endpoint,
     endpointType,
     conversation: preset,

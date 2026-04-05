@@ -29,7 +29,7 @@ export interface TFeedbackTag {
 }
 
 // --- Tag Registry ---
-export const FEEDBACK_TAGS: TFeedbackTag[] = [
+const FEEDBACK_TAGS: TFeedbackTag[] = [
   // Thumbs Down
   {
     key: 'not_matched',
@@ -104,8 +104,8 @@ export function getTagsForRating(rating: TFeedbackRating): TFeedbackTag[] {
   return FEEDBACK_TAGS.filter((tag) => tag.direction === rating);
 }
 
-export const feedbackTagKeySchema = z.enum(FEEDBACK_REASON_KEYS);
-export const feedbackRatingSchema = z.enum(FEEDBACK_RATINGS);
+const feedbackTagKeySchema = z.enum(FEEDBACK_REASON_KEYS);
+const feedbackRatingSchema = z.enum(FEEDBACK_RATINGS);
 
 export const feedbackSchema = z.object({
   rating: feedbackRatingSchema,

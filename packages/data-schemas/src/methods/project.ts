@@ -1,7 +1,7 @@
 import logger from '~/config/winston';
+import { escapeRegExp } from '~/utils/string';
 import type { FilterQuery, Model, SortOrder } from 'mongoose';
-import type { IProject } from '~/types';
-import type { IMongoFile } from '~/types';
+import type { IMongoFile, IProject } from '~/types';
 
 export interface ProjectMethods {
   createProject(userId: string, data: Partial<IProject> & { projectId: string; name: string }): Promise<IProject>;
@@ -17,7 +17,7 @@ export interface ProjectMethods {
   ): Promise<{ projects: IProject[]; nextCursor: string | null }>;
   updateProject(projectId: string, userId: string, update: Partial<IProject>): Promise<IProject | null>;
   deleteProject(projectId: string, userId: string): Promise<{ deletedCount: number }>;
-  getProjectFiles(projectId: string): Promise<IMongoFile[]>;
+  getProjectFiles(projectId: string, userId?: string): Promise<IMongoFile[]>;
   getProjectConversationCount(projectId: string, userId: string): Promise<number>;
 }
 
@@ -66,10 +66,11 @@ export function createProjectMethods(mongoose: typeof import('mongoose')): Proje
     }
 
     if (search) {
+      const escaped = escapeRegExp(search);
       filters.push({
         $or: [
-          { name: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } },
+          { name: { $regex: escaped, $options: 'i' } },
+          { description: { $regex: escaped, $options: 'i' } },
         ],
       } as FilterQuery<IProject>);
     }
@@ -80,7 +81,7 @@ export function createProjectMethods(mongoose: typeof import('mongoose')): Proje
         const decoded = JSON.parse(Buffer.from(cursor, 'base64').toString());
         const { primary, secondary } = decoded;
         const primaryValue = new Date(primary);
-        const secondaryValue = new Date(secondary);
+        const secondaryValue = new mongoose.Types.ObjectId(secondary);
         cursorFilter = {
           $or: [
             { updatedAt: { $lt: primaryValue } },
@@ -108,7 +109,7 @@ export function createProjectMethods(mongoose: typeof import('mongoose')): Proje
         const last = projects[projects.length - 1] as Record<string, unknown>;
         const composite = {
           primary: (last.updatedAt as Date).toISOString(),
-          secondary: (last._id as Date).toISOString(),
+          secondary: String(last._id),
         };
         nextCursor = Buffer.from(JSON.stringify(composite)).toString('base64');
       }
@@ -142,9 +143,13 @@ export function createProjectMethods(mongoose: typeof import('mongoose')): Proje
     return { deletedCount: result.deletedCount };
   }
 
-  async function getProjectFiles(projectId: string): Promise<IMongoFile[]> {
+  async function getProjectFiles(projectId: string, userId?: string): Promise<IMongoFile[]> {
     const File = mongoose.models.File as Model<IMongoFile>;
-    return File.find({ projectId, conversationId: { $exists: false } }).lean();
+    const filter: FilterQuery<IMongoFile> = { projectId, conversationId: { $exists: false } };
+    if (userId) {
+      filter.user = userId;
+    }
+    return File.find(filter).lean();
   }
 
   async function getProjectConversationCount(projectId: string, userId: string): Promise<number> {

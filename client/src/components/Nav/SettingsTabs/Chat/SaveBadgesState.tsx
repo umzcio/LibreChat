@@ -1,4 +1,4 @@
-import { useRecoilState } from 'recoil';
+import { useAtom } from 'jotai';
 import { Switch, InfoHoverCard, ESide } from '@librechat/client';
 import { useLocalize } from '~/hooks';
 import store from '~/store';
@@ -8,7 +8,7 @@ export default function SaveBadgesState({
 }: {
   onCheckedChange?: (value: boolean) => void;
 }) {
-  const [saveBadgesState, setSaveBadgesState] = useRecoilState<boolean>(store.saveBadgesState);
+  const [saveBadgesState, setSaveBadgesState] = useAtom(store.saveBadgesState);
   const localize = useLocalize();
 
   const handleCheckedChange = (value: boolean) => {

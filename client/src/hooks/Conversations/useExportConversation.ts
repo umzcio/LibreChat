@@ -19,7 +19,7 @@ import type {
 } from 'librechat-data-provider';
 import useBuildMessageTree from '~/hooks/Messages/useBuildMessageTree';
 import { useScreenshot } from '~/hooks/ScreenshotContext';
-import { cleanupPreset } from '~/utils';
+import { cleanupPreset, logger } from '~/utils';
 
 type ExportValues = {
   fieldName: string;
@@ -161,8 +161,8 @@ export default function useExportConversation({
     try {
       data = await captureScreenshot();
     } catch (err) {
-      console.error('Failed to capture screenshot');
-      return console.error(err);
+      logger.error('Export', 'Failed to capture screenshot:', err);
+      return;
     }
     download(data, `${filename}.png`, 'image/png');
   };

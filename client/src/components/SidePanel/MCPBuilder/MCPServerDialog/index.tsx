@@ -33,6 +33,7 @@ interface MCPServerDialogProps {
   children?: React.ReactNode;
   triggerRef?: React.MutableRefObject<HTMLDivElement | HTMLButtonElement | null>;
   server?: MCPServerDefinition | null;
+  cosmeticOnly?: boolean;
 }
 
 export default function MCPServerDialog({
@@ -41,6 +42,7 @@ export default function MCPServerDialog({
   children,
   triggerRef,
   server,
+  cosmeticOnly = false,
 }: MCPServerDialogProps) {
   const localize = useLocalize();
   const { user } = useAuthContext();
@@ -55,6 +57,7 @@ export default function MCPServerDialog({
   // Form hook
   const formHook = useMCPServerForm({
     server,
+    cosmeticOnly,
     onSuccess: (serverName, isOAuth) => {
       if (isOAuth) {
         setCreatedServerId(serverName);
@@ -207,10 +210,10 @@ export default function MCPServerDialog({
           }
           showCloseButton={false}
           className="w-11/12 md:max-w-3xl"
-          main={<MCPServerForm formHook={formHook} />}
+          main={<MCPServerForm formHook={formHook} cosmeticOnly={cosmeticOnly} />}
           footerClassName="sm:justify-between"
           leftButtons={
-            isEditMode ? (
+            isEditMode && !cosmeticOnly ? (
               <div className="flex items-center gap-2">
                 <Button
                   variant="destructive"

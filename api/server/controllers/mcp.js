@@ -13,10 +13,11 @@ const {
   isMCPDomainNotAllowedError,
   isMCPInspectionFailedError,
 } = require('@librechat/api');
-const { Constants, MCPServerUserInputSchema } = require('librechat-data-provider');
+const { Constants, MCPServerUserInputSchema, MCPServerCosmeticUpdateSchema } = require('librechat-data-provider');
 const { resolveConfigServers, resolveAllMcpConfigs } = require('~/server/services/MCP');
 const { cacheMCPServerTools, getMCPServerTools } = require('~/server/services/Config');
 const { getMCPManager, getMCPServersRegistry } = require('~/config');
+const db = require('~/models');
 
 /**
  * Handles MCP-specific errors and sends appropriate HTTP responses.
@@ -304,6 +305,50 @@ const deleteMCPServerController = async (req, res) => {
   }
 };
 
+/**
+ * Update cosmetic metadata on a yaml/config-defined MCP server.
+ * Admin-only. Does not modify connection settings.
+ * @route PATCH /api/mcp/servers/:serverName/cosmetics
+ */
+const updateMCPServerCosmeticsController = async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const { serverName } = req.params;
+
+    const validation = MCPServerCosmeticUpdateSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({
+        message: 'Invalid cosmetic update',
+        errors: validation.error.errors,
+      });
+    }
+
+    const registry = getMCPServersRegistry();
+    const configServers = await resolveConfigServers(req);
+    const serverConfig = await registry.getServerConfig(serverName, userId, configServers);
+    if (!serverConfig) {
+      return res.status(404).json({ message: `MCP server '${serverName}' not found` });
+    }
+
+    if (serverConfig.source === 'user') {
+      return res.status(400).json({
+        message: 'User-created servers should use the standard update endpoint',
+      });
+    }
+
+    const cosmeticData = validation.data;
+    await db.upsertCosmeticOverride(serverName, cosmeticData, userId);
+
+    await registry.applyCosmeticOverride(serverName, cosmeticData);
+
+    const updatedConfig = await registry.getServerConfig(serverName, userId, configServers);
+    res.status(200).json(redactServerSecrets(updatedConfig));
+  } catch (error) {
+    logger.error('[updateMCPServerCosmetics]', error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   getMCPTools,
   getMCPServersList,
@@ -311,4 +356,5 @@ module.exports = {
   getMCPServerById,
   updateMCPServerController,
   deleteMCPServerController,
+  updateMCPServerCosmeticsController,
 };

@@ -471,9 +471,7 @@ export const useDeleteConversationMutation = (
         await queryClient.cancelQueries([QueryKeys.archivedConversations]);
         // could store old state if needed for rollback
       },
-      onError: () => {
-        // TODO: CHECK THIS, no-op; restore if needed
-      },
+      onError: () => {},
       onSuccess: (data, vars, context) => {
         if (vars.conversationId) {
           removeConvoFromAllQueries(queryClient, vars.conversationId);
@@ -736,7 +734,7 @@ export const useCreateAssistantMutation = (
           return options?.onSuccess?.(newAssistant, variables, context);
         }
 
-        const currentAssistants = [newAssistant, ...JSON.parse(JSON.stringify(listRes.data))];
+        const currentAssistants = [newAssistant, ...structuredClone(listRes.data)];
 
         queryClient.setQueryData<t.AssistantListResponse>(
           [QueryKeys.assistants, variables.endpoint, defaultOrderQuery],

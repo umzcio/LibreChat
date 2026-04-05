@@ -3,7 +3,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import supersub from 'remark-supersub';
 import rehypeKatex from 'rehype-katex';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkDirective from 'remark-directive';
@@ -15,7 +15,8 @@ import {
   MCPUIResourceCarousel,
 } from '~/components/MCPUIResource';
 import { Artifact, artifactPlugin } from '~/components/Artifacts/Artifact';
-import { ArtifactProvider, CodeBlockProvider } from '~/Providers';
+import { ArtifactUpdate } from '~/components/Artifacts/ArtifactUpdate';
+import { CodeBlockProvider } from '~/Providers';
 import MarkdownErrorBoundary from './MarkdownErrorBoundary';
 import { langSubset, preprocessLaTeX } from '~/utils';
 import { unicodeCitation } from '~/components/Web';
@@ -28,7 +29,7 @@ type TContentProps = {
 };
 
 const Markdown = memo(function Markdown({ content = '', isLatestMessage }: TContentProps) {
-  const LaTeXParsing = useRecoilValue<boolean>(store.LaTeXParsing);
+  const LaTeXParsing = useAtomValue(store.LaTeXParsing);
   const isInitializing = content === '';
 
   const currentContent = useMemo(() => {
@@ -75,34 +76,33 @@ const Markdown = memo(function Markdown({ content = '', isLatestMessage }: TCont
 
   return (
     <MarkdownErrorBoundary content={content} codeExecution={true}>
-      <ArtifactProvider>
-        <CodeBlockProvider>
-          <ReactMarkdown
-            /** @ts-ignore */
-            remarkPlugins={remarkPlugins}
-            /* @ts-ignore */
-            rehypePlugins={rehypePlugins}
-            components={
-              {
-                code,
-                a,
-                p,
-                img,
-                artifact: Artifact,
-                citation: Citation,
-                'highlighted-text': HighlightedText,
-                'composite-citation': CompositeCitation,
-                'mcp-ui-resource': MCPUIResource,
-                'mcp-ui-carousel': MCPUIResourceCarousel,
-              } as {
-                [nodeType: string]: React.ElementType;
-              }
+      <CodeBlockProvider>
+        <ReactMarkdown
+          // @ts-expect-error - remark/rehype plugin types incompatible with unified v11
+          remarkPlugins={remarkPlugins}
+          // @ts-expect-error - rehype plugin types incompatible with unified v11
+          rehypePlugins={rehypePlugins}
+          components={
+            {
+              code,
+              a,
+              p,
+              img,
+              artifact: Artifact,
+              'artifact-update': ArtifactUpdate,
+              citation: Citation,
+              'highlighted-text': HighlightedText,
+              'composite-citation': CompositeCitation,
+              'mcp-ui-resource': MCPUIResource,
+              'mcp-ui-carousel': MCPUIResourceCarousel,
+            } as {
+              [nodeType: string]: React.ElementType;
             }
-          >
-            {currentContent}
-          </ReactMarkdown>
-        </CodeBlockProvider>
-      </ArtifactProvider>
+          }
+        >
+          {currentContent}
+        </ReactMarkdown>
+      </CodeBlockProvider>
     </MarkdownErrorBoundary>
   );
 });

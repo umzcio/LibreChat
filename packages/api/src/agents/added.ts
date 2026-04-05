@@ -222,9 +222,7 @@ export async function loadAddedAgent(
     tools,
   };
 
-  if (ephemeralAgent?.artifacts != null && ephemeralAgent.artifacts) {
-    result.artifacts = ephemeralAgent.artifacts;
-  }
+  result.artifacts = ephemeralAgent?.artifacts || 'default';
 
   return result as unknown as Agent;
 }

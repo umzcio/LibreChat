@@ -1,10 +1,10 @@
 import { useState, useId, useRef, memo, useCallback, useMemo } from 'react';
 import * as Ariakit from '@ariakit/react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { QueryKeys } from 'librechat-data-provider';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
+import { QueryKeys, dataService } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import { DropdownPopup, Spinner, useToastContext } from '@librechat/client';
-import { Ellipsis, Share2, CopyPlus, Archive, Pen, Trash } from 'lucide-react';
+import { Ellipsis, Share2, CopyPlus, Archive, Pen, Trash, FolderInput, FolderOutput, Code2 } from 'lucide-react';
 import type { MouseEvent } from 'react';
 import type { TMessage } from 'librechat-data-provider';
 import {
@@ -15,10 +15,10 @@ import {
 } from '~/data-provider';
 import { useLocalize, useNavigateToConvo, useNewConvo } from '~/hooks';
 import { NotificationSeverity } from '~/common';
-import { useChatContext } from '~/Providers';
+import MoveToProjectDialog from '~/components/Projects/MoveToProjectDialog';
 import DeleteButton from './DeleteButton';
 import ShareButton from './ShareButton';
-import { cn } from '~/utils';
+import { buildConversationPath, cn, getConversationModeFromPath } from '~/utils';
 
 function ConvoOptions({
   conversationId,
@@ -29,6 +29,8 @@ function ConvoOptions({
   setIsPopoverActive,
   isActiveConvo,
   isShiftHeld = false,
+  index = 0,
+  projectId,
 }: {
   conversationId: string | null;
   title: string | null;
@@ -38,23 +40,27 @@ function ConvoOptions({
   setIsPopoverActive: (open: boolean) => void;
   isActiveConvo: boolean;
   isShiftHeld?: boolean;
+  index?: number;
+  projectId?: string;
 }) {
   const localize = useLocalize();
   const queryClient = useQueryClient();
-  const { index } = useChatContext();
   const { data: startupConfig } = useGetStartupConfig();
   const { navigateToConvo } = useNavigateToConvo(index);
   const { showToast } = useToastContext();
 
   const navigate = useNavigate();
-  const { conversationId: currentConvoId } = useParams();
+  const location = useLocation();
+  const { conversationId: currentConvoId, projectId: routeProjectId } = useParams();
   const { newConversation } = useNewConvo();
 
   const menuId = useId();
   const shareButtonRef = useRef<HTMLButtonElement>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const moveButtonRef = useRef<HTMLButtonElement>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [announcement, setAnnouncement] = useState('');
 
   const archiveConvoMutation = useArchiveConvoMutation();
@@ -63,7 +69,14 @@ function ConvoOptions({
     onSuccess: () => {
       if (currentConvoId === conversationId || currentConvoId === 'new') {
         newConversation();
-        navigate('/c/new', { replace: true });
+        navigate(
+          buildConversationPath({
+            conversationId: 'new',
+            mode: getConversationModeFromPath(location.pathname),
+            projectId: projectId ?? routeProjectId,
+          }),
+          { replace: true },
+        );
       }
       retainView();
       showToast({
@@ -149,7 +162,14 @@ function ConvoOptions({
             }, 10000);
             if (currentConvoId === convoId || currentConvoId === 'new') {
               newConversation();
-              navigate('/c/new', { replace: true });
+              navigate(
+                buildConversationPath({
+                  conversationId: 'new',
+                  mode: getConversationModeFromPath(location.pathname),
+                  projectId: projectId ?? routeProjectId,
+                }),
+                { replace: true },
+              );
             }
             retainView();
             setIsPopoverActive(false);
@@ -170,6 +190,8 @@ function ConvoOptions({
       archiveConvoMutation,
       navigate,
       newConversation,
+      projectId,
+      routeProjectId,
       retainView,
       setIsPopoverActive,
       showToast,
@@ -213,6 +235,77 @@ function ConvoOptions({
         ),
       },
       {
+        label: localize('com_ui_open_in_librecode'),
+        onClick: () => {
+          if (!conversationId) {
+            return;
+          }
+
+          navigate(
+            buildConversationPath({
+              conversationId,
+              mode: 'code',
+              projectId,
+            }),
+          );
+          setIsPopoverActive(false);
+        },
+        icon: <Code2 className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
+      },
+      {
+        label: localize('com_ui_move_to_project'),
+        onClick: () => {
+          setShowMoveDialog(true);
+        },
+        icon: <FolderInput className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
+        ariaHasPopup: 'dialog' as const,
+        ariaControls: 'move-to-project-dialog',
+        hideOnClick: false,
+        ref: moveButtonRef,
+        render: (props) => <button {...props} />,
+      },
+      {
+        label: localize('com_ui_remove_from_project'),
+        onClick: (e: MouseEvent) => {
+          e.stopPropagation();
+          if (!projectId || !conversationId) {
+            return;
+          }
+          // Optimistic: remove from cache immediately
+          queryClient.setQueryData(
+            [QueryKeys.projectConversations, projectId],
+            (old: { conversations: Array<{ conversationId?: string }> } | undefined) => {
+              if (!old) {
+                return old;
+              }
+              return {
+                ...old,
+                conversations: old.conversations.filter(
+                  (c) => c.conversationId !== conversationId,
+                ),
+              };
+            },
+          );
+          // Fire API call in background
+          dataService.removeConversationFromProject(projectId, conversationId).catch(() => {
+            // Revert on failure
+            queryClient.invalidateQueries([QueryKeys.projectConversations, projectId]);
+            showToast({
+              message: localize('com_ui_error_remove_from_project'),
+              severity: NotificationSeverity.ERROR,
+              showIcon: true,
+            });
+          });
+          showToast({
+            message: localize('com_ui_removed_from_project'),
+            severity: NotificationSeverity.SUCCESS,
+            showIcon: true,
+          });
+        },
+        icon: <FolderOutput className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
+        show: !!projectId,
+      },
+      {
         label: localize('com_ui_archive'),
         onClick: handleArchiveClick,
         hideOnClick: false,
@@ -244,6 +337,14 @@ function ConvoOptions({
       isDuplicateLoading,
       handleArchiveClick,
       handleDuplicateClick,
+      projectId,
+      conversationId,
+      queryClient,
+      showToast,
+      setIsPopoverActive,
+      retainView,
+      navigate,
+      location.pathname,
     ],
   );
 
@@ -342,6 +443,14 @@ function ConvoOptions({
           setShowDeleteDialog={setShowDeleteDialog}
         />
       )}
+      {showMoveDialog && (
+        <MoveToProjectDialog
+          open={showMoveDialog}
+          onOpenChange={setShowMoveDialog}
+          conversationIds={conversationId ? [conversationId] : []}
+          triggerRef={moveButtonRef}
+        />
+      )}
     </>
   );
 }
@@ -352,6 +461,8 @@ export default memo(ConvoOptions, (prevProps, nextProps) => {
     prevProps.title === nextProps.title &&
     prevProps.isPopoverActive === nextProps.isPopoverActive &&
     prevProps.isActiveConvo === nextProps.isActiveConvo &&
-    prevProps.isShiftHeld === nextProps.isShiftHeld
+    prevProps.isShiftHeld === nextProps.isShiftHeld &&
+    prevProps.projectId === nextProps.projectId &&
+    prevProps.retainView === nextProps.retainView
   );
 });

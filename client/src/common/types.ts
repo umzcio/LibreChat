@@ -2,7 +2,7 @@ import { RefObject } from 'react';
 import { FileSources, EModelEndpoint, isEphemeralAgentId } from 'librechat-data-provider';
 import type { UseMutationResult } from '@tanstack/react-query';
 import type * as InputNumberPrimitive from 'rc-input-number';
-import type { SetterOrUpdater, RecoilState } from 'recoil';
+import type { WritableAtom, SetStateAction } from 'jotai';
 import type { ColumnDef } from '@tanstack/react-table';
 import type * as t from 'librechat-data-provider';
 import type { LucideIcon } from 'lucide-react';
@@ -59,9 +59,9 @@ export type AudioChunk = {
 
 export type BadgeItem = {
   id: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
-  atom: RecoilState<boolean>;
+  atom: WritableAtom<boolean, [SetStateAction<boolean>], void>;
   isAvailable: boolean;
 };
 
@@ -81,6 +81,8 @@ export type AgentListItem = {
 export type TPluginMap = Record<string, t.TPlugin>;
 
 export type GenericSetter<T> = (value: T | ((currentValue: T) => T)) => void;
+
+export type AtomSetter<T> = (value: T | ((prev: T) => T)) => void;
 
 export type LastSelectedModels = Record<t.EModelEndpoint, string>;
 
@@ -149,7 +151,7 @@ export enum Panel {
 }
 
 export type FileSetter =
-  | SetterOrUpdater<Map<string, ExtendedFile>>
+  | ((value: Map<string, ExtendedFile> | ((prev: Map<string, ExtendedFile>) => Map<string, ExtendedFile>)) => void)
   | React.Dispatch<React.SetStateAction<Map<string, ExtendedFile>>>;
 
 export type ActionAuthForm = {

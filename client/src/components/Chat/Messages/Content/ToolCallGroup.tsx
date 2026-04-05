@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { ChevronDown } from 'lucide-react';
 import { ContentTypes, ToolCallTypes } from 'librechat-data-provider';
 import type { TMessageContentParts, Agents, FunctionToolCall } from 'librechat-data-provider';
@@ -109,7 +109,7 @@ export default function ToolCallGroup({
     return `${labels.slice(0, 3).join(', ')}, +${labels.length - 3}`;
   }, [toolNames, localize]);
 
-  const autoExpand = useRecoilValue(store.autoExpandTools);
+  const autoExpand = useAtomValue(store.autoExpandTools);
   const autoCollapse = !autoExpand && count >= 2 && allCompleted;
   const [isExpanded, setIsExpanded] = useState(autoExpand || !autoCollapse);
   const [userOverride, setUserOverride] = useState(false);

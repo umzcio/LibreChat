@@ -282,6 +282,8 @@ const createNewPromptGroup = async (req, res) => {
           `[createPromptGroup] Failed to grant owner permissions for promptGroup ${result.prompt.groupId}:`,
           permissionError,
         );
+        await deletePromptGroup({ _id: result.prompt.groupId });
+        return res.status(500).send({ error: 'Error granting owner permissions for prompt group' });
       }
     }
 

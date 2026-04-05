@@ -11,7 +11,7 @@ export function createAssistantMethods(mongoose: typeof import('mongoose')) {
     updateData: Partial<IAssistant>,
   ): Promise<IAssistant | null> {
     const Assistant = mongoose.models.Assistant as Model<IAssistant>;
-    const options = { new: true, upsert: true };
+    const options = { new: true, upsert: true, runValidators: true };
     return (await Assistant.findOneAndUpdate(
       searchParams,
       updateData,

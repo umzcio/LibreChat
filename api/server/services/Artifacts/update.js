@@ -1,55 +1,93 @@
 const ARTIFACT_START = ':::artifact';
-const ARTIFACT_END = ':::';
+const ARTIFACT_UPDATE_START = ':::artifact-update';
 
 /**
- * Find all artifact boundaries in the message
+ * Check if a match at the given position is an artifact-update (not a regular artifact)
+ * @param {string} text
+ * @param {number} position
+ * @returns {boolean}
+ */
+const isArtifactUpdate = (text, position) => {
+  return text.slice(position, position + ARTIFACT_UPDATE_START.length) === ARTIFACT_UPDATE_START;
+};
+
+/**
+ * Find the closing ::: for an artifact directive.
+ * The closing marker must be a standalone ::: on its own line (preceded by newline or start-of-string)
+ * and must NOT be inside a fenced code block.
+ * @param {string} text
+ * @param {number} searchFrom - position after the opening :::artifact line
+ * @returns {number} position of closing :::, or -1
+ */
+const findClosingMarker = (text, searchFrom) => {
+  let inCodeBlock = false;
+  let pos = searchFrom;
+
+  while (pos < text.length) {
+    const lineEnd = text.indexOf('\n', pos);
+    const line = lineEnd === -1 ? text.slice(pos) : text.slice(pos, lineEnd);
+    const trimmed = line.trimStart();
+
+    if (trimmed.startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+    } else if (!inCodeBlock && trimmed === ':::') {
+      return pos + (line.length - trimmed.length);
+    }
+
+    if (lineEnd === -1) {
+      break;
+    }
+    pos = lineEnd + 1;
+  }
+  return -1;
+};
+
+/**
+ * Find all artifact boundaries in the message, excluding artifact-update directives
  * @param {TMessage} message
  * @returns {Array<{start: number, end: number, source: 'content'|'text', partIndex?: number}>}
  */
 const findAllArtifacts = (message) => {
   const artifacts = [];
 
-  // Check content parts first
-  if (message.content?.length) {
-    message.content.forEach((part, partIndex) => {
-      if (part.type === 'text' && typeof part.text === 'string') {
-        let currentIndex = 0;
-        let start = part.text.indexOf(ARTIFACT_START, currentIndex);
-
-        while (start !== -1) {
-          const end = part.text.indexOf(ARTIFACT_END, start + ARTIFACT_START.length);
-          artifacts.push({
-            start,
-            end: end !== -1 ? end + ARTIFACT_END.length : part.text.length,
-            source: 'content',
-            partIndex,
-            text: part.text,
-          });
-
-          currentIndex = end !== -1 ? end + ARTIFACT_END.length : part.text.length;
-          start = part.text.indexOf(ARTIFACT_START, currentIndex);
-        }
-      }
-    });
-  }
-
-  // Check message.text if no content parts
-  if (!artifacts.length && message.text) {
+  const findInText = (text, source, partIndex) => {
     let currentIndex = 0;
-    let start = message.text.indexOf(ARTIFACT_START, currentIndex);
+    let start = text.indexOf(ARTIFACT_START, currentIndex);
 
     while (start !== -1) {
-      const end = message.text.indexOf(ARTIFACT_END, start + ARTIFACT_START.length);
-      artifacts.push({
-        start,
-        end: end !== -1 ? end + ARTIFACT_END.length : message.text.length,
-        source: 'text',
-        text: message.text,
-      });
+      if (isArtifactUpdate(text, start)) {
+        currentIndex = start + ARTIFACT_UPDATE_START.length;
+        start = text.indexOf(ARTIFACT_START, currentIndex);
+        continue;
+      }
 
-      currentIndex = end !== -1 ? end + ARTIFACT_END.length : message.text.length;
-      start = message.text.indexOf(ARTIFACT_START, currentIndex);
+      const lineEnd = text.indexOf('\n', start);
+      const contentStart = lineEnd !== -1 ? lineEnd + 1 : text.length;
+      const closingPos = findClosingMarker(text, contentStart);
+      const end = closingPos !== -1 ? closingPos + 3 : text.length;
+
+      const entry = { start, end, source, text };
+      if (partIndex != null) {
+        entry.partIndex = partIndex;
+      }
+      artifacts.push(entry);
+
+      currentIndex = end;
+      start = text.indexOf(ARTIFACT_START, currentIndex);
     }
+  };
+
+  if (message.content?.length) {
+    for (let i = 0; i < message.content.length; i++) {
+      const part = message.content[i];
+      if (part.type === 'text' && typeof part.text === 'string') {
+        findInText(part.text, 'content', i);
+      }
+    }
+  }
+
+  if (!artifacts.length && message.text) {
+    findInText(message.text, 'text');
   }
 
   return artifacts;
@@ -58,18 +96,11 @@ const findAllArtifacts = (message) => {
 const replaceArtifactContent = (originalText, artifact, original, updated) => {
   const artifactContent = artifact.text.substring(artifact.start, artifact.end);
 
-  // Find boundaries between ARTIFACT_START and ARTIFACT_END
   const contentStart = artifactContent.indexOf('\n', artifactContent.indexOf(ARTIFACT_START)) + 1;
-  let contentEnd = artifactContent.lastIndexOf(ARTIFACT_END);
+  const closingPos = findClosingMarker(artifactContent, contentStart);
+  const contentEnd = closingPos !== -1 ? closingPos : artifactContent.length;
 
-  // Special case: if contentEnd is 0, it means the only ::: found is at the start of :::artifact
-  // This indicates an incomplete artifact (no closing :::)
-  // We need to check that it's exactly at position 0 (the beginning of artifactContent)
-  if (contentEnd === 0 && artifactContent.indexOf(ARTIFACT_START) === 0) {
-    contentEnd = artifactContent.length;
-  }
-
-  if (contentStart === -1 || contentEnd === -1) {
+  if (contentStart <= 0) {
     return null;
   }
 
@@ -126,9 +157,13 @@ const replaceArtifactContent = (originalText, artifact, original, updated) => {
   return updatedText.replace(/\n+(?=```\n:::)/g, '\n');
 };
 
+const ARTIFACT_END = ':::';
+
 module.exports = {
   ARTIFACT_START,
+  ARTIFACT_UPDATE_START,
   ARTIFACT_END,
   findAllArtifacts,
+  findClosingMarker,
   replaceArtifactContent,
 };

@@ -61,7 +61,8 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, cont
       errorData = { message: error.message };
     } else if (isErrorObject(error)) {
       // Handle axios error response structure
-      errorData = (error as any)?.response?.data || (error as any)?.data || error;
+      const errorObj = error as Exclude<ApiError, string | Error>;
+      errorData = errorObj?.response?.data || errorObj?.data || error;
     } else {
       errorData = error;
     }
@@ -70,11 +71,13 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, cont
     let errorMessage = '';
     if (isErrorInstance(error)) {
       errorMessage = error.message;
-    } else if (isErrorObject(error) && (error as any)?.message) {
-      errorMessage = (error as any).message;
+    } else if (isErrorObject(error) && (error as Exclude<ApiError, string | Error>)?.message) {
+      errorMessage = (error as Exclude<ApiError, string | Error>).message ?? '';
     }
 
-    const errorCode = isErrorObject(error) ? (error as any)?.code : '';
+    const errorCode = isErrorObject(error)
+      ? (error as Exclude<ApiError, string | Error>)?.code
+      : '';
 
     // Handle timeout errors specifically
     if (errorCode === 'ECONNABORTED' || errorMessage?.includes('timeout')) {
@@ -94,7 +97,9 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, cont
     }
 
     // Handle specific HTTP status codes before generic userMessage
-    const status = isErrorObject(error) ? (error as any)?.response?.status : null;
+    const status = isErrorObject(error)
+      ? (error as Exclude<ApiError, string | Error>)?.response?.status
+      : null;
     if (status) {
       if (status === 404) {
         return {
@@ -108,9 +113,11 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, cont
         return {
           title: localize('com_agents_error_invalid_request'),
           message:
-            (errorData as any)?.userMessage || localize('com_agents_error_bad_request_message'),
+            (errorData as { userMessage?: string })?.userMessage ||
+            localize('com_agents_error_bad_request_message'),
           suggestion:
-            (errorData as any)?.suggestion || localize('com_agents_error_bad_request_suggestion'),
+            (errorData as { suggestion?: string })?.suggestion ||
+            localize('com_agents_error_bad_request_suggestion'),
         };
       }
 
@@ -124,12 +131,12 @@ export const ErrorDisplay: React.FC<ErrorDisplayProps> = ({ error, onRetry, cont
     }
 
     // Use user-friendly message from backend if available (after specific status code handling)
-    if (errorData && typeof errorData === 'object' && (errorData as any)?.userMessage) {
+    const errorDataObj = errorData as { userMessage?: string; suggestion?: string } | null;
+    if (errorData && typeof errorData === 'object' && errorDataObj?.userMessage) {
       return {
         title: getContextualTitle(),
-        message: (errorData as any).userMessage,
-        suggestion:
-          (errorData as any).suggestion || localize('com_agents_error_suggestion_generic'),
+        message: errorDataObj.userMessage,
+        suggestion: errorDataObj.suggestion || localize('com_agents_error_suggestion_generic'),
       };
     }
 

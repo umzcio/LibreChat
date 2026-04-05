@@ -14,9 +14,9 @@ import type {
   ValidationResult,
 } from 'librechat-data-provider';
 import type { ActionAuthForm } from '~/common';
-import type { Spec } from './ActionsTable';
+import type { Spec } from '../Shared';
 import ActionCallback from '~/components/SidePanel/Builder/ActionCallback';
-import { ActionsTable, columns } from './ActionsTable';
+import { ActionsTable, columns } from '../Shared';
 import { useUpdateAgentAction } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { logger } from '~/utils';
@@ -210,19 +210,6 @@ export default function ActionsInput({
           >
             {localize('com_ui_schema')}
           </label>
-          {/* TODO: Implement examples functionality
-          <div className="flex items-center gap-2">
-            <select
-              onChange={(e) => logger.log('actions', 'selecting example action', e.target.value)}
-              className="border-token-border-medium h-8 min-w-[100px] rounded-lg border bg-transparent px-2 py-0 text-sm"
-            >
-              <option value="label">{localize('com_ui_examples')}</option>
-              <option value="0">Weather (JSON)</option>
-              <option value="1">Pet Store (YAML)</option>
-              <option value="2">Blank Template</option>
-            </select>
-          </div>
-          */}
         </div>
         <div className="border-token-border-medium bg-token-surface-primary hover:border-token-border-hover mb-4 w-full overflow-hidden rounded-lg border ring-0">
           <div className="relative">

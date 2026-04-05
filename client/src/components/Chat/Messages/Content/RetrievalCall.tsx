@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { Tools } from 'librechat-data-provider';
 import { TooltipAnchor } from '@librechat/client';
 import { FileText, FileSpreadsheet, FileCode, FileImage, File } from 'lucide-react';
@@ -338,7 +338,7 @@ export default function RetrievalCall({
   const errorState = typeof output === 'string' && isError(output);
   const cancelled = !isSubmitting && initialProgress < 1 && !errorState;
   const hasOutput = !!output && !isError(output);
-  const autoExpand = useRecoilValue(store.autoExpandTools);
+  const autoExpand = useAtomValue(store.autoExpandTools);
   const [showOutput, setShowOutput] = useState(() => autoExpand && hasOutput);
   const { style: expandStyle, ref: expandRef } = useExpandCollapse(showOutput);
 

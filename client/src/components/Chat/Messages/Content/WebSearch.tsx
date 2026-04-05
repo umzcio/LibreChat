@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { Tools } from 'librechat-data-provider';
 import { Globe, ChevronDown } from 'lucide-react';
 import type { TAttachment, ValidSource, SearchResultData } from 'librechat-data-provider';
@@ -162,7 +162,7 @@ export default function WebSearch({
     return localize(text);
   }, [ownTurn, localize, showSources, finalizing]);
 
-  const autoExpand = useRecoilValue(store.autoExpandTools);
+  const autoExpand = useAtomValue(store.autoExpandTools);
   const sourceCount = allSources.length;
   const [showSourceList, setShowSourceList] = useState(() => autoExpand && sourceCount > 0);
   const { style: sourceExpandStyle, ref: sourceExpandRef } = useExpandCollapse(showSourceList);

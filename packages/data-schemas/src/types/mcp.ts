@@ -11,3 +11,13 @@ export interface MCPServerDocument
   author: Types.ObjectId; // ObjectId reference in DB (vs string in API)
   tenantId?: string;
 }
+
+export interface MCPCosmeticOverrideDocument extends Document<Types.ObjectId> {
+  serverName: string;
+  title?: string;
+  description?: string;
+  iconPath?: string;
+  updatedBy: Types.ObjectId;
+  createdAt?: Date;
+  updatedAt?: Date;
+}

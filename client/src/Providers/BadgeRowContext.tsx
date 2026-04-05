@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { Tools, Constants, LocalStorageKeys, AgentCapabilities } from 'librechat-data-provider';
 import type { TAgentsEndpoint } from 'librechat-data-provider';
 import {
@@ -12,6 +12,7 @@ import {
 import { getTimestampedValue } from '~/utils/timestamps';
 import { useGetStartupConfig } from '~/data-provider';
 import { ephemeralAgentByConvoId } from '~/store';
+import { logger } from '~/utils';
 
 interface BadgeRowContextType {
   conversationId?: string | null;
@@ -79,7 +80,7 @@ export default function BadgeRowProvider({
   const isNewConvo = key === Constants.NEW_CONVO;
   const storageSuffix = isNewConvo && storageContextKey ? storageContextKey : key;
 
-  const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(key));
+  const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(key));
 
   /** Initialize ephemeralAgent from localStorage on mount and when conversation/spec changes.
    *  Skipped when a spec is active — applyModelSpecEphemeralAgent handles both new conversations
@@ -110,13 +111,13 @@ export default function BadgeRowProvider({
       const fileSearchToggleValue = getTimestampedValue(fileSearchToggleKey);
       const artifactsToggleValue = getTimestampedValue(artifactsToggleKey);
 
-      const initialValues: Record<string, any> = {};
+      const initialValues: Record<string, boolean | string[]> = {};
 
       if (codeToggleValue !== null) {
         try {
           initialValues[Tools.execute_code] = JSON.parse(codeToggleValue);
         } catch (e) {
-          console.error('Failed to parse code toggle value:', e);
+          logger.error('BadgeRow', 'Failed to parse code toggle value:', e);
         }
       }
 
@@ -124,7 +125,7 @@ export default function BadgeRowProvider({
         try {
           initialValues[Tools.web_search] = JSON.parse(webSearchToggleValue);
         } catch (e) {
-          console.error('Failed to parse web search toggle value:', e);
+          logger.error('BadgeRow', 'Failed to parse web search toggle value:', e);
         }
       }
 
@@ -132,7 +133,7 @@ export default function BadgeRowProvider({
         try {
           initialValues[Tools.file_search] = JSON.parse(fileSearchToggleValue);
         } catch (e) {
-          console.error('Failed to parse file search toggle value:', e);
+          logger.error('BadgeRow', 'Failed to parse file search toggle value:', e);
         }
       }
 
@@ -140,7 +141,7 @@ export default function BadgeRowProvider({
         try {
           initialValues[AgentCapabilities.artifacts] = JSON.parse(artifactsToggleValue);
         } catch (e) {
-          console.error('Failed to parse artifacts toggle value:', e);
+          logger.error('BadgeRow', 'Failed to parse artifacts toggle value:', e);
         }
       }
 
@@ -157,7 +158,7 @@ export default function BadgeRowProvider({
             mcpOverrides = parsed;
           }
         } catch (e) {
-          console.error('Failed to parse MCP values:', e);
+          logger.error('BadgeRow', 'Failed to parse MCP values:', e);
         }
       }
 

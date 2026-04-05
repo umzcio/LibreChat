@@ -1,5 +1,5 @@
 import { useMemo, useCallback } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { useLocation } from 'react-router-dom';
 import { SystemRoles } from 'librechat-data-provider';
 import { ArrowLeft, MessageSquareQuote } from 'lucide-react';
@@ -32,8 +32,8 @@ export default function DashBreadcrumb() {
   const { prevLocationPath } = useDashboardContext();
   const lastConversationId = useMemo(() => getConversationId(prevLocationPath), [prevLocationPath]);
 
-  const setPromptsName = useSetRecoilState(store.promptsName);
-  const setPromptsCategory = useSetRecoilState(store.promptsCategory);
+  const setPromptsName = useSetAtom(store.promptsName);
+  const setPromptsCategory = useSetAtom(store.promptsCategory);
 
   const clickCallback = useCallback(() => {
     setPromptsName('');

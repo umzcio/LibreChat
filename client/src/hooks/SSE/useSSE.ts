@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { request, createPayload, removeNullishValues } from 'librechat-data-provider';
 import type { TMessage, TPayload, TSubmission, EventSubmission } from 'librechat-data-provider';
 import type { EventHandlerParams } from './useEventHandlers';
@@ -9,7 +9,7 @@ import type { TResData } from '~/common';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
-import { clearAllDrafts } from '~/utils';
+import { logger, clearAllDrafts } from '~/utils';
 import store from '~/store';
 
 type ChatHelpers = Pick<
@@ -28,12 +28,19 @@ export default function useSSE(
   isAddedRequest = false,
   runIndex = 0,
 ) {
-  const setActiveRunId = useSetRecoilState(store.activeRunFamily(runIndex));
+  const setActiveRunId = useSetAtom(store.activeRunFamily(runIndex));
 
   const { token, isAuthenticated } = useAuthContext();
-  const [completed, setCompleted] = useState(new Set());
-  const setAbortScroll = useSetRecoilState(store.abortScrollFamily(runIndex));
-  const setShowStopButton = useSetRecoilState(store.showStopButtonByIndex(runIndex));
+  const completed = useRef(new Set<unknown>());
+  const setCompleted = useCallback<React.Dispatch<React.SetStateAction<Set<unknown>>>>(
+    (action) => {
+      completed.current =
+        typeof action === 'function' ? action(completed.current) : action;
+    },
+    [],
+  );
+  const setAbortScroll = useSetAtom(store.abortScrollFamily(runIndex));
+  const setShowStopButton = useSetAtom(store.showStopButtonByIndex(runIndex));
 
   const {
     setMessages,
@@ -96,24 +103,30 @@ export default function useSSE(
         const data = JSON.parse(e.data);
         attachmentHandler({ data, submission: submission as EventSubmission });
       } catch (error) {
-        console.error(error);
+        logger.error('useSSE', 'Error in attachment handler:', error);
       }
     });
 
     sse.addEventListener('message', (e: MessageEvent) => {
-      const data = JSON.parse(e.data);
+      let data;
+      try {
+        data = JSON.parse(e.data);
+      } catch (error) {
+        logger.error('useSSE', 'Failed to parse message data', error);
+        return;
+      }
 
       if (data.final != null) {
         clearAllDrafts(submission.conversation?.conversationId);
         try {
           finalHandler(data, submission as EventSubmission);
         } catch (error) {
-          console.error('Error in finalHandler:', error);
+          logger.error('useSSE', 'Error in finalHandler:', error);
           setIsSubmitting(false);
           setShowStopButton(false);
         }
         (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
-        console.log('final', data);
+        logger.log('useSSE', 'final', data);
         return;
       } else if (data.created != null) {
         const runId = v4();
@@ -156,21 +169,18 @@ export default function useSSE(
 
     sse.addEventListener('open', () => {
       setAbortScroll(false);
-      console.log('connection is opened');
+      logger.log('useSSE', 'connection is opened');
     });
 
     sse.addEventListener('cancel', async () => {
       const streamKey = (submission as TSubmission | null)?.['initialResponse']?.messageId;
-      if (completed.has(streamKey)) {
+      if (completed.current.has(streamKey)) {
         setIsSubmitting(false);
-        setCompleted((prev) => {
-          prev.delete(streamKey);
-          return new Set(prev);
-        });
+        completed.current.delete(streamKey);
         return;
       }
 
-      setCompleted((prev) => new Set(prev.add(streamKey)));
+      completed.current.add(streamKey);
       const latestMessages = getMessages();
       const conversationId = latestMessages?.[latestMessages.length - 1]?.conversationId;
       try {
@@ -183,14 +193,14 @@ export default function useSSE(
           latestMessages,
         );
       } catch (error) {
-        console.error('Error during abort:', error);
+        logger.error('useSSE', 'Error during abort:', error);
         setIsSubmitting(false);
         setShowStopButton(false);
       }
     });
 
     sse.addEventListener('error', async (e: MessageEvent) => {
-      /* @ts-ignore */
+      // @ts-expect-error - sse.js types don't expose responseCode on MessageEvent
       if (e.responseCode === 401) {
         /* token expired, refresh and retry */
         try {
@@ -209,20 +219,20 @@ export default function useSSE(
           return;
         } catch (error) {
           /* token refresh failed, continue handling the original 401 */
-          console.log(error);
+          logger.error('useSSE', 'Token refresh failed:', error);
         }
       }
 
-      console.log('error in server stream.');
+      logger.error('useSSE', 'error in server stream.');
       (startupConfig?.balance?.enabled ?? false) && balanceQuery.refetch();
 
       let data: TResData | undefined = undefined;
       try {
         data = JSON.parse(e.data) as TResData;
       } catch (error) {
-        console.error(error);
-        console.log(e);
+        logger.error('useSSE', 'Failed to parse error data', error);
         setIsSubmitting(false);
+        setShowStopButton(false);
       }
 
       errorHandler({ data, submission: { ...submission, userMessage } as EventSubmission });
@@ -236,7 +246,7 @@ export default function useSSE(
       sse.close();
       if (isCancelled) {
         const e = new Event('cancel');
-        /* @ts-ignore */
+        // @ts-expect-error - sse.js types are incorrect, dispatchEvent actually takes Event
         sse.dispatchEvent(e);
       }
     };

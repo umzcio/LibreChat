@@ -1,10 +1,13 @@
+import mongoose from 'mongoose';
 import { PrincipalType, SystemRoles } from 'librechat-data-provider';
-import { logger, isValidObjectIdString, RoleConflictError } from '@librechat/data-schemas';
+import { logger, isValidObjectIdString, RoleConflictError, getTransactionSupport } from '@librechat/data-schemas';
 import type { IRole, IUser, IConfig, AdminMember } from '@librechat/data-schemas';
 import type { FilterQuery, Types } from 'mongoose';
 import type { Response } from 'express';
 import type { ServerRequest } from '~/types/http';
 import { parsePagination } from './pagination';
+
+let transactionSupportCache: boolean | null = null;
 
 const systemRoleValues = new Set<string>(Object.values(SystemRoles));
 
@@ -233,6 +236,10 @@ export function createAdminRolesHandlers(deps: AdminRolesDeps) {
   /**
    * Renames a role by migrating users to the new name and updating the role document.
    *
+   * When MongoDB transactions are supported, the user migration and role update are
+   * wrapped in a single transaction for atomicity. Otherwise, falls back to the
+   * snapshot-based rollback approach.
+   *
    * The ID snapshot from `findUserIdsByRole` is a point-in-time read. Users assigned
    * to `currentName` between the snapshot and the bulk `updateUsersByRole` write will
    * be moved to `newName` but will NOT be reverted on rollback. This window is narrow
@@ -243,6 +250,40 @@ export function createAdminRolesHandlers(deps: AdminRolesDeps) {
     newName: string,
     extraUpdates?: Partial<IRole>,
   ): Promise<IRole | null> {
+    const supportsTransactions = await getTransactionSupport(mongoose, transactionSupportCache);
+    transactionSupportCache = supportsTransactions;
+
+    if (supportsTransactions) {
+      const session = await mongoose.startSession();
+      try {
+        session.startTransaction();
+        const User = mongoose.models.User;
+        const Role = mongoose.models.Role;
+        await User.updateMany({ role: currentName }, { $set: { role: newName } }, { session });
+        const updates: Partial<IRole> = { name: newName, ...extraUpdates };
+        const role = await Role.findOneAndUpdate(
+          { name: currentName },
+          { $set: updates },
+          { new: true, session },
+        ).select('-__v').lean();
+        if (!role) {
+          await session.abortTransaction();
+          return null;
+        }
+        await session.commitTransaction();
+        return role as unknown as IRole;
+      } catch (error) {
+        try {
+          await session.abortTransaction();
+        } catch {
+          /** best-effort abort */
+        }
+        throw error;
+      } finally {
+        await session.endSession();
+      }
+    }
+
     const migratedIds = await findUserIdsByRole(currentName);
     await updateUsersByRole(currentName, newName);
     try {

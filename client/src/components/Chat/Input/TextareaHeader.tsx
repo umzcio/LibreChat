@@ -1,14 +1,14 @@
 import { memo } from 'react';
 import AddedConvo from './AddedConvo';
 import type { TConversation } from 'librechat-data-provider';
-import type { SetterOrUpdater } from 'recoil';
+import type { AtomSetter } from '~/common';
 
 export default memo(function TextareaHeader({
   addedConvo,
   setAddedConvo,
 }: {
   addedConvo: TConversation | null;
-  setAddedConvo: SetterOrUpdater<TConversation | null>;
+  setAddedConvo: AtomSetter<TConversation | null>;
 }) {
   if (!addedConvo) {
     return null;

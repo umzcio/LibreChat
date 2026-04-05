@@ -1,6 +1,6 @@
-import { Types } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import { PrincipalType, SystemRoles } from 'librechat-data-provider';
-import { logger, isValidObjectIdString } from '@librechat/data-schemas';
+import { logger, isValidObjectIdString, getTransactionSupport } from '@librechat/data-schemas';
 import type {
   IUser,
   IConfig,
@@ -12,6 +12,8 @@ import type { FilterQuery } from 'mongoose';
 import type { Response } from 'express';
 import type { ServerRequest } from '~/types/http';
 import { parsePagination } from './pagination';
+
+let transactionSupportCache: boolean | null = null;
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -40,10 +42,11 @@ export interface AdminUsersDeps {
     principalType: PrincipalType;
     principalId: string | Types.ObjectId;
   }) => Promise<void>;
+  deleteUserCascade?: (userId: string, userObjectId: Types.ObjectId) => Promise<void>;
 }
 
 export function createAdminUsersHandlers(deps: AdminUsersDeps) {
-  const { findUsers, countUsers, deleteUserById, deleteConfig, deleteAclEntries } = deps;
+  const { findUsers, countUsers, deleteUserById, deleteConfig, deleteAclEntries, deleteUserCascade } = deps;
 
   async function listUsersHandler(req: ServerRequest, res: Response) {
     try {
@@ -135,37 +138,83 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps) {
       }
 
       const [targetUser] = await findUsers({ _id: id }, 'role', { limit: 1 });
-      if (targetUser?.role === SystemRoles.ADMIN) {
-        const adminCount = await countUsers({ role: SystemRoles.ADMIN });
-        if (adminCount <= 1) {
-          return res.status(400).json({ error: 'Cannot delete the last admin user' });
-        }
-      }
 
-      const result = await deleteUserById(id);
+      const supportsTransactions = await getTransactionSupport(mongoose, transactionSupportCache);
+      transactionSupportCache = supportsTransactions;
 
-      if (result.deletedCount === 0) {
-        return res.status(404).json({ error: 'User not found' });
-      }
+      let result: UserDeleteResult;
 
-      if (targetUser?.role === SystemRoles.ADMIN) {
-        const remaining = await countUsers({ role: SystemRoles.ADMIN });
-        if (remaining === 0) {
-          logger.error(
-            `[adminUsers] CRITICAL: last admin deleted via race condition, user: ${id}. ` +
-              'Manual DB intervention required to restore an ADMIN user.',
+      if (supportsTransactions && targetUser?.role === SystemRoles.ADMIN) {
+        const User = mongoose.models.User;
+        const session = await mongoose.startSession();
+        try {
+          session.startTransaction();
+          const adminCount = await User.countDocuments(
+            { role: SystemRoles.ADMIN },
+            { session },
           );
+          if (adminCount <= 1) {
+            await session.abortTransaction();
+            return res.status(400).json({ error: 'Cannot delete the last admin user' });
+          }
+          const deleteResult = await User.deleteOne({ _id: id }, { session });
+          if (deleteResult.deletedCount === 0) {
+            await session.abortTransaction();
+            return res.status(404).json({ error: 'User not found' });
+          }
+          await session.commitTransaction();
+          result = { deletedCount: deleteResult.deletedCount, message: 'User was deleted successfully.' };
+        } catch (txError) {
+          try {
+            await session.abortTransaction();
+          } catch {
+            /** best-effort abort */
+          }
+          throw txError;
+        } finally {
+          await session.endSession();
+        }
+      } else {
+        if (targetUser?.role === SystemRoles.ADMIN) {
+          const adminCount = await countUsers({ role: SystemRoles.ADMIN });
+          if (adminCount <= 1) {
+            return res.status(400).json({ error: 'Cannot delete the last admin user' });
+          }
+        }
+
+        result = await deleteUserById(id);
+
+        if (result.deletedCount === 0) {
+          return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (targetUser?.role === SystemRoles.ADMIN) {
+          const remaining = await countUsers({ role: SystemRoles.ADMIN });
+          if (remaining === 0) {
+            logger.error(
+              `[adminUsers] CRITICAL: last admin deleted via race condition, user: ${id}. ` +
+                'Manual DB intervention required to restore an ADMIN user.',
+            );
+          }
         }
       }
 
       const objectId = new Types.ObjectId(id);
-      const cleanupResults = await Promise.allSettled([
-        deleteConfig(PrincipalType.USER, id),
-        deleteAclEntries({ principalType: PrincipalType.USER, principalId: objectId }),
-      ]);
-      for (const r of cleanupResults) {
-        if (r.status === 'rejected') {
-          logger.error('[adminUsers] cascade cleanup failed for user:', id, r.reason);
+      if (deleteUserCascade) {
+        try {
+          await deleteUserCascade(id, objectId);
+        } catch (cascadeErr) {
+          logger.error('[adminUsers] cascade cleanup failed for user:', id, cascadeErr);
+        }
+      } else {
+        const cleanupResults = await Promise.allSettled([
+          deleteConfig(PrincipalType.USER, id),
+          deleteAclEntries({ principalType: PrincipalType.USER, principalId: objectId }),
+        ]);
+        for (const r of cleanupResults) {
+          if (r.status === 'rejected') {
+            logger.error('[adminUsers] cascade cleanup failed for user:', id, r.reason);
+          }
         }
       }
 

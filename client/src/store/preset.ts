@@ -1,15 +1,11 @@
-import { atom } from 'recoil';
-import { TPreset } from 'librechat-data-provider';
+import { atom } from 'jotai';
+import type { TPreset } from 'librechat-data-provider';
 
-const defaultPreset = atom<TPreset | null>({
-  key: 'defaultPreset',
-  default: null,
-});
+const defaultPreset = atom<TPreset | null>(null);
+defaultPreset.debugLabel = 'defaultPreset';
 
-const presetModalVisible = atom<boolean>({
-  key: 'presetModalVisible',
-  default: false,
-});
+const presetModalVisible = atom<boolean>(false);
+presetModalVisible.debugLabel = 'presetModalVisible';
 
 export default {
   defaultPreset,

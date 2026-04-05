@@ -120,14 +120,14 @@ const PromptEditor: React.FC<Props> = ({ name, isEditing, setIsEditing }) => {
                 ) : (
                   <ReactMarkdown
                     remarkPlugins={[
-                      /** @ts-ignore */
+                      // @ts-expect-error - remark plugin types incompatible with unified v11
                       supersub,
                       remarkGfm,
                       [remarkMath, { singleDollarTextMath: false }],
                     ]}
-                    /** @ts-ignore */
+                    // @ts-expect-error - rehype plugin types incompatible with unified v11
                     rehypePlugins={rehypePlugins}
-                    /** @ts-ignore */
+                    // @ts-expect-error - custom component types don't match react-markdown expected signatures
                     components={{ p: PromptVariableGfm, code: codeNoExecution }}
                     className="markdown prose dark:prose-invert light w-full break-words text-text-primary"
                   >

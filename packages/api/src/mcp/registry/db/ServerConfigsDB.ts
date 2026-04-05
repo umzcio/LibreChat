@@ -60,14 +60,16 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
   private _dbMethods: AllMethods;
   private _aclService: AccessControlService;
   private _mongoose: typeof import('mongoose');
+  private _tenantId?: string;
 
-  constructor(mongoose: typeof import('mongoose')) {
+  constructor(mongoose: typeof import('mongoose'), tenantId?: string) {
     if (!mongoose) {
       throw new Error('ServerConfigsDB requires mongoose instance');
     }
     this._mongoose = mongoose;
     this._dbMethods = createMethods(mongoose);
     this._aclService = new AccessControlService(mongoose);
+    this._tenantId = tenantId;
   }
 
   /**
@@ -143,15 +145,21 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
     const createdServer = await this._dbMethods.createMCPServer({
       config: encryptedConfig,
       author: userId,
+      tenantId: this._tenantId,
     });
-    await this._aclService.grantPermission({
-      principalType: PrincipalType.USER,
-      principalId: userId,
-      resourceType: ResourceType.MCPSERVER,
-      resourceId: createdServer._id,
-      accessRoleId: AccessRoleIds.MCPSERVER_OWNER,
-      grantedBy: userId,
-    });
+    try {
+      await this._aclService.grantPermission({
+        principalType: PrincipalType.USER,
+        principalId: userId,
+        resourceType: ResourceType.MCPSERVER,
+        resourceId: createdServer._id,
+        accessRoleId: AccessRoleIds.MCPSERVER_OWNER,
+        grantedBy: userId,
+      });
+    } catch (permissionError) {
+      await this._dbMethods.deleteMCPServer(createdServer.serverName, this._tenantId);
+      throw permissionError;
+    }
     return {
       serverName: createdServer.serverName,
       config: await this.mapDBServerToParsedConfig(createdServer),
@@ -175,7 +183,7 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
       );
     }
 
-    const existingServer = await this._dbMethods.findMCPServerByServerName(serverName);
+    const existingServer = await this._dbMethods.findMCPServerByServerName(serverName, this._tenantId);
 
     let configToSave: ParsedServerConfig = {
       ...config,
@@ -217,7 +225,7 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
       };
     }
 
-    await this._dbMethods.updateMCPServer(serverName, { config: configToSave });
+    await this._dbMethods.updateMCPServer(serverName, { config: configToSave }, this._tenantId);
   }
 
   /**
@@ -246,7 +254,7 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
    */
   public async remove(serverName: string, userId?: string): Promise<void> {
     logger.debug(`[ServerConfigsDB.remove] removing ${serverName}. UserId: ${userId}`);
-    const deletedServer = await this._dbMethods.deleteMCPServer(serverName);
+    const deletedServer = await this._dbMethods.deleteMCPServer(serverName, this._tenantId);
     if (deletedServer && deletedServer._id) {
       logger.debug(`[ServerConfigsDB.remove] removing all permissions entries of ${serverName}.`);
       await this._aclService.removeAllPermissions({
@@ -265,7 +273,7 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
    * @returns The parsed server config or undefined if not found. If accessed via agent, consumeOnly will be true.
    */
   public async get(serverName: string, userId?: string): Promise<ParsedServerConfig | undefined> {
-    const server = await this._dbMethods.findMCPServerByServerName(serverName);
+    const server = await this._dbMethods.findMCPServerByServerName(serverName, this._tenantId);
     if (!server) return undefined;
 
     if (!userId) {
@@ -400,6 +408,7 @@ export class ServerConfigsDB implements IServerConfigsRepositoryInterface {
     if (agentOnlyServerNames.length > 0) {
       const agentServers = await this._dbMethods.getListMCPServersByNames({
         names: agentOnlyServerNames,
+        tenantId: this._tenantId,
       });
 
       const agentData = agentServers.data || [];

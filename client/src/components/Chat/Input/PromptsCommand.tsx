@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useMemo, memo, useCallback } from 'react';
 import { AutoSizer, List } from 'react-virtualized';
 import { Spinner, useCombobox } from '@librechat/client';
-import { useSetRecoilState, useRecoilValue } from 'recoil';
+import { useAtomValue, useSetAtom } from 'jotai';
 import type { TPromptGroup } from 'librechat-data-provider';
 import type { PromptOption } from '~/common';
 import { removeCharIfLast, detectVariables } from '~/utils';
@@ -30,7 +30,7 @@ const PopoverContainer = memo(
     setVariableDialogOpen: (isOpen: boolean) => void;
     textAreaRef: React.MutableRefObject<HTMLTextAreaElement | null>;
   }) => {
-    const showPromptsPopover = useRecoilValue(store.showPromptsPopoverFamily(index));
+    const showPromptsPopover = useAtomValue(store.showPromptsPopoverFamily(index));
     return (
       <>
         {showPromptsPopover ? children : null}
@@ -70,7 +70,7 @@ function PromptsCommand({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [isVariableDialogOpen, setVariableDialogOpen] = useState(false);
   const [variableGroup, setVariableGroup] = useState<TPromptGroup | null>(null);
-  const setShowPromptsPopover = useSetRecoilState(store.showPromptsPopoverFamily(index));
+  const setShowPromptsPopover = useSetAtom(store.showPromptsPopoverFamily(index));
 
   const prompts = useMemo(() => data?.promptGroups, [data]);
   const promptsMap = useMemo(() => data?.promptsMap, [data]);

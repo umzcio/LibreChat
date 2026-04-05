@@ -269,3 +269,15 @@ export const MCPServerUserInputSchema = z.union([
 ]);
 
 export type MCPServerUserInput = z.infer<typeof MCPServerUserInputSchema>;
+
+/** Schema for cosmetic-only updates on yaml/config-defined MCP servers */
+export const MCPServerCosmeticUpdateSchema = z.object({
+  title: z
+    .string()
+    .regex(/^[a-zA-Z0-9 ]+$/, 'Title can only contain letters, numbers, and spaces')
+    .optional(),
+  description: z.string().optional(),
+  iconPath: z.string().optional(),
+});
+
+export type MCPServerCosmeticUpdate = z.infer<typeof MCPServerCosmeticUpdateSchema>;

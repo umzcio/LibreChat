@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { Button } from '@librechat/client';
 import { TriangleAlert } from 'lucide-react';
 import {
@@ -38,7 +38,7 @@ export default function ToolCall({
   auth?: string;
 }) {
   const localize = useLocalize();
-  const autoExpand = useRecoilValue(store.autoExpandTools);
+  const autoExpand = useAtomValue(store.autoExpandTools);
   const hasOutput = (output?.length ?? 0) > 0;
   const [showInfo, setShowInfo] = useState(() => autoExpand && hasOutput);
   const { style: expandStyle, ref: expandRef } = useExpandCollapse(showInfo);

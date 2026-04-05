@@ -239,6 +239,13 @@ function escapeForTemplateLiteral(content: string): string {
     .replace(/<\/script/gi, '<\\/script');
 }
 
+function escapeHtml(content: string): string {
+  return content
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
 const MARKED_CDN = 'https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js';
 const MARKED_SRI = 'sha384-948ahk4ZmxYVYOc+rxN1H2gM1EJ2Duhp7uHtZ4WSLkV4Vtx5MUqnV+l7u9B+jFv+';
 
@@ -298,6 +305,49 @@ document.getElementById('content').innerHTML = marked.parse(\`${escapedContent}\
 </html>`;
 }
 
+function generatePlainTextHtml(content: string): string {
+  const escapedContent = escapeHtml(content);
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plain Text Preview</title>
+<style>
+  :root {
+    color-scheme: light dark;
+  }
+  body {
+    margin: 0;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    background: #ffffff;
+    color: #111827;
+  }
+  pre {
+    box-sizing: border-box;
+    margin: 0;
+    min-height: 100vh;
+    padding: 1.5rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.5;
+    font-size: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+  }
+</style>
+</head>
+<body>
+<pre>${escapedContent || ' '}</pre>
+</body>
+</html>`;
+}
+
 export const getMarkdownFiles = (content: string): Record<string, string> => {
   const md = content || '# No content provided';
   return {
@@ -305,3 +355,8 @@ export const getMarkdownFiles = (content: string): Record<string, string> => {
     'index.html': generateMarkdownHtml(md),
   };
 };
+
+export const getPlainTextFiles = (content: string): Record<string, string> => ({
+  'content.txt': content,
+  'index.html': generatePlainTextHtml(content),
+});

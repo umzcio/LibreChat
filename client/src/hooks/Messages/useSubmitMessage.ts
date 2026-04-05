@@ -1,9 +1,10 @@
 import { useCallback } from 'react';
-import { useRecoilValue, useSetRecoilState } from 'recoil';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { replaceSpecialVars } from 'librechat-data-provider';
 import { useChatContext, useChatFormContext, useAddedChatContext } from '~/Providers';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { mainTextareaId } from '~/common';
+import { logger } from '~/utils';
 import store from '~/store';
 
 export default function useSubmitMessage() {
@@ -11,15 +12,16 @@ export default function useSubmitMessage() {
   const methods = useChatFormContext();
   const { conversation: addedConvo } = useAddedChatContext();
   const { ask, index, getMessages, setMessages } = useChatContext();
-  const latestMessage = useRecoilValue(store.latestMessageFamily(index));
+  const latestMessage = useAtomValue(store.latestMessageFamily(index));
 
-  const autoSendPrompts = useRecoilValue(store.autoSendPrompts);
-  const setActivePrompt = useSetRecoilState(store.activePromptByIndex(index));
+  const autoSendPrompts = useAtomValue(store.autoSendPrompts);
+  const setActivePrompt = useSetAtom(store.activePromptByIndex(index));
 
   const submitMessage = useCallback(
     (data?: { text: string }) => {
       if (!data) {
-        return console.warn('No data provided to submitMessage');
+        logger.warn('SubmitMessage', 'No data provided to submitMessage');
+        return;
       }
       const rootMessages = getMessages();
       const isLatestInRootMessages = rootMessages?.some(

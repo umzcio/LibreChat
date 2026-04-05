@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { useSetRecoilState } from 'recoil';
-// @ts-ignore - no type definitions available
+import { useSetAtom } from 'jotai';
+// @ts-expect-error - react-avatar-editor has no type definitions
 import AvatarEditor from 'react-avatar-editor';
 import { FileImage, RotateCw, Upload, ZoomIn, ZoomOut, Move, X } from 'lucide-react';
 import { fileConfig as defaultFileConfig, mergeFileConfig } from 'librechat-data-provider';
@@ -33,7 +33,7 @@ interface Position {
 }
 
 function Avatar() {
-  const setUser = useSetRecoilState(store.user);
+  const setUser = useSetAtom(store.user);
 
   const [scale, setScale] = useState<number>(1);
   const [rotation, setRotation] = useState<number>(0);

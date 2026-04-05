@@ -9,7 +9,7 @@ import React, {
   useCallback,
 } from 'react';
 import { Badge } from '@librechat/client';
-import { useRecoilValue, useRecoilCallback } from 'recoil';
+import { useAtomValue, useAtom } from 'jotai';
 import type { LucideIcon } from 'lucide-react';
 import CodeInterpreter from './CodeInterpreter';
 import { BadgeRowProvider } from '~/Providers';
@@ -46,8 +46,13 @@ interface BadgeWrapperProps {
 const BadgeWrapper = React.memo(
   forwardRef<HTMLDivElement, BadgeWrapperProps>(
     ({ badge, isEditing, isInChat, onToggle, onDelete, onMouseDown, badgeRefs }, ref) => {
-      const atomBadge = useRecoilValue(badge.atom);
+      const [atomBadge, setAtomBadge] = useAtom(badge.atom);
       const isActive = badge.atom ? atomBadge : false;
+
+      const handleToggle = useCallback(() => {
+        setAtomBadge((prev) => !prev);
+        onToggle(badge);
+      }, [badge, onToggle, setAtomBadge]);
 
       return (
         <div
@@ -72,7 +77,7 @@ const BadgeWrapper = React.memo(
             isEditing={isEditing}
             isAvailable={badge.isAvailable}
             isInChat={isInChat}
-            onToggle={() => onToggle(badge)}
+            onToggle={handleToggle}
             onBadgeAction={() => onDelete(badge.id)}
           />
         </div>
@@ -164,20 +169,11 @@ function BadgeRow({
   const containerRectRef = useRef<DOMRect | null>(null);
 
   const allBadges = useChatBadges();
-  const isEditing = useRecoilValue(store.isEditingBadges);
+  const isEditing = useAtomValue(store.isEditingBadges);
 
   const badges = useMemo(
     () => allBadges.filter((badge) => badge.isAvailable !== false),
     [allBadges],
-  );
-
-  const toggleBadge = useRecoilCallback(
-    ({ snapshot, set }) =>
-      async (badgeAtom: any) => {
-        const current = await snapshot.getPromise(badgeAtom);
-        set(badgeAtom, !current);
-      },
-    [],
   );
 
   useEffect(() => {
@@ -295,14 +291,11 @@ function BadgeRow({
 
   const handleBadgeToggle = useCallback(
     (badge: BadgeItem) => {
-      if (badge.atom) {
-        toggleBadge(badge.atom);
-      }
       if (onToggle) {
         onToggle(badge.id, !!badge.atom);
       }
     },
-    [toggleBadge, onToggle],
+    [onToggle],
   );
 
   useEffect(() => {

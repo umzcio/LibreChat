@@ -1,5 +1,5 @@
 import { useState, useId, useCallback, useMemo, useRef } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import * as Ariakit from '@ariakit/react';
 import { BookmarkPlusIcon } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -22,11 +22,11 @@ const BookmarkMenu: FC = () => {
   const queryClient = useQueryClient();
   const { showToast } = useToastContext();
 
-  const conversation = useRecoilValue(store.conversationByIndex(0)) || undefined;
-  const conversationId = conversation?.conversationId ?? '';
+  const bookmarkInfo = useAtomValue(store.conversationBookmarkInfoByIndex(0));
+  const conversationId = bookmarkInfo?.conversationId ?? '';
   const updateConvoTags = useBookmarkSuccess(conversationId);
-  const tags = conversation?.tags;
-  const isTemporary = conversation?.expiredAt != null;
+  const tags = bookmarkInfo?.tags;
+  const isTemporary = bookmarkInfo?.expiredAt != null;
 
   const menuId = useId();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -59,7 +59,7 @@ const BookmarkMenu: FC = () => {
   const { data } = useConversationTagsQuery();
 
   const isActiveConvo = Boolean(
-    conversation &&
+    bookmarkInfo &&
       conversationId &&
       conversationId !== Constants.NEW_CONVO &&
       conversationId !== 'search',

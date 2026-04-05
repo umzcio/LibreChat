@@ -1,4 +1,4 @@
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { QueryKeys, dataService } from 'librechat-data-provider';
 import { useQuery } from '@tanstack/react-query';
 import type { QueryObserverResult, UseQueryOptions } from '@tanstack/react-query';
@@ -8,7 +8,7 @@ import store from '~/store';
 export const useGetBannerQuery = (
   config?: UseQueryOptions<t.TBannerResponse>,
 ): QueryObserverResult<t.TBannerResponse> => {
-  const queriesEnabled = useRecoilValue<boolean>(store.queriesEnabled);
+  const queriesEnabled = useAtomValue(store.queriesEnabled);
   return useQuery<t.TBannerResponse>([QueryKeys.banner], () => dataService.getBanner(), {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
@@ -21,7 +21,7 @@ export const useGetBannerQuery = (
 export const useGetUserBalance = (
   config?: UseQueryOptions<t.TBalanceResponse>,
 ): QueryObserverResult<t.TBalanceResponse> => {
-  const queriesEnabled = useRecoilValue<boolean>(store.queriesEnabled);
+  const queriesEnabled = useAtomValue(store.queriesEnabled);
   return useQuery<t.TBalanceResponse>([QueryKeys.balance], () => dataService.getUserBalance(), {
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
@@ -34,7 +34,7 @@ export const useGetUserBalance = (
 export const useGetSearchEnabledQuery = (
   config?: UseQueryOptions<boolean>,
 ): QueryObserverResult<boolean> => {
-  const queriesEnabled = useRecoilValue<boolean>(store.queriesEnabled);
+  const queriesEnabled = useAtomValue(store.queriesEnabled);
   return useQuery<boolean>([QueryKeys.searchEnabled], () => dataService.getSearchEnabled(), {
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

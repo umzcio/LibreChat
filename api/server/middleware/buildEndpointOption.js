@@ -1,4 +1,4 @@
-const { handleError } = require('@librechat/api');
+const { handleError, createProjectContextBuilder } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const {
   EndpointURLs,
@@ -21,7 +21,6 @@ const buildFunction = {
 
 async function buildEndpointOption(req, res, next) {
   const { endpoint, endpointType } = req.body;
-  logger.debug(`[buildEndpointOption] raw projectId: ${req.body.projectId}`);
 
   let endpointsConfig;
   try {
@@ -105,17 +104,23 @@ async function buildEndpointOption(req, res, next) {
       req.body.endpointOption.attachments = updateFilesUsage(req.body.files);
     }
 
+    /** Persist projectId in endpointOption so it's saved to the conversation */
+    if (req.body.projectId) {
+      req.body.endpointOption.projectId = req.body.projectId;
+    }
+
     /** Inject project context for non-agent endpoints */
     if (req.body.projectId && !isAgents) {
-      try {
-        const project = await getProject(req.body.projectId);
-        if (project?.instructions) {
-          const existingSystem = req.body.endpointOption.promptPrefix || '';
-          req.body.endpointOption.promptPrefix = project.instructions +
-            (existingSystem ? '\n\n' + existingSystem : '');
-        }
-      } catch (err) {
-        logger.error('[buildEndpointOption] Error loading project context', err);
+      const { buildProjectContext } = createProjectContextBuilder({ getProject, getProjectFiles });
+      const projectContext = await buildProjectContext({
+        projectId: req.body.projectId,
+        userId: req.user.id,
+        userQuery: req.body.text || '',
+      });
+      if (projectContext) {
+        const existingSystem = req.body.endpointOption.promptPrefix || '';
+        req.body.endpointOption.promptPrefix = projectContext +
+          (existingSystem ? '\n\n' + existingSystem : '');
       }
     }
 

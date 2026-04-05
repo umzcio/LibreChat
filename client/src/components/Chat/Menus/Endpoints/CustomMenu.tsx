@@ -4,8 +4,8 @@ import { cn } from '~/utils';
 
 export interface CustomMenuProps extends Ariakit.MenuButtonProps<'div'> {
   label?: React.ReactNode;
-  values?: Record<string, any>;
-  onValuesChange?: (values: Record<string, any>) => void;
+  values?: Ariakit.MenuProviderProps['values'];
+  onValuesChange?: Ariakit.MenuProviderProps['setValues'];
   searchValue?: string;
   onSearch?: (value: string) => void;
   combobox?: Ariakit.ComboboxProps['render'];

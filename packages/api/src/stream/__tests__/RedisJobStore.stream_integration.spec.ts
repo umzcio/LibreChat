@@ -488,7 +488,7 @@ describe('RedisJobStore Integration Tests', () => {
       await store.destroy();
     });
 
-    // TODO: Debug consumer group timing with Redis Streams
+    /** Skipped: requires debugging consumer group timing with Redis Streams (infrastructure-dependent). */
     test.skip('should resume from where client left off', async () => {
       if (!ioredisClient) {
         return;

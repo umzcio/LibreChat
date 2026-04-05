@@ -1,4 +1,3 @@
-require('events').EventEmitter.defaultMaxListeners = 100;
 const { logger } = require('@librechat/data-schemas');
 const { getBufferString, HumanMessage } = require('@langchain/core/messages');
 const {
@@ -28,6 +27,7 @@ const {
   filterMalformedContentParts,
   countFormattedMessageTokens,
   hydrateMissingIndexTokenCounts,
+  createProjectContextBuilder,
 } = require('@librechat/api');
 const {
   Callback,
@@ -328,26 +328,24 @@ class AgentClient extends BaseClient {
 
     /** Project context (instructions + knowledge base) - stacks on top of everything */
     const projectId = this.options.req?.body?.projectId;
-    logger.debug(`[AgentClient] projectId from req.body: ${projectId}`);
+    const latestMessage = orderedMessages[orderedMessages.length - 1];
     if (projectId) {
-      try {
-        const project = await db.getProject(projectId);
-        if (project?.instructions) {
-          sharedRunContextParts.push(`## Project Instructions\n${project.instructions}`);
-        }
-        const projectFiles = await db.getProjectFiles(projectId);
-        const filesWithText = projectFiles.filter((f) => f.text);
-        if (filesWithText.length > 0) {
-          const fileContextParts = filesWithText.map((f) => `### ${f.filename}\n${f.text}`);
-          sharedRunContextParts.push(`## Project Knowledge Base\n${fileContextParts.join('\n\n')}`);
-        }
-      } catch (error) {
-        logger.error('[AgentClient] Error loading project context', error);
+      const { buildProjectContext } = createProjectContextBuilder({
+        getProject: db.getProject,
+        getProjectFiles: db.getProjectFiles,
+      });
+      const userQuery = latestMessage?.text || latestMessage?.content?.[0]?.text?.value || '';
+      const projectContext = await buildProjectContext({
+        projectId,
+        userId: this.options.req.user.id,
+        userQuery,
+      });
+      if (projectContext) {
+        sharedRunContextParts.push(projectContext);
       }
     }
 
     /** File context from the latest message (attachments) */
-    const latestMessage = orderedMessages[orderedMessages.length - 1];
     if (latestMessage?.fileContext) {
       sharedRunContextParts.push(latestMessage.fileContext);
     }
@@ -360,10 +358,11 @@ class AgentClient extends BaseClient {
       }
     }
 
-    /** Memory context (user preferences/memories) */
-    const withoutKeys = await this.useMemory();
-    if (withoutKeys) {
-      const memoryContext = `${memoryInstructions}\n\n# Existing memory about the user:\n${withoutKeys}`;
+    /** Memory context (user preferences/memories) via Mem0 semantic search */
+    const userQuery = latestMessage?.text || latestMessage?.content?.[0]?.text?.value || '';
+    const memoryResults = await this.useMemory(userQuery);
+    if (memoryResults) {
+      const memoryContext = `${memoryInstructions}\n\n# Relevant memories about the user:\n${memoryResults}`;
       sharedRunContextParts.push(memoryContext);
     }
 
@@ -449,9 +448,11 @@ class AgentClient extends BaseClient {
   }
 
   /**
+   * Retrieves relevant memories for the current conversation using Mem0 semantic search.
+   * @param {string} [userQuery] - The user's current message for semantic search
    * @returns {Promise<string | undefined>}
    */
-  async useMemory() {
+  async useMemory(userQuery) {
     const user = this.options.req.user;
     if (user.personalization?.memories === false) {
       return;
@@ -469,113 +470,34 @@ class AgentClient extends BaseClient {
       );
       return;
     }
+
     const appConfig = this.options.req.config;
     const memoryConfig = appConfig.memory;
     if (!memoryConfig || memoryConfig.disabled === true) {
       return;
     }
 
-    /** @type {Agent} */
-    let prelimAgent;
-    const allowedProviders = new Set(
-      appConfig?.endpoints?.[EModelEndpoint.agents]?.allowedProviders,
-    );
-    try {
-      if (memoryConfig.agent?.id != null && memoryConfig.agent.id !== this.options.agent.id) {
-        prelimAgent = await loadAgent({
-          req: this.options.req,
-          agent_id: memoryConfig.agent.id,
-          endpoint: EModelEndpoint.agents,
-        });
-      } else if (memoryConfig.agent?.id != null) {
-        prelimAgent = this.options.agent;
-      } else if (
-        memoryConfig.agent?.id == null &&
-        memoryConfig.agent?.model != null &&
-        memoryConfig.agent?.provider != null
-      ) {
-        prelimAgent = { id: Constants.EPHEMERAL_AGENT_ID, ...memoryConfig.agent };
-      }
-    } catch (error) {
-      logger.error(
-        '[api/server/controllers/agents/client.js #useMemory] Error loading agent for memory',
-        error,
-      );
-    }
-
-    if (!prelimAgent) {
-      return;
-    }
-
-    const agent = await initializeAgent(
-      {
-        req: this.options.req,
-        res: this.options.res,
-        agent: prelimAgent,
-        allowedProviders,
-        endpointOption: {
-          endpoint: !isEphemeralAgentId(prelimAgent.id)
-            ? EModelEndpoint.agents
-            : memoryConfig.agent?.provider,
-        },
-      },
-      {
-        getFiles: db.getFiles,
-        getUserKey: db.getUserKey,
-        getConvoFiles: db.getConvoFiles,
-        updateFilesUsage: db.updateFilesUsage,
-        getUserKeyValues: db.getUserKeyValues,
-        getToolFilesByIds: db.getToolFilesByIds,
-        getCodeGeneratedFiles: db.getCodeGeneratedFiles,
-        filterFilesByAgentAccess,
-      },
-    );
-
-    if (!agent) {
-      logger.warn(
-        '[api/server/controllers/agents/client.js #useMemory] No agent found for memory',
-        memoryConfig,
-      );
-      return;
-    }
-
-    const llmConfig = Object.assign(
-      {
-        provider: agent.provider,
-        model: agent.model,
-      },
-      agent.model_parameters,
-    );
-
-    /** @type {import('@librechat/api').MemoryConfig} */
-    const config = {
-      validKeys: memoryConfig.validKeys,
-      instructions: agent.instructions,
-      llmConfig,
-      tokenLimit: memoryConfig.tokenLimit,
-    };
-
+    const mem0 = require('~/server/services/Mem0Client');
     const userId = this.options.req.user.id + '';
-    const messageId = this.responseMessageId + '';
-    const conversationId = this.conversationId + '';
-    const streamId = this.options.req?._resumableStreamId || null;
-    const [withoutKeys, processMemory] = await createMemoryProcessor({
-      userId,
-      config,
-      messageId,
-      streamId,
-      conversationId,
-      memoryMethods: {
-        setMemory: db.setMemory,
-        deleteMemory: db.deleteMemory,
-        getFormattedMemories: db.getFormattedMemories,
-      },
-      res: this.options.res,
-      user: createSafeUser(this.options.req.user),
-    });
 
-    this.processMemory = processMemory;
-    return withoutKeys;
+    try {
+      const query = userQuery || 'general context';
+      const memories = await mem0.searchMemories(query, userId, { limit: 15 });
+
+      if (!memories || memories.length === 0) {
+        return;
+      }
+
+      const formatted = memories
+        .map((m, i) => `${i + 1}. ${m.memory}`)
+        .join('\n');
+
+      this._mem0Enabled = true;
+      return formatted;
+    } catch (error) {
+      logger.error('[useMemory] Mem0 search failed, falling back to no memory', error.message);
+      return;
+    }
   }
 
   /**
@@ -612,16 +534,25 @@ class AgentClient extends BaseClient {
   }
 
   /**
+   * Sends conversation messages to Mem0 for automatic memory extraction.
+   * Runs after agent completion — extracts facts, preferences, and relationships.
    * @param {BaseMessage[]} messages
-   * @returns {Promise<void | (TAttachment | null)[]>}
+   * @returns {Promise<void>}
    */
   async runMemory(messages) {
     try {
-      if (this.processMemory == null) {
+      if (!this._mem0Enabled) {
         return;
       }
+
       const appConfig = this.options.req.config;
       const memoryConfig = appConfig.memory;
+      if (!memoryConfig || memoryConfig.disabled === true) {
+        return;
+      }
+
+      const mem0 = require('~/server/services/Mem0Client');
+      const userId = this.options.req.user.id + '';
       const messageWindowSize = memoryConfig?.messageWindowSize ?? 5;
 
       let messagesToProcess = [...messages];
@@ -640,11 +571,22 @@ class AgentClient extends BaseClient {
       }
 
       const filteredMessages = messagesToProcess.map((msg) => this.filterImageUrls(msg));
-      const bufferString = getBufferString(filteredMessages);
-      const bufferMessage = new HumanMessage(`# Current Chat:\n\n${bufferString}`);
-      return await this.processMemory([bufferMessage]);
+      const mem0Messages = filteredMessages.map((msg) => ({
+        role: msg._getType?.() === 'human' ? 'user' : msg._getType?.() === 'ai' ? 'assistant' : msg.role || 'user',
+        content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content),
+      }));
+
+      const metadata = {};
+      if (this.options.req?.body?.projectId) {
+        metadata.project_id = this.options.req.body.projectId;
+      }
+      if (this.conversationId) {
+        metadata.conversation_id = this.conversationId;
+      }
+
+      await mem0.addMemories(mem0Messages, userId, { metadata });
     } catch (error) {
-      logger.error('Memory Agent failed to process memory', error);
+      logger.error('[AgentClient] Mem0 memory extraction failed', error.message);
     }
   }
 
@@ -736,6 +678,10 @@ class AgentClient extends BaseClient {
     try {
       if (!abortController) {
         abortController = new AbortController();
+      }
+
+      if (typeof abortController.signal?.setMaxListeners === 'function') {
+        abortController.signal.setMaxListeners(100);
       }
 
       /** @type {AppConfig['endpoints']['agents']} */

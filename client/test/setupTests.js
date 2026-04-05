@@ -2,6 +2,11 @@
  * https://create-react-app.dev/docs/running-tests/#initializing-test-environment
  */
 
+// Polyfill structuredClone for jsdom (not available in older Node/jsdom)
+if (typeof globalThis.structuredClone === 'undefined') {
+  globalThis.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
+}
+
 // react-testing-library renders your components to document.body,
 // this adds jest-dom's custom assertions
 // https://github.com/testing-library/jest-dom#table-of-contents

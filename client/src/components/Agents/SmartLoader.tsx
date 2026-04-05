@@ -75,7 +75,7 @@ export const useHasData = (data: AgentListResponse | undefined): boolean => {
   if (typeof data === 'object' && data !== null) {
     // Check for agent list data
     if ('agents' in data) {
-      const agents = (data as any).agents;
+      const agents = (data as AgentListResponse & { agents?: unknown[] }).agents;
       return Array.isArray(agents) && agents.length > 0;
     }
 

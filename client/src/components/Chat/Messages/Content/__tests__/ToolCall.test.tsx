@@ -1,5 +1,4 @@
 import React from 'react';
-import { RecoilRoot } from 'recoil';
 import { Tools, Constants } from 'librechat-data-provider';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ToolCall from '../ToolCall';
@@ -107,8 +106,8 @@ describe('ToolCall', () => {
     isSubmitting: false,
   };
 
-  const renderWithRecoil = (component: React.ReactElement) => {
-    return render(<RecoilRoot>{component}</RecoilRoot>);
+  const renderComponent = (component: React.ReactElement) => {
+    return render(component);
   };
 
   beforeEach(() => {
@@ -129,7 +128,7 @@ describe('ToolCall', () => {
         },
       ];
 
-      renderWithRecoil(<ToolCall {...mockProps} attachments={attachments as any} />);
+      renderComponent(<ToolCall {...mockProps} attachments={attachments as any} />);
 
       fireEvent.click(screen.getByTestId('progress-text'));
 
@@ -141,7 +140,7 @@ describe('ToolCall', () => {
     });
 
     it('should pass empty array when no attachments', () => {
-      renderWithRecoil(<ToolCall {...mockProps} />);
+      renderComponent(<ToolCall {...mockProps} />);
 
       fireEvent.click(screen.getByTestId('progress-text'));
 
@@ -172,7 +171,7 @@ describe('ToolCall', () => {
         },
       ];
 
-      renderWithRecoil(<ToolCall {...mockProps} attachments={attachments as any} />);
+      renderComponent(<ToolCall {...mockProps} attachments={attachments as any} />);
 
       fireEvent.click(screen.getByTestId('progress-text'));
 
@@ -196,7 +195,7 @@ describe('ToolCall', () => {
         },
       ];
 
-      renderWithRecoil(<ToolCall {...mockProps} attachments={attachments as any} />);
+      renderComponent(<ToolCall {...mockProps} attachments={attachments as any} />);
 
       const attachmentGroup = screen.getByTestId('attachment-group');
       expect(attachmentGroup).toBeInTheDocument();
@@ -204,13 +203,13 @@ describe('ToolCall', () => {
     });
 
     it('should not render AttachmentGroup when no attachments', () => {
-      renderWithRecoil(<ToolCall {...mockProps} />);
+      renderComponent(<ToolCall {...mockProps} />);
 
       expect(screen.queryByTestId('attachment-group')).not.toBeInTheDocument();
     });
 
     it('should not render AttachmentGroup when attachments is empty array', () => {
-      renderWithRecoil(<ToolCall {...mockProps} attachments={[]} />);
+      renderComponent(<ToolCall {...mockProps} attachments={[]} />);
 
       expect(screen.queryByTestId('attachment-group')).not.toBeInTheDocument();
     });
@@ -218,7 +217,7 @@ describe('ToolCall', () => {
 
   describe('tool call info visibility', () => {
     it('should toggle tool call info expand/collapse when clicking header', () => {
-      renderWithRecoil(<ToolCall {...mockProps} />);
+      renderComponent(<ToolCall {...mockProps} />);
 
       // ToolCallInfo is always in the DOM (CSS expand/collapse), but initially collapsed
       const toolCallInfo = screen.getByTestId('tool-call-info');
@@ -234,7 +233,7 @@ describe('ToolCall', () => {
     });
 
     it('should pass input and output props to ToolCallInfo', () => {
-      renderWithRecoil(<ToolCall {...mockProps} />);
+      renderComponent(<ToolCall {...mockProps} />);
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -249,7 +248,7 @@ describe('ToolCall', () => {
       const originalOpen = window.open;
       window.open = jest.fn();
 
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           initialProgress={0.5} // Less than 1 so it's not complete
@@ -272,7 +271,7 @@ describe('ToolCall', () => {
     });
 
     it('should not show auth section when cancelled', () => {
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           auth="https://auth.example.com"
@@ -285,7 +284,7 @@ describe('ToolCall', () => {
     });
 
     it('should not show auth section when progress is complete', () => {
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           auth="https://auth.example.com"
@@ -300,7 +299,7 @@ describe('ToolCall', () => {
 
   describe('edge cases', () => {
     it('should handle undefined args', () => {
-      renderWithRecoil(<ToolCall {...mockProps} args={undefined as any} />);
+      renderComponent(<ToolCall {...mockProps} args={undefined as any} />);
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -308,7 +307,7 @@ describe('ToolCall', () => {
     });
 
     it('should handle null output', () => {
-      renderWithRecoil(<ToolCall {...mockProps} output={null} />);
+      renderComponent(<ToolCall {...mockProps} output={null} />);
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       const props = JSON.parse(toolCallInfo.textContent!);
@@ -316,7 +315,7 @@ describe('ToolCall', () => {
     });
 
     it('should handle simple function name without domain', () => {
-      renderWithRecoil(<ToolCall {...mockProps} name="simpleName" />);
+      renderComponent(<ToolCall {...mockProps} name="simpleName" />);
 
       const toolCallInfo = screen.getByTestId('tool-call-info');
       expect(toolCallInfo).toBeInTheDocument();
@@ -344,7 +343,7 @@ describe('ToolCall', () => {
         },
       ];
 
-      renderWithRecoil(<ToolCall {...mockProps} attachments={complexAttachments as any} />);
+      renderComponent(<ToolCall {...mockProps} attachments={complexAttachments as any} />);
 
       fireEvent.click(screen.getByTestId('progress-text'));
 
@@ -361,7 +360,7 @@ describe('ToolCall', () => {
     const d = Constants.mcp_delimiter;
 
     it('should detect MCP OAuth from delimiter in tool-call name', () => {
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           name={`oauth${d}my-server`}
@@ -375,7 +374,7 @@ describe('ToolCall', () => {
     });
 
     it('should preserve full server name when it contains the delimiter substring', () => {
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           name={`oauth${d}foo${d}bar`}
@@ -389,7 +388,7 @@ describe('ToolCall', () => {
     });
 
     it('should display server name (not "oauth") as function_name for OAuth tool calls', () => {
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           name={`oauth${d}my-server`}
@@ -407,7 +406,7 @@ describe('ToolCall', () => {
     it('should display server name even when auth is cleared (post-completion)', () => {
       // After OAuth completes, createOAuthEnd re-emits the toolCall without auth.
       // The display should still show the server name, not literal "oauth".
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           name={`oauth${d}my-server`}
@@ -425,7 +424,7 @@ describe('ToolCall', () => {
       const authUrl =
         'https://oauth.example.com/authorize?redirect_uri=' +
         encodeURIComponent('https://app.example.com/api/mcp/my-server/oauth/callback');
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           name="bare_name"
@@ -442,7 +441,7 @@ describe('ToolCall', () => {
       const authUrl =
         'https://oauth.example.com/authorize?redirect_uri=' +
         encodeURIComponent('https://app.example.com/api/mcp/my-server/oauth/callback');
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           name="bare_name"
@@ -462,7 +461,7 @@ describe('ToolCall', () => {
       // gets prefixed to oauth_mcp_oauth_mcp_server. Client parses:
       // func="oauth", server="oauth_mcp_server". Visually awkward but
       // semantically correct — the normalized name IS oauth_mcp_server.
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           name={`oauth${d}oauth${d}server`}
@@ -479,7 +478,7 @@ describe('ToolCall', () => {
       const authUrl =
         'https://oauth.example.com/authorize?redirect_uri=' +
         encodeURIComponent('https://app.example.com/api/actions/xyz/oauth/callback');
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           name="action_name"
@@ -494,7 +493,7 @@ describe('ToolCall', () => {
 
   describe('A11Y-04: screen reader status announcements', () => {
     it('includes sr-only aria-live region for status announcements', () => {
-      renderWithRecoil(
+      renderComponent(
         <ToolCall
           {...mockProps}
           initialProgress={1}

@@ -8,6 +8,7 @@ import { createAgentModel } from './agent';
 import { createAgentApiKeyModel } from './agentApiKey';
 import { createAgentCategoryModel } from './agentCategory';
 import { createMCPServerModel } from './mcpServer';
+import { createMCPCosmeticOverrideModel } from './mcpCosmeticOverride';
 import { createRoleModel } from './role';
 import { createActionModel } from './action';
 import { createAssistantModel } from './assistant';
@@ -28,6 +29,7 @@ import { createAclEntryModel } from './aclEntry';
 import { createSystemGrantModel } from './systemGrant';
 import { createGroupModel } from './group';
 import { createProjectModel } from './project';
+import { createWorkspaceSessionModel } from './workspace';
 import { createConfigModel } from './config';
 
 /**
@@ -45,6 +47,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
     AgentApiKey: createAgentApiKeyModel(mongoose),
     AgentCategory: createAgentCategoryModel(mongoose),
     MCPServer: createMCPServerModel(mongoose),
+    MCPCosmeticOverride: createMCPCosmeticOverrideModel(mongoose),
     Role: createRoleModel(mongoose),
     Action: createActionModel(mongoose),
     Assistant: createAssistantModel(mongoose),
@@ -65,6 +68,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
     SystemGrant: createSystemGrantModel(mongoose),
     Group: createGroupModel(mongoose),
     Project: createProjectModel(mongoose),
+    WorkspaceSession: createWorkspaceSessionModel(mongoose),
     Config: createConfigModel(mongoose),
   };
 }

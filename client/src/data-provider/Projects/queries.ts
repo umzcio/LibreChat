@@ -10,6 +10,7 @@ import type {
   TProjectListResponse,
   TCreateProjectRequest,
   TUpdateProjectRequest,
+  ConversationListResponse,
 } from 'librechat-data-provider';
 
 export const useListProjectsQuery = (
@@ -90,6 +91,21 @@ export const useDeleteProjectMutation = (
         queryClient.invalidateQueries([QueryKeys.projects]);
         options?.onSuccess?.(...params);
       },
+    },
+  );
+};
+
+export const useGetProjectConversationsQuery = (
+  projectId: string,
+  config?: UseQueryOptions<ConversationListResponse>,
+): QueryObserverResult<ConversationListResponse> => {
+  return useQuery<ConversationListResponse>(
+    [QueryKeys.projectConversations, projectId],
+    () => dataService.getProjectConversations(projectId),
+    {
+      enabled: !!projectId,
+      refetchOnWindowFocus: false,
+      ...config,
     },
   );
 };

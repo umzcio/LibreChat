@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const { logger } = require('@librechat/data-schemas');
 const { mergeAppTools, getAppConfig } = require('./Config');
-const { createMCPServersRegistry, createMCPManager } = require('~/config');
+const { createMCPServersRegistry, createMCPManager, getMCPServersRegistry } = require('~/config');
+const db = require('~/models');
 
 /**
  * Initialize MCP servers
@@ -19,6 +20,17 @@ async function initializeMCPs() {
 
   try {
     const mcpManager = await createMCPManager(mcpServers || {});
+
+    // Apply persisted cosmetic overrides (title, description, icon) to yaml/config servers
+    try {
+      const overrides = await db.getAllCosmeticOverrides();
+      if (overrides.length > 0) {
+        await getMCPServersRegistry().applyCosmeticOverrides(overrides);
+        logger.info(`[MCP] Applied ${overrides.length} cosmetic override(s) to server configs.`);
+      }
+    } catch (error) {
+      logger.warn('[MCP] Failed to apply cosmetic overrides, continuing without:', error);
+    }
 
     if (mcpServers && Object.keys(mcpServers).length > 0) {
       const mcpTools = (await mcpManager.getAppToolFunctions()) || {};

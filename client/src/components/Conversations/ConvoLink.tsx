@@ -1,4 +1,5 @@
 import React from 'react';
+import type { LocalizeFunction } from '~/common';
 import { cn } from '~/utils';
 
 interface ConvoLinkProps {
@@ -7,7 +8,7 @@ interface ConvoLinkProps {
   title: string | null;
   onRename: () => void;
   isSmallScreen: boolean;
-  localize: (key: any, options?: any) => string;
+  localize: LocalizeFunction;
   children: React.ReactNode;
 }
 

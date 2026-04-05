@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify';
 import { ThemeContext, isDark } from '@librechat/client';
 import type { MermaidConfig } from 'mermaid';
 import { inlineFlowchartConfig } from '~/utils/mermaid';
+import { logger } from '~/utils';
 
 // Constants
 const MD5_LENGTH_THRESHOLD = 10_000;
@@ -151,7 +152,7 @@ export const useMermaid = ({
 
       return sanitizedSvg;
     } catch (error) {
-      console.error('Mermaid rendering error:', error);
+      logger.error('Mermaid', 'rendering error:', error);
 
       // Return last valid content if available (graceful degradation)
       if (validContent) {

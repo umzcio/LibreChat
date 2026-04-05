@@ -3,7 +3,6 @@ import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/extend-expect';
 import { LangSelector } from './General';
-import { RecoilRoot } from 'recoil';
 
 describe('LangSelector', () => {
   let mockOnChange;
@@ -19,9 +18,7 @@ describe('LangSelector', () => {
       disconnect = jest.fn();
     };
     const { getByText, getByRole } = render(
-      <RecoilRoot>
-        <LangSelector langcode="en-US" onChange={mockOnChange} />
-      </RecoilRoot>,
+      <LangSelector langcode="en-US" onChange={mockOnChange} />,
     );
 
     expect(getByText('Language')).toBeInTheDocument();
@@ -36,9 +33,7 @@ describe('LangSelector', () => {
       disconnect = jest.fn();
     };
     const { getByRole, getByTestId } = render(
-      <RecoilRoot>
-        <LangSelector langcode="en-US" onChange={mockOnChange} />
-      </RecoilRoot>,
+      <LangSelector langcode="en-US" onChange={mockOnChange} />,
     );
 
     expect(getByRole('combobox')).toHaveTextContent('English');

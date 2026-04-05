@@ -1,5 +1,5 @@
 import React, { useState, useMemo, memo } from 'react';
-import { useRecoilState } from 'recoil';
+import { useAtomValue } from 'jotai';
 import type { TConversation, TMessage, TFeedback } from 'librechat-data-provider';
 import { EditIcon, Clipboard, CheckMark, ContinueIcon, RegenerateIcon } from '@librechat/client';
 import { useGenerationsByLatest, useLocalize } from '~/hooks';
@@ -125,7 +125,7 @@ const HoverButtons = ({
 }: THoverButtons) => {
   const localize = useLocalize();
   const [isCopied, setIsCopied] = useState(false);
-  const [TextToSpeech] = useRecoilState<boolean>(store.textToSpeech);
+  const TextToSpeech = useAtomValue(store.textToSpeech);
 
   const endpoint = useMemo(() => {
     if (!conversation) {

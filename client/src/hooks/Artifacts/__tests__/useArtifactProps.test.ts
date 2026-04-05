@@ -22,18 +22,37 @@ describe('useArtifactProps', () => {
       expect(result.current.template).toBe('static');
     });
 
-    it('should handle text/plain type with content.md as fileKey', () => {
+  });
+
+  describe('plain text artifacts', () => {
+    it('should handle text/plain type with content.txt as fileKey', () => {
       const artifact = createArtifact({
         type: 'text/plain',
-        content: '# Plain text as markdown',
+        content: 'Plain text content',
       });
 
       const { result } = renderHook(() => useArtifactProps({ artifact }));
 
-      expect(result.current.fileKey).toBe('content.md');
+      expect(result.current.fileKey).toBe('content.txt');
       expect(result.current.template).toBe('static');
+      expect(result.current.files['content.txt']).toBe('Plain text content');
+      expect(result.current.files['index.html']).toContain('<pre>');
     });
 
+    it('should escape html in plain text preview output', () => {
+      const artifact = createArtifact({
+        type: 'text/plain',
+        content: '<script>alert("xss")</script>',
+      });
+
+      const { result } = renderHook(() => useArtifactProps({ artifact }));
+
+      expect(result.current.files['content.txt']).toBe('<script>alert("xss")</script>');
+      expect(result.current.files['index.html']).toContain('&lt;script&gt;alert("xss")&lt;/script&gt;');
+    });
+  });
+
+  describe('markdown artifacts', () => {
     it('should include content.md in files with original markdown', () => {
       const markdownContent = '# Test\n\n- Item 1\n- Item 2';
       const artifact = createArtifact({
@@ -180,6 +199,21 @@ describe('useArtifactProps', () => {
 
       expect(result.current.fileKey).toBe('index.html');
       expect(result.current.template).toBe('static');
+    });
+  });
+
+  describe('svg artifacts', () => {
+    it('should handle svg type with image.svg as fileKey', () => {
+      const artifact = createArtifact({
+        type: 'image/svg+xml',
+        content: '<svg viewBox="0 0 10 10"></svg>',
+      });
+
+      const { result } = renderHook(() => useArtifactProps({ artifact }));
+
+      expect(result.current.fileKey).toBe('image.svg');
+      expect(result.current.template).toBe('static');
+      expect(result.current.files['image.svg']).toBe('<svg viewBox="0 0 10 10"></svg>');
     });
   });
 

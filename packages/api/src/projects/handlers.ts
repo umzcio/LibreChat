@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { logger } from '~/config';
+import { logger } from '@librechat/data-schemas';
 import type { Response } from 'express';
 import type { ProjectMethods } from '@librechat/data-schemas';
 import type { IProject } from '@librechat/data-schemas';

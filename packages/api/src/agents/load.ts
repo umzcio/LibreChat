@@ -127,9 +127,7 @@ export async function loadEphemeralAgent(
     tools,
   };
 
-  if (ephemeralAgent?.artifacts) {
-    result.artifacts = ephemeralAgent.artifacts;
-  }
+  result.artifacts = ephemeralAgent?.artifacts || 'default';
   return result as Agent;
 }
 

@@ -2,7 +2,6 @@ import React from 'react';
 import '@testing-library/jest-dom/extend-expect';
 import { render, fireEvent } from 'test/layout-test-utils';
 import CacheTTSSwitch from '../CacheTTSSwitch';
-import { RecoilRoot } from 'recoil';
 
 describe('CacheTTSSwitch', () => {
   /**
@@ -16,9 +15,7 @@ describe('CacheTTSSwitch', () => {
 
   it('renders correctly', () => {
     const { getByTestId } = render(
-      <RecoilRoot>
-        <CacheTTSSwitch />
-      </RecoilRoot>,
+      <CacheTTSSwitch />,
     );
 
     expect(getByTestId('CacheTTS')).toBeInTheDocument();
@@ -26,9 +23,7 @@ describe('CacheTTSSwitch', () => {
 
   it('calls onCheckedChange when the switch is toggled', () => {
     const { getByTestId } = render(
-      <RecoilRoot>
-        <CacheTTSSwitch onCheckedChange={mockSetCacheTTS} />
-      </RecoilRoot>,
+      <CacheTTSSwitch onCheckedChange={mockSetCacheTTS} />,
     );
     const switchElement = getByTestId('CacheTTS');
     fireEvent.click(switchElement);

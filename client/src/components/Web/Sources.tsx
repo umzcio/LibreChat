@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import * as Ariakit from '@ariakit/react';
 import { VisuallyHidden } from '@ariakit/react';
 import { Tools } from 'librechat-data-provider';
@@ -166,6 +166,18 @@ function ImageItem({ image }: { image: ImageResult }) {
   );
 }
 
+type FileResultReference = {
+  link: string;
+  type: 'file';
+  title?: string;
+  attribution?: string;
+  fileId?: string;
+  pages?: number[];
+  relevance?: number;
+  pageRelevance?: Record<number, number>;
+  metadata?: Record<string, unknown>;
+};
+
 // Type for agent file sources (simplified for file citations)
 type AgentFileSource = {
   file_id: string;
@@ -177,7 +189,7 @@ type AgentFileSource = {
   pageRelevance?: Record<number, number>;
   messageId: string;
   toolCallId: string;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 };
 
 interface FileItemProps {
@@ -209,20 +221,23 @@ const FileItem = React.memo(function FileItem({
   expanded = false,
 }: FileItemProps) {
   const localize = useLocalize();
-  const user = useRecoilValue(store.user);
+  const user = useAtomValue(store.user);
   const { showToast } = useToastContext();
 
   const { refetch: downloadFile } = useFileDownload(user?.id ?? '', file.file_id);
 
   // Extract error message logic to avoid duplication
   const getErrorMessage = useCallback(
-    (error: any) => {
+    (error: unknown) => {
       const errorString = JSON.stringify(error);
-      const errorWithResponse = error as any;
+      const errorObj = error as {
+        message?: string;
+        response?: { data?: { error?: string }; status?: number };
+      } | null;
       const isLocalFileError =
-        error?.message?.includes('local files') ||
-        errorWithResponse?.response?.data?.error?.includes('local files') ||
-        errorWithResponse?.response?.status === 403 ||
+        errorObj?.message?.includes('local files') ||
+        errorObj?.response?.data?.error?.includes('local files') ||
+        errorObj?.response?.status === 403 ||
         errorString.includes('local files') ||
         errorString.includes('403');
 
@@ -602,8 +617,9 @@ function SourcesComponent({ messageId, conversationId }: SourcesProps = {}) {
       result.references?.forEach((source) => {
         if (source.type === 'image') {
           imagesMap.set(source.link, { ...source, imageUrl: source.link });
-        } else if ((source as any).type === 'file') {
-          const fileId = (source as any).fileId || 'unknown';
+        } else if (source.type === 'file') {
+          const fileRef = source as FileResultReference;
+          const fileId = fileRef.fileId || 'unknown';
           const fileName = source.title || 'Unknown File';
           const uniqueKey = `${fileId}_${fileName}`;
 
@@ -611,14 +627,14 @@ function SourcesComponent({ messageId, conversationId }: SourcesProps = {}) {
             // Merge pages for the same file
             const existing = agentFilesMap.get(uniqueKey)!;
             const existingPages = existing.pages || [];
-            const newPages = (source as any).pages || [];
+            const newPages = fileRef.pages || [];
             const uniquePages = [...new Set([...existingPages, ...newPages])].sort((a, b) => a - b);
 
             existing.pages = uniquePages;
-            existing.relevance = Math.max(existing.relevance || 0, (source as any).relevance || 0);
+            existing.relevance = Math.max(existing.relevance || 0, fileRef.relevance || 0);
             existing.pageRelevance = {
               ...existing.pageRelevance,
-              ...(source as any).pageRelevance,
+              ...fileRef.pageRelevance,
             };
           } else {
             const agentFile: AgentFileSource = {
@@ -626,10 +642,10 @@ function SourcesComponent({ messageId, conversationId }: SourcesProps = {}) {
               file_id: fileId,
               filename: fileName,
               bytes: undefined,
-              metadata: (source as any).metadata,
-              pages: (source as any).pages,
-              relevance: (source as any).relevance,
-              pageRelevance: (source as any).pageRelevance,
+              metadata: fileRef.metadata,
+              pages: fileRef.pages,
+              relevance: fileRef.relevance,
+              pageRelevance: fileRef.pageRelevance,
               messageId: messageId || '',
               toolCallId: 'file_search_results',
             };

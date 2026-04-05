@@ -89,7 +89,7 @@ export type SchemaDefaults<T> = ExtractDefaults<SchemaShape<T>>;
 
 export type TConfigDefaults = SchemaDefaults<typeof configSchema>;
 
-export function getSchemaDefaults<Schema extends z.AnyZodObject>(
+function getSchemaDefaults<Schema extends z.AnyZodObject>(
   schema: Schema,
 ): ExtractDefaults<SchemaShape<Schema>> {
   const shape = schema.shape;
@@ -848,6 +848,11 @@ export type TStartupConfig = {
   >;
   mcpPlaceholder?: string;
   conversationImportMaxFileSize?: number;
+  branding?: {
+    favicon?: string;
+    logoLight?: string;
+    logoDark?: string;
+  };
 };
 
 export enum OCRStrategy {
@@ -1032,6 +1037,13 @@ export const configSchema = z.object({
     })
     .optional(),
   interface: interfaceSchema,
+  branding: z
+    .object({
+      favicon: z.string().optional(),
+      logoLight: z.string().optional(),
+      logoDark: z.string().optional(),
+    })
+    .optional(),
   turnstile: turnstileSchema.optional(),
   fileStrategy: fileSourceSchema.default(FileSources.local),
   fileStrategies: fileStrategiesSchema,

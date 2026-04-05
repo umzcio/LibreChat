@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { Trans } from 'react-i18next';
 import { BookCopy } from 'lucide-react';
 import { Content, Portal, Root, Trigger } from '@radix-ui/react-popover';
@@ -34,7 +34,7 @@ const PresetsMenu: FC = () => {
     presetToDelete,
     confirmDeletePreset,
   } = usePresets();
-  const preset = useRecoilValue(store.presetByIndex(0));
+  const preset = useAtomValue(store.presetByIndex(0));
 
   const handleDeleteDialogChange = (open: boolean) => {
     setShowDeleteDialog(open);

@@ -1,4 +1,5 @@
 import { LocalStorageKeys } from 'librechat-data-provider';
+import logger from './logger';
 
 /** Suffix for timestamp entries */
 const TIMESTAMP_SUFFIX = '_TIMESTAMP';
@@ -29,7 +30,7 @@ export function setTimestamp(key: string): void {
 /**
  * Set a value in localStorage with an associated timestamp
  */
-export function setTimestampedValue(key: string, value: any): void {
+export function setTimestampedValue(key: string, value: unknown): void {
   localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
   localStorage.setItem(`${key}${TIMESTAMP_SUFFIX}`, Date.now().toString());
 }
@@ -110,10 +111,10 @@ export function cleanupTimestampedStorage(): void {
     keysToRemove.forEach((key) => localStorage.removeItem(key));
 
     if (keysToRemove.length > 0) {
-      console.log(`Cleaned up ${keysToRemove.length} old localStorage entries`);
+      logger.log('localStorage', `Cleaned up ${keysToRemove.length} old localStorage entries`);
     }
   } catch (error) {
-    console.error('Error during cleanup of timestamped storage:', error);
+    logger.error('localStorage', 'Error during cleanup of timestamped storage:', error);
   }
 }
 

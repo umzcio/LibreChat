@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { useParams } from 'react-router-dom';
 import { Constants } from 'librechat-data-provider';
 import { useToastContext, useMediaQuery } from '@librechat/client';
@@ -11,7 +11,7 @@ import { useGetEndpointsQuery } from '~/data-provider';
 import { NotificationSeverity } from '~/common';
 import { ConvoOptions } from './ConvoOptions';
 import RenameForm from './RenameForm';
-import { cn, logger } from '~/utils';
+import { buildConversationPath, cn, logger } from '~/utils';
 import ConvoLink from './ConvoLink';
 import store from '~/store';
 
@@ -29,13 +29,14 @@ export default function Conversation({
   isGenerating = false,
 }: ConversationProps) {
   const params = useParams();
+
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const { navigateToConvo } = useNavigateToConvo();
   const { data: endpointsConfig } = useGetEndpointsQuery();
   const currentConvoId = useMemo(() => params.conversationId, [params.conversationId]);
   const updateConvoMutation = useUpdateConversationMutation(currentConvoId ?? '');
-  const activeConvos = useRecoilValue(store.allConversationsSelector);
+  const activeConvos = useAtomValue(store.allConversationsSelector);
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const isShiftHeld = useShiftKey();
   const { conversationId, title = '' } = conversation;
@@ -145,7 +146,10 @@ export default function Conversation({
     if (ctrlOrMetaKey) {
       toggleNav();
       const baseUrl = window.location.origin;
-      const path = `/c/${conversationId}`;
+      const path = buildConversationPath({
+        conversationId: conversationId ?? Constants.NEW_CONVO,
+        projectId: conversation.projectId,
+      });
       window.open(baseUrl + path, '_blank');
       return;
     }

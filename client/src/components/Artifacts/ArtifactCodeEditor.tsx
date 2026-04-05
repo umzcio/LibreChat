@@ -46,6 +46,7 @@ const TYPE_MAP: Record<string, string> = {
   'text/markdown': 'markdown',
   'text/md': 'markdown',
   'text/plain': 'plaintext',
+  'image/svg+xml': 'xml',
   'application/vnd.mermaid': 'markdown',
 };
 

@@ -1,6 +1,7 @@
 // AnnouncerContext.tsx
 import React from 'react';
 import type { AnnounceOptions } from '~/common';
+import { logger } from '~/utils';
 
 interface AnnouncerContextType {
   announceAssertive: (options: AnnounceOptions) => void;
@@ -8,8 +9,8 @@ interface AnnouncerContextType {
 }
 
 const defaultContext: AnnouncerContextType = {
-  announceAssertive: () => console.warn('Announcement failed, LiveAnnouncer context is missing'),
-  announcePolite: () => console.warn('Announcement failed, LiveAnnouncer context is missing'),
+  announceAssertive: () => logger.warn('Announcer', 'Announcement failed, LiveAnnouncer context is missing'),
+  announcePolite: () => logger.warn('Announcer', 'Announcement failed, LiveAnnouncer context is missing'),
 };
 
 const AnnouncerContext = React.createContext<AnnouncerContextType>(defaultContext);

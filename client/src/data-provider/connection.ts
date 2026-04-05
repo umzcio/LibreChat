@@ -31,7 +31,7 @@ export const useHealthCheck = (isAuthenticated = false) => {
             staleTime: 0,
           });
         } catch (error) {
-          console.error('Health check failed:', error);
+          logger.error('HealthCheck', 'Health check failed:', error);
         }
       };
 

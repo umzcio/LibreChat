@@ -1,6 +1,6 @@
 import { useMemo, useCallback } from 'react';
 import { ArrowLeft } from 'lucide-react';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { useLocation } from 'react-router-dom';
 import { Button, Sidebar, TooltipAnchor } from '@librechat/client';
 import { usePromptGroupsContext, useDashboardContext } from '~/Providers';
@@ -27,8 +27,8 @@ export default function GroupSidePanel({
   const isChatRoute = useMemo(() => location.pathname?.startsWith('/c/'), [location.pathname]);
 
   const { prevLocationPath } = useDashboardContext();
-  const setPromptsName = useSetRecoilState(store.promptsName);
-  const setPromptsCategory = useSetRecoilState(store.promptsCategory);
+  const setPromptsName = useSetAtom(store.promptsName);
+  const setPromptsCategory = useSetAtom(store.promptsCategory);
   const clickCallback = useCallback(() => {
     setPromptsName('');
     setPromptsCategory('');

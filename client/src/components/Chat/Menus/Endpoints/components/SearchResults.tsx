@@ -3,7 +3,7 @@ import { VisuallyHidden } from '@ariakit/react';
 import { CheckCircle2, EarthIcon } from 'lucide-react';
 import { isAgentsEndpoint, isAssistantsEndpoint } from 'librechat-data-provider';
 import type { TModelSpec } from 'librechat-data-provider';
-import type { Endpoint } from '~/common';
+import type { Endpoint, LocalizeFunction } from '~/common';
 import { useModelSelectorContext } from '../ModelSelectorContext';
 import { CustomMenuItem as MenuItem } from '../CustomMenu';
 import SpecIcon from './SpecIcon';
@@ -11,7 +11,7 @@ import { cn } from '~/utils';
 
 interface SearchResultsProps {
   results: (TModelSpec | Endpoint)[] | null;
-  localize: (phraseKey: any, options?: any) => string;
+  localize: LocalizeFunction;
   searchValue: string;
 }
 
@@ -240,7 +240,7 @@ export function SearchResults({ results, localize, searchValue }: SearchResultsP
 
 export function renderSearchResults(
   results: (TModelSpec | Endpoint)[] | null,
-  localize: (phraseKey: any, options?: any) => string,
+  localize: LocalizeFunction,
   searchValue: string,
 ) {
   return (

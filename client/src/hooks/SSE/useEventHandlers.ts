@@ -1,6 +1,6 @@
 import { useCallback, useRef } from 'react';
 import { v4 } from 'uuid';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -21,9 +21,10 @@ import type {
 } from 'librechat-data-provider';
 import type { TResData, TFinalResData, ConvoGenerator } from '~/common';
 import type { InfiniteData } from '@tanstack/react-query';
-import type { SetterOrUpdater, Resetter } from 'recoil';
 import type { ConversationCursorData } from '~/utils';
+import type { AtomSetter } from '~/common';
 import {
+  buildConversationPath,
   logger,
   setDraft,
   scrollToEnd,
@@ -32,6 +33,7 @@ import {
   updateConvoInAllQueries,
   removeConvoFromAllQueries,
   findConversationInInfinite,
+  getConversationModeFromPath,
 } from '~/utils';
 import { startupConfigKey, queueTitleGeneration } from '~/data-provider';
 import useAttachmentHandler from '~/hooks/SSE/useAttachmentHandler';
@@ -57,11 +59,11 @@ export type EventHandlerParams = {
   setCompleted: React.Dispatch<React.SetStateAction<Set<unknown>>>;
   setMessages: (messages: TMessage[]) => void;
   getMessages: () => TMessage[] | undefined;
-  setIsSubmitting: SetterOrUpdater<boolean>;
-  setConversation?: SetterOrUpdater<TConversation | null>;
+  setIsSubmitting: AtomSetter<boolean>;
+  setConversation?: AtomSetter<TConversation | null>;
   newConversation?: ConvoGenerator;
-  setShowStopButton: SetterOrUpdater<boolean>;
-  resetLatestMessage?: Resetter;
+  setShowStopButton: AtomSetter<boolean>;
+  resetLatestMessage?: () => void;
 };
 
 const createErrorMessage = ({
@@ -179,7 +181,7 @@ export default function useEventHandlers({
   const queryClient = useQueryClient();
   const { announcePolite } = useLiveAnnouncer();
   const applyAgentTemplate = useApplyAgentTemplate();
-  const setAbortScroll = useSetRecoilState(store.abortScroll);
+  const setAbortScroll = useSetAtom(store.abortScroll);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -442,17 +444,16 @@ export default function useEventHandlers({
         // Handle early abort - aborted during tool loading before any messages saved
         // Don't update conversation state, just reset UI and stay on new chat
         if ((data as Record<string, unknown>).earlyAbort) {
-          console.log(
-            '[finalHandler] Early abort detected - no messages saved, staying on new chat',
-          );
           setShowStopButton(false);
           setIsSubmitting(false);
-          // Navigate to new chat if not already there
-          if (!location.pathname.endsWith(`/c/${Constants.NEW_CONVO}`)) {
-            const pPrefix = submission.conversation?.projectId
-              ? `/p/${submission.conversation.projectId}`
-              : '';
-            navigate(`${pPrefix}/c/${Constants.NEW_CONVO}`, { replace: true });
+          const mode = getConversationModeFromPath(location.pathname);
+          const newPath = buildConversationPath({
+            conversationId: `${Constants.NEW_CONVO}`,
+            mode,
+            projectId: submission.conversation?.projectId,
+          });
+          if (location.pathname !== newPath) {
+            navigate(`${newPath}${location.search}`, { replace: true });
           }
           return;
         }
@@ -509,16 +510,20 @@ export default function useEventHandlers({
           }
 
           const isNewChat =
-            location.pathname.endsWith(`/c/${Constants.NEW_CONVO}`) &&
+            location.pathname.endsWith(`/${Constants.NEW_CONVO}`) &&
             currentConvoId === Constants.NEW_CONVO;
 
           setFinalMessages(currentConvoId, isNewChat ? [] : [...messages]);
           setDraft({ id: currentConvoId, value: requestMessage?.text });
           if (isNewChat) {
-            const pPrefix = submission.conversation?.projectId
-              ? `/p/${submission.conversation.projectId}`
-              : '';
-            navigate(`${pPrefix}/c/${Constants.NEW_CONVO}`, { replace: true, state: { focusChat: true } });
+            navigate(
+              `${buildConversationPath({
+                conversationId: `${Constants.NEW_CONVO}`,
+                mode: getConversationModeFromPath(location.pathname),
+                projectId: submission.conversation?.projectId,
+              })}${location.search}`,
+              { replace: true, state: { focusChat: true } },
+            );
           }
           return;
         }
@@ -598,11 +603,15 @@ export default function useEventHandlers({
             });
           }
 
-          if (location.pathname.endsWith(`/c/${Constants.NEW_CONVO}`)) {
-            const projectPrefix = conversation.projectId
-              ? `/p/${conversation.projectId}`
-              : '';
-            navigate(`${projectPrefix}/c/${conversation.conversationId}`, { replace: true });
+          if (location.pathname.endsWith(`/${Constants.NEW_CONVO}`) && conversation.conversationId) {
+            navigate(
+              `${buildConversationPath({
+                conversationId: conversation.conversationId,
+                mode: getConversationModeFromPath(location.pathname),
+                projectId: conversation.projectId ?? submissionConvo.projectId ?? undefined,
+              })}${location.search}`,
+              { replace: true },
+            );
           }
         }
       } finally {
@@ -622,6 +631,7 @@ export default function useEventHandlers({
       setIsSubmitting,
       setShowStopButton,
       location.pathname,
+      location.search,
       applyAgentTemplate,
       attachmentHandler,
     ],
@@ -767,7 +777,7 @@ export default function useEventHandlers({
             submission,
           );
         } catch (error) {
-          console.error('Error in finalHandler during abort:', error);
+          logger.error('EventHandlers', 'Error in finalHandler during abort:', error);
           setShowStopButton(false);
           setIsSubmitting(false);
         }

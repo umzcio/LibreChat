@@ -17,6 +17,7 @@ import {
 import type { TFile, EndpointFileConfig, FileConfig } from 'librechat-data-provider';
 import type { QueryClient } from '@tanstack/react-query';
 import type { ExtendedFile } from '~/common';
+import logger from './logger';
 
 export const partialTypes = ['text/x-'];
 
@@ -186,14 +187,14 @@ export function addFileToCache(queryClient: QueryClient, newfile: TFile) {
   const currentFiles = queryClient.getQueryData<TFile[]>([QueryKeys.files]);
 
   if (!currentFiles) {
-    console.warn('No current files found in cache, skipped updating file query cache');
+    logger.warn('Files', 'No current files found in cache, skipped updating file query cache');
     return;
   }
 
   const fileIndex = currentFiles.findIndex((file) => file.file_id === newfile.file_id);
 
   if (fileIndex > -1) {
-    console.warn('File already exists in cache, skipped updating file query cache');
+    logger.warn('Files', 'File already exists in cache, skipped updating file query cache');
     return;
   }
 

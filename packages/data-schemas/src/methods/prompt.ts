@@ -16,6 +16,8 @@ export interface PromptDeps {
   ) => Promise<Types.ObjectId[]>;
 }
 
+type PromptGroupLean = Partial<IPromptGroup> & { _id?: Types.ObjectId; productionId?: Types.ObjectId };
+
 export function createPromptMethods(mongoose: typeof import('mongoose'), deps: PromptDeps) {
   const { getSoleOwnedResourceIds } = deps;
   const { ObjectId } = mongoose.Types;
@@ -25,8 +27,8 @@ export function createPromptMethods(mongoose: typeof import('mongoose'), deps: P
    * and attaches them as `productionPrompt` field.
    */
   async function attachProductionPrompts(
-    groups: Array<Record<string, unknown>>,
-  ): Promise<Array<Record<string, unknown>>> {
+    groups: Array<PromptGroupLean>,
+  ): Promise<Array<PromptGroupLean & { productionPrompt: IPrompt | null }>> {
     const Prompt = mongoose.models.Prompt as Model<IPrompt>;
     const uniqueIds = [
       ...new Set(groups.map((g) => (g.productionId as Types.ObjectId)?.toString()).filter(Boolean)),
@@ -79,7 +81,7 @@ export function createPromptMethods(mongoose: typeof import('mongoose'), deps: P
           'name numberOfGenerations oneliner category author authorName createdAt updatedAt command productionId',
         )
         .lean();
-      return await attachProductionPrompts(groups as unknown as Array<Record<string, unknown>>);
+      return await attachProductionPrompts(groups as unknown as Array<PromptGroupLean>);
     } catch (error) {
       logger.error('Error getting all prompt groups', error);
       return { message: 'Error getting all prompt groups' };
@@ -137,7 +139,7 @@ export function createPromptMethods(mongoose: typeof import('mongoose'), deps: P
       ]);
 
       const promptGroups = await attachProductionPrompts(
-        groups as unknown as Array<Record<string, unknown>>,
+        groups as unknown as Array<PromptGroupLean>,
       );
 
       return {
@@ -267,7 +269,7 @@ export function createPromptMethods(mongoose: typeof import('mongoose'), deps: P
 
     const groups = await findQuery.lean();
     const promptGroups = await attachProductionPrompts(
-      groups as unknown as Array<Record<string, unknown>>,
+      groups as unknown as Array<PromptGroupLean>,
     );
 
     const hasMore = isPaginated && normalizedLimit ? promptGroups.length > normalizedLimit : false;
@@ -275,7 +277,7 @@ export function createPromptMethods(mongoose: typeof import('mongoose'), deps: P
       isPaginated && normalizedLimit ? promptGroups.slice(0, normalizedLimit) : promptGroups
     ).map((group) => {
       if (group.author) {
-        group.author = (group.author as Types.ObjectId).toString();
+        (group as Record<string, unknown>).author = (group.author as Types.ObjectId).toString();
       }
       return group;
     });

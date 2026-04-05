@@ -583,6 +583,69 @@ export class MCPServersRegistry {
   }
 
   /**
+   * Applies a cosmetic overlay (title, description, iconPath) to a yaml/config server's
+   * cached config. Does not modify connection settings. Used by the admin cosmetic update
+   * endpoint to update display metadata without restarting.
+   */
+  public async applyCosmeticOverride(
+    serverName: string,
+    cosmetics: { title?: string; description?: string; iconPath?: string },
+  ): Promise<void> {
+    const existing = await this.cacheConfigsRepo.get(serverName);
+    if (!existing) {
+      const configExisting = await this.configCacheRepo.get(serverName);
+      if (configExisting) {
+        const merged = { ...configExisting };
+        if (cosmetics.title !== undefined) {
+          merged.title = cosmetics.title;
+        }
+        if (cosmetics.description !== undefined) {
+          merged.description = cosmetics.description;
+        }
+        if (cosmetics.iconPath !== undefined) {
+          merged.iconPath = cosmetics.iconPath;
+        }
+        await this.configCacheRepo.update(serverName, merged);
+        await this.readThroughCache.delete(this.getReadThroughCacheKey(serverName));
+        await this.readThroughCacheAll.clear();
+        return;
+      }
+      logger.warn(
+        `[MCPServersRegistry] applyCosmeticOverride: server "${serverName}" not found in cache`,
+      );
+      return;
+    }
+
+    const merged = { ...existing };
+    if (cosmetics.title !== undefined) {
+      merged.title = cosmetics.title;
+    }
+    if (cosmetics.description !== undefined) {
+      merged.description = cosmetics.description;
+    }
+    if (cosmetics.iconPath !== undefined) {
+      merged.iconPath = cosmetics.iconPath;
+    }
+
+    await this.cacheConfigsRepo.update(serverName, merged);
+    await this.readThroughCache.delete(this.getReadThroughCacheKey(serverName));
+    await this.readThroughCacheAll.clear();
+  }
+
+  /**
+   * Bulk-applies cosmetic overrides from the database at startup.
+   * Called after yaml servers are loaded into the cache.
+   */
+  public async applyCosmeticOverrides(
+    overrides: Array<{ serverName: string; title?: string; description?: string; iconPath?: string }>,
+  ): Promise<void> {
+    for (const override of overrides) {
+      const { serverName, ...cosmetics } = override;
+      await this.applyCosmeticOverride(serverName, cosmetics);
+    }
+  }
+
+  /**
    * Produces a config-cache key scoped by server name AND a hash of the raw config.
    * Prevents cross-tenant cache poisoning when two tenants define the same server name
    * with different configurations.

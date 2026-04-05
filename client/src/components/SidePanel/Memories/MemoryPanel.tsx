@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Plus } from 'lucide-react';
 import { matchSorter } from 'match-sorter';
 import { SystemRoles, PermissionTypes, Permissions } from 'librechat-data-provider';
 import {
@@ -7,8 +6,6 @@ import {
   Checkbox,
   Spinner,
   FilterInput,
-  TooltipAnchor,
-  OGDialogTrigger,
   useToastContext,
 } from '@librechat/client';
 import type { TUserMemory } from 'librechat-data-provider';
@@ -18,8 +15,6 @@ import {
   useGetUserQuery,
 } from '~/data-provider';
 import { useLocalize, useAuthContext, useHasAccess } from '~/hooks';
-import MemoryCreateDialog from './MemoryCreateDialog';
-import MemoryUsageBadge from './MemoryUsageBadge';
 import AdminSettings from './AdminSettings';
 import MemoryList from './MemoryList';
 
@@ -33,7 +28,6 @@ export default function MemoryPanel() {
   const { showToast } = useToastContext();
   const [pageIndex, setPageIndex] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [referenceSavedMemories, setReferenceSavedMemories] = useState(true);
 
   const updateMemoryPreferencesMutation = useUpdateMemoryPreferencesMutation({
@@ -73,11 +67,6 @@ export default function MemoryPanel() {
     permission: Permissions.UPDATE,
   });
 
-  const hasCreateAccess = useHasAccess({
-    permissionType: PermissionTypes.MEMORIES,
-    permission: Permissions.CREATE,
-  });
-
   const hasOptOutAccess = useHasAccess({
     permissionType: PermissionTypes.MEMORIES,
     permission: Permissions.OPT_OUT,
@@ -87,7 +76,7 @@ export default function MemoryPanel() {
 
   const filteredMemories = useMemo(() => {
     return matchSorter(memories, searchQuery, {
-      keys: ['key', 'value'],
+      keys: ['value'],
     });
   }, [memories, searchQuery]);
 
@@ -95,7 +84,6 @@ export default function MemoryPanel() {
     return filteredMemories.slice(pageIndex * pageSize, (pageIndex + 1) * pageSize);
   }, [filteredMemories, pageIndex]);
 
-  // Reset page when search changes
   useEffect(() => {
     setPageIndex(0);
   }, [searchQuery]);
@@ -123,7 +111,7 @@ export default function MemoryPanel() {
   return (
     <div className="flex h-auto w-full flex-col px-3 pb-3">
       <div role="region" aria-label={localize('com_ui_memories')} className="space-y-2">
-        {/* Header: Filter + Create Button */}
+        {/* Header: Filter */}
         <div className="flex items-center gap-2">
           <FilterInput
             inputId="memory-search"
@@ -132,61 +120,28 @@ export default function MemoryPanel() {
             onChange={(e) => setSearchQuery(e.target.value)}
             containerClassName="flex-1"
           />
-          {hasCreateAccess && (
-            <MemoryCreateDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-              <OGDialogTrigger asChild>
-                <TooltipAnchor
-                  description={localize('com_ui_create_memory')}
-                  side="bottom"
-                  render={
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="size-9 shrink-0 bg-transparent"
-                      aria-label={localize('com_ui_create_memory')}
-                      onClick={() => setCreateDialogOpen(true)}
-                    >
-                      <Plus className="size-4" aria-hidden="true" />
-                    </Button>
-                  }
-                />
-              </OGDialogTrigger>
-            </MemoryCreateDialog>
-          )}
         </div>
 
-        {/* Controls: Usage Badge + Memory Toggle */}
-        {(memData?.tokenLimit != null || hasOptOutAccess) && (
-          <div className="flex items-center justify-between">
-            {/* Usage Badge */}
-            {memData?.tokenLimit != null && (
-              <MemoryUsageBadge
-                percentage={memData.usagePercentage ?? 0}
-                tokenLimit={memData.tokenLimit}
-                totalTokens={memData.totalTokens}
+        {/* Memory Toggle */}
+        {hasOptOutAccess && (
+          <div className="flex items-center justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              className={`${referenceSavedMemories ? 'bg-surface-hover hover:bg-surface-hover' : ''}`}
+              onClick={() => handleMemoryToggle(!referenceSavedMemories)}
+              aria-label={localize('com_ui_use_memory')}
+              aria-pressed={referenceSavedMemories}
+              disabled={updateMemoryPreferencesMutation.isLoading}
+            >
+              <Checkbox
+                checked={referenceSavedMemories}
+                tabIndex={-1}
+                aria-hidden="true"
+                className="pointer-events-none mr-2"
               />
-            )}
-
-            {/* Memory Toggle */}
-            {hasOptOutAccess && (
-              <Button
-                size="sm"
-                variant="outline"
-                className={`ml-auto ${referenceSavedMemories ? 'bg-surface-hover hover:bg-surface-hover' : ''}`}
-                onClick={() => handleMemoryToggle(!referenceSavedMemories)}
-                aria-label={localize('com_ui_use_memory')}
-                aria-pressed={referenceSavedMemories}
-                disabled={updateMemoryPreferencesMutation.isLoading}
-              >
-                <Checkbox
-                  checked={referenceSavedMemories}
-                  tabIndex={-1}
-                  aria-hidden="true"
-                  className="pointer-events-none mr-2"
-                />
-                {localize('com_ui_use_memory')}
-              </Button>
-            )}
+              {localize('com_ui_use_memory')}
+            </Button>
           </div>
         )}
 
@@ -200,10 +155,8 @@ export default function MemoryPanel() {
         {/* Footer: Admin Settings + Pagination */}
         {(user?.role === SystemRoles.ADMIN || filteredMemories.length > pageSize) && (
           <div className="flex items-center justify-between gap-2">
-            {/* Admin Settings - Left */}
             {user?.role === SystemRoles.ADMIN ? <AdminSettings /> : <div />}
 
-            {/* Pagination - Right */}
             {filteredMemories.length > pageSize && (
               <div className="flex items-center gap-2" role="navigation" aria-label="Pagination">
                 <Button

@@ -1,4 +1,14 @@
-export type VersionRecord = Record<string, any>;
+export type VersionRecord = {
+  name?: string | null;
+  description?: string | null;
+  instructions?: string | null;
+  artifacts?: string | null;
+  capabilities?: string[];
+  tools?: string[];
+  updatedAt?: string | number | Date;
+  createdAt?: string | number | Date;
+  [key: string]: unknown;
+};
 
 export type AgentState = {
   name: string | null;

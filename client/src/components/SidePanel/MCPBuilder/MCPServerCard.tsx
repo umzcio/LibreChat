@@ -1,12 +1,12 @@
 import { useState, useRef } from 'react';
 import { MCPIcon } from '@librechat/client';
-import { PermissionBits, hasPermissions } from 'librechat-data-provider';
+import { SystemRoles, PermissionBits, hasPermissions } from 'librechat-data-provider';
 import type { MCPServerStatusIconProps } from '~/components/MCP/MCPServerStatusIcon';
 import type { MCPServerDefinition } from '~/hooks';
 import MCPServerDialog from './MCPServerDialog';
 import { getStatusDotColor } from './MCPStatusBadge';
 import MCPCardActions from './MCPCardActions';
-import { useMCPServerManager, useLocalize } from '~/hooks';
+import { useAuthContext, useMCPServerManager, useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
 interface MCPServerCardProps {
@@ -29,6 +29,7 @@ export default function MCPServerCard({
   canCreateEditMCPs,
 }: MCPServerCardProps) {
   const localize = useLocalize();
+  const { user } = useAuthContext();
   const triggerRef = useRef<HTMLDivElement>(null);
   const { initializeServer, revokeOAuthForServer } = useMCPServerManager();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -44,10 +45,13 @@ export default function MCPServerCard({
   } = statusIconProps;
 
   const canEditThisServer = hasPermissions(server.effectivePermissions, PermissionBits.EDIT);
+  const isYamlOrConfig = server.source === 'yaml' || server.source === 'config';
+  const isAdmin = user?.role === SystemRoles.ADMIN;
+  const cosmeticOnly = isYamlOrConfig && isAdmin && !canEditThisServer;
   const displayName = server.config?.title || server.serverName;
   const description = server.config?.description;
   const statusDotColor = getStatusDotColor(serverStatus, isInitializing);
-  const canEdit = canCreateEditMCPs && canEditThisServer;
+  const canEdit = (canCreateEditMCPs && canEditThisServer) || cosmeticOnly;
 
   const handleInitialize = () => {
     /** If server has custom user vars and is not already connected, show config dialog first
@@ -153,6 +157,7 @@ export default function MCPServerCard({
           onOpenChange={setDialogOpen}
           triggerRef={triggerRef}
           server={server}
+          cosmeticOnly={cosmeticOnly}
         />
       )}
     </>

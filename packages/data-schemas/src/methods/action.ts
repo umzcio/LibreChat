@@ -13,7 +13,7 @@ export function createActionMethods(mongoose: typeof import('mongoose')) {
     updateData: Partial<IAction>,
   ): Promise<IAction | null> {
     const Action = mongoose.models.Action as Model<IAction>;
-    const options = { new: true, upsert: true };
+    const options = { new: true, upsert: true, runValidators: true };
     return (await Action.findOneAndUpdate(
       searchParams,
       updateData,

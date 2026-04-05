@@ -49,13 +49,14 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
    * Finds the next available server name by checking for duplicates.
    * If baseName exists, returns baseName-2, baseName-3, etc.
    */
-  async function findNextAvailableServerName(baseName: string): Promise<string> {
+  async function findNextAvailableServerName(baseName: string, tenantId?: string): Promise<string> {
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
 
     // Find all servers with matching base name pattern (baseName or baseName-N)
     const escapedBaseName = escapeRegex(baseName);
     const existing = await MCPServer.find({
       serverName: { $regex: `^${escapedBaseName}(-\\d+)?$` },
+      ...(tenantId != null && { tenantId }),
     })
       .select('serverName')
       .lean();
@@ -86,6 +87,7 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
   async function createMCPServer(data: {
     config: MCPOptions;
     author: string | Types.ObjectId;
+    tenantId?: string;
   }): Promise<MCPServerDocument> {
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
     let lastError: unknown;
@@ -97,7 +99,7 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
         let serverName: string;
         if (data.config.title) {
           const baseSlug = generateServerNameFromTitle(data.config.title);
-          serverName = await findNextAvailableServerName(baseSlug);
+          serverName = await findNextAvailableServerName(baseSlug, data.tenantId);
         } else {
           serverName = `mcp-${nanoid(16)}`;
         }
@@ -106,6 +108,7 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
           serverName,
           config: data.config,
           author: data.author,
+          ...(data.tenantId != null && { tenantId: data.tenantId }),
         });
 
         return newServer.toObject() as MCPServerDocument;
@@ -137,9 +140,12 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
    * @param serverName - The unique server name identifier
    * @returns The MCP server document or null
    */
-  async function findMCPServerByServerName(serverName: string): Promise<MCPServerDocument | null> {
+  async function findMCPServerByServerName(
+    serverName: string,
+    tenantId?: string,
+  ): Promise<MCPServerDocument | null> {
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
-    return await MCPServer.findOne({ serverName }).lean();
+    return await MCPServer.findOne({ serverName, ...(tenantId != null && { tenantId }) }).lean();
   }
 
   /**
@@ -274,10 +280,11 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
   async function updateMCPServer(
     serverName: string,
     updateData: { config?: MCPOptions },
+    tenantId?: string,
   ): Promise<MCPServerDocument | null> {
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
     return await MCPServer.findOneAndUpdate(
-      { serverName },
+      { serverName, ...(tenantId != null && { tenantId }) },
       { $set: updateData },
       { new: true, runValidators: true },
     ).lean();
@@ -288,9 +295,12 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
    * @param serverName - The MCP server ID
    * @returns The deleted MCP server document or null
    */
-  async function deleteMCPServer(serverName: string): Promise<MCPServerDocument | null> {
+  async function deleteMCPServer(
+    serverName: string,
+    tenantId?: string,
+  ): Promise<MCPServerDocument | null> {
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
-    return await MCPServer.findOneAndDelete({ serverName }).lean();
+    return await MCPServer.findOneAndDelete({ serverName, ...(tenantId != null && { tenantId }) }).lean();
   }
 
   /**
@@ -298,14 +308,23 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
    * @param names - Array of serverName strings to fetch
    * @returns Object containing array of MCP server documents
    */
-  async function getListMCPServersByNames({ names = [] }: { names: string[] }): Promise<{
+  async function getListMCPServersByNames({
+    names = [],
+    tenantId,
+  }: {
+    names: string[];
+    tenantId?: string;
+  }): Promise<{
     data: MCPServerDocument[];
   }> {
     if (names.length === 0) {
       return { data: [] };
     }
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
-    const servers = await MCPServer.find({ serverName: { $in: names } }).lean();
+    const servers = await MCPServer.find({
+      serverName: { $in: names },
+      ...(tenantId != null && { tenantId }),
+    }).lean();
     return { data: servers };
   }
 

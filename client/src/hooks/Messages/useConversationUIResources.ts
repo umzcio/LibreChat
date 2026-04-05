@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { Tools } from 'librechat-data-provider';
 import type { TAttachment, UIResource } from 'librechat-data-provider';
 import { useOptionalMessagesOperations } from '~/Providers';
@@ -18,7 +18,7 @@ export function useConversationUIResources(
 ): Map<string, UIResource> {
   const { getMessages } = useOptionalMessagesOperations();
 
-  const conversationAttachmentsMap = useRecoilValue(
+  const conversationAttachmentsMap = useAtomValue(
     store.conversationAttachmentsSelector(conversationId),
   );
 
@@ -45,7 +45,7 @@ export function useConversationUIResources(
       collectResources(message.attachments);
     });
 
-    // Collect from in-flight messages (Recoil state during streaming - only when we have a conversationId)
+    // Collect from in-flight messages (Jotai state during streaming - only when we have a conversationId)
     if (conversationId) {
       Object.values(conversationAttachmentsMap).forEach(collectResources);
     }

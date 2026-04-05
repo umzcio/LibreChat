@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAtom, useSetAtom, useAtomValue } from 'jotai';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useGetModelsQuery } from 'librechat-data-provider/react-query';
-import { useRecoilState, useRecoilValue, useSetRecoilState, useRecoilCallback } from 'recoil';
 import {
   Constants,
   FileSources,
@@ -31,6 +31,7 @@ import {
   getDefaultEndpoint,
   getModelSpecPreset,
   buildDefaultConvo,
+  buildConversationPath,
   logger,
 } from '~/utils';
 import { useDeleteFilesMutation, useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
@@ -43,16 +44,17 @@ import store from '~/store';
 
 const useNewConvo = (index = 0) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { data: startupConfig } = useGetStartupConfig();
   const applyModelSpecEffects = useApplyModelSpecEffects();
   const clearAllConversations = store.useClearConvoState();
-  const defaultPreset = useRecoilValue(store.defaultPreset);
+  const defaultPreset = useAtomValue(store.defaultPreset);
   const { setConversation } = store.useSetConversationAtom(index);
-  const [files, setFiles] = useRecoilState(store.filesByIndex(index));
-  const saveBadgesState = useRecoilValue<boolean>(store.saveBadgesState);
+  const [files, setFiles] = useAtom(store.filesByIndex(index));
+  const saveBadgesState = useAtomValue(store.saveBadgesState);
   const clearAllLatestMessages = store.useClearLatestMessages(`useNewConvo ${index}`);
-  const setSubmission = useSetRecoilState<TSubmission | null>(store.submissionByIndex(index));
+  const setSubmission = useSetAtom(store.submissionByIndex(index));
   const { data: endpointsConfig = {} as TEndpointsConfig } = useGetEndpointsQuery();
 
   const hasAgentAccess = useHasAccess({
@@ -63,7 +65,7 @@ const useNewConvo = (index = 0) => {
   const modelsQuery = useGetModelsQuery();
   const assistantsListMap = useAssistantListMap();
   const { pauseGlobalAudio } = usePauseGlobalAudio(index);
-  const saveDrafts = useRecoilValue<boolean>(store.saveDrafts);
+  const saveDrafts = useAtomValue(store.saveDrafts);
   const resetBadges = useResetChatBadges();
 
   const { mutateAsync } = useDeleteFilesMutation({
@@ -75,9 +77,8 @@ const useNewConvo = (index = 0) => {
     },
   });
 
-  const switchToConversation = useRecoilCallback(
-    () =>
-      async (
+  const switchToConversation = useCallback(
+    (
         conversation: TConversation,
         preset: Partial<TPreset> | null = null,
         modelsData?: TModelsConfig,
@@ -237,27 +238,31 @@ const useNewConvo = (index = 0) => {
         const getParams = () => (searchParamsString ? `?${searchParamsString}` : '');
 
         const projectPrefix = conversation.projectId
-          ? `/p/${conversation.projectId}`
-          : '';
-        console.log('[useNewConvo] navigation - projectId:', conversation.projectId, 'prefix:', projectPrefix);
-
+          ? conversation.projectId
+          : undefined;
         if (conversation.conversationId === Constants.NEW_CONVO && !modelsData) {
           const appTitle = localStorage.getItem(LocalStorageKeys.APP_TITLE) ?? '';
           if (appTitle) {
             document.title = appTitle;
           }
-          const path = `${projectPrefix}/c/${Constants.NEW_CONVO}${getParams()}`;
+          const path = `${buildConversationPath({
+            conversationId: Constants.NEW_CONVO,
+            projectId: projectPrefix,
+          })}${getParams()}`;
           navigate(path, { state: { focusChat: true } });
           return;
         }
 
-        const path = `${projectPrefix}/c/${conversation.conversationId}${getParams()}`;
+        const path = `${buildConversationPath({
+          conversationId: conversation.conversationId,
+          projectId: projectPrefix,
+        })}${getParams()}`;
         navigate(path, {
           replace: true,
           state: disableFocus ? {} : { focusChat: true },
         });
       },
-    [endpointsConfig, defaultPreset, assistantsListMap, modelsQuery.data, hasAgentAccess],
+    [endpointsConfig, defaultPreset, assistantsListMap, modelsQuery.data, hasAgentAccess, location.pathname],
   );
 
   const newConversation = useCallback(

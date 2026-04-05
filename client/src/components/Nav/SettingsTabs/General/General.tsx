@@ -1,6 +1,6 @@
 import React, { useContext, useCallback } from 'react';
 import Cookies from 'js-cookie';
-import { useRecoilState } from 'recoil';
+import { useAtom } from 'jotai';
 import { Dropdown, ThemeContext } from '@librechat/client';
 import ArchivedChats from './ArchivedChats';
 import ToggleSwitch from '../ToggleSwitch';
@@ -146,7 +146,7 @@ export const LangSelector = ({
 function General() {
   const { theme, setTheme } = useContext(ThemeContext);
 
-  const [langcode, setLangcode] = useRecoilState(store.lang);
+  const [langcode, setLangcode] = useAtom(store.lang);
 
   const changeTheme = useCallback(
     (value: string) => {

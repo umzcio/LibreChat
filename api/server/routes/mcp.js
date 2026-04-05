@@ -26,10 +26,12 @@ const {
   createMCPServerController,
   updateMCPServerController,
   deleteMCPServerController,
+  updateMCPServerCosmeticsController,
   getMCPServersList,
   getMCPServerById,
   getMCPTools,
 } = require('~/server/controllers/mcp');
+const checkAdmin = require('~/server/middleware/roles/admin');
 const {
   getOAuthReconnectionManager,
   getMCPServersRegistry,
@@ -788,6 +790,21 @@ router.patch(
     resourceIdParam: 'serverName',
   }),
   updateMCPServerController,
+);
+
+/**
+ * Update cosmetic metadata (title, description, icon) on yaml/config MCP servers
+ * Admin-only, bypasses ACL since yaml servers have no DB record
+ * @route PATCH /api/mcp/servers/:serverName/cosmetics
+ * @param {string} req.params.serverName - MCP server identifier
+ * @param {MCPServerCosmeticUpdateParams} req.body - Cosmetic fields to update
+ * @returns {MCPServer} 200 - Updated server config
+ */
+router.patch(
+  '/servers/:serverName/cosmetics',
+  requireJwtAuth,
+  checkAdmin,
+  updateMCPServerCosmeticsController,
 );
 
 /**

@@ -1,13 +1,14 @@
 import React, { useEffect, useRef } from 'react';
 import { Check, X } from 'lucide-react';
 import type { KeyboardEvent } from 'react';
+import type { LocalizeFunction } from '~/common';
 
 interface RenameFormProps {
   titleInput: string;
   setTitleInput: (value: string) => void;
   onSubmit: (title: string) => void;
   onCancel: () => void;
-  localize: (key: any, options?: any) => string;
+  localize: LocalizeFunction;
 }
 
 const RenameForm: React.FC<RenameFormProps> = ({

@@ -491,21 +491,19 @@ const syncUserEntraGroupMemberships = async (user, accessToken, session = null) 
       }
     }
 
-    if (!allGroupIds || allGroupIds.length === 0) {
-      return;
-    }
-
     const sessionOptions = session ? { session } : {};
 
-    await db.bulkUpdateGroups(
-      {
-        idOnTheSource: { $in: allGroupIds },
-        source: 'entra',
-        memberIds: { $ne: user.idOnTheSource },
-      },
-      { $addToSet: { memberIds: user.idOnTheSource } },
-      sessionOptions,
-    );
+    if (allGroupIds.length > 0) {
+      await db.bulkUpdateGroups(
+        {
+          idOnTheSource: { $in: allGroupIds },
+          source: 'entra',
+          memberIds: { $ne: user.idOnTheSource },
+        },
+        { $addToSet: { memberIds: user.idOnTheSource } },
+        sessionOptions,
+      );
+    }
 
     await db.bulkUpdateGroups(
       {

@@ -1,13 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { XIcon } from 'lucide-react';
-import { useRecoilState } from 'recoil';
+import { useAtom } from 'jotai';
 import { Button, cn } from '@librechat/client';
 import { useGetBannerQuery } from '~/data-provider';
+import { sanitizeHtml } from '~/utils';
 import store from '~/store';
 
 export const Banner = ({ onHeightChange }: { onHeightChange?: (height: number) => void }) => {
   const { data: banner } = useGetBannerQuery();
-  const [hideBannerHint, setHideBannerHint] = useRecoilState<string[]>(store.hideBannerHint);
+  const [hideBannerHint, setHideBannerHint] = useAtom(store.hideBannerHint);
   const bannerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -45,7 +46,7 @@ export const Banner = ({ onHeightChange }: { onHeightChange?: (height: number) =
           'text-md w-full truncate text-center [&_a]:text-blue-700 [&_a]:underline dark:[&_a]:text-blue-400',
           !banner.persistable && 'px-4',
         )}
-        dangerouslySetInnerHTML={{ __html: banner.message }}
+        dangerouslySetInnerHTML={{ __html: sanitizeHtml(banner.message) }}
       ></div>
       {!banner.persistable && (
         <Button

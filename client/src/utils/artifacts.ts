@@ -5,12 +5,14 @@ import type {
   SandpackPredefinedTemplate,
 } from '@codesandbox/sandpack-react';
 import type { TStartupConfig } from 'librechat-data-provider';
+import type { Artifact } from '~/common';
 
 const artifactFilename = {
   'application/vnd.react': 'App.tsx',
   'application/vnd.ant.react': 'App.tsx',
   'text/html': 'index.html',
   'application/vnd.code-html': 'index.html',
+  'image/svg+xml': 'image.svg',
   // mermaid and markdown types are handled separately in useArtifactProps.ts
   default: 'index.html',
   // 'css': 'css',
@@ -33,6 +35,7 @@ const artifactTemplate: Record<
   'application/vnd.ant.react': 'react-ts',
   'application/vnd.mermaid': 'react-ts',
   'application/vnd.code-html': 'static',
+  'image/svg+xml': 'static',
   'text/markdown': 'static',
   'text/md': 'static',
   'text/plain': 'static',
@@ -51,6 +54,46 @@ export function getKey(type: string, language?: string): string {
 export function getArtifactFilename(type: string, language?: string): string {
   const key = getKey(type, language);
   return artifactFilename[key] ?? artifactFilename.default;
+}
+
+function sanitizeArtifactPathSegment(value: string, fallback: string): string {
+  const sanitized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return sanitized || fallback;
+}
+
+export function getArtifactWorkspaceFilename(type: string, language?: string): string {
+  const key = getKey(type, language);
+
+  if (key.includes('mermaid')) {
+    return 'diagram.mmd';
+  }
+
+  if (type === 'text/markdown' || type === 'text/md') {
+    return 'content.md';
+  }
+
+  if (type === 'text/plain') {
+    return 'content.txt';
+  }
+
+  return getArtifactFilename(type, language);
+}
+
+export function getArtifactWorkspacePath(artifact: Artifact): string {
+  const title = sanitizeArtifactPathSegment(artifact.title ?? '', 'artifact');
+  const identifier = sanitizeArtifactPathSegment(artifact.identifier ?? '', 'artifact');
+  const uniqueSuffix = sanitizeArtifactPathSegment(artifact.id, 'artifact').slice(0, 12);
+  const filename = sanitizeArtifactPathSegment(
+    getArtifactWorkspaceFilename(artifact.type ?? '', artifact.language),
+    'artifact.txt',
+  );
+
+  return `artifacts/${identifier}-${title}-${uniqueSuffix}/${filename}`;
 }
 
 export function getTemplate(type: string, language?: string): SandpackPredefinedTemplate {
@@ -121,6 +164,7 @@ const dependenciesMap: Record<
   'application/vnd.ant.react': standardDependencies,
   'text/html': standardDependencies,
   'application/vnd.code-html': standardDependencies,
+  'image/svg+xml': {},
   'text/markdown': {},
   'text/md': {},
   'text/plain': {},

@@ -1,5 +1,6 @@
 import type { ExtendedFile, FileSetter } from '~/common';
 import useSetFilesToDelete from './useSetFilesToDelete';
+import { logger } from '~/utils';
 
 export default function useUpdateFiles(setFiles: FileSetter) {
   const setFilesToDelete = useSetFilesToDelete();
@@ -23,14 +24,14 @@ export default function useUpdateFiles(setFiles: FileSetter) {
   const updateFileById = (fileId: string, updates: Partial<ExtendedFile>, isEntityFile = false) => {
     setFiles((currentFiles) => {
       if (!currentFiles.has(fileId)) {
-        console.warn(`File with id ${fileId} not found.`);
+        logger.warn('Files', `File with id ${fileId} not found.`);
         return currentFiles;
       }
 
       const updatedFiles = new Map(currentFiles);
       const currentFile = updatedFiles.get(fileId);
       if (!currentFile) {
-        console.warn(`File with id ${fileId} not found.`);
+        logger.warn('Files', `File with id ${fileId} not found.`);
         return currentFiles;
       }
       updatedFiles.set(fileId, { ...currentFile, ...updates });
@@ -50,7 +51,7 @@ export default function useUpdateFiles(setFiles: FileSetter) {
       if (updatedFiles.has(fileId)) {
         updatedFiles.delete(fileId);
       } else {
-        console.warn(`File with id ${fileId} not found.`);
+        logger.warn('Files', `File with id ${fileId} not found.`);
       }
 
       const files = Object.fromEntries(updatedFiles);

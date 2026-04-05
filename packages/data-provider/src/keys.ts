@@ -65,6 +65,10 @@ export enum QueryKeys {
   project = 'project',
   projectConversations = 'projectConversations',
   projectFiles = 'projectFiles',
+  codeSession = 'codeSession',
+  codeFiles = 'codeFiles',
+  codeChanges = 'codeChanges',
+  codeDiff = 'codeDiff',
   /* Active Jobs */
   activeJobs = 'activeJobs',
   /* Agent API Keys */

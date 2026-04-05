@@ -77,6 +77,8 @@ export interface AppConfig {
   imageOutputType: string;
   /** Interface configuration */
   interfaceConfig?: TCustomConfig['interface'];
+  /** Branding configuration (logo, favicon) */
+  branding?: TCustomConfig['branding'];
   /** Turnstile configuration */
   turnstileConfig?: Partial<TCustomConfig['turnstile']>;
   /** Balance configuration */

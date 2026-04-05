@@ -1,5 +1,5 @@
 import { startTransition } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { TooltipAnchor, Button, Sidebar } from '@librechat/client';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
@@ -10,7 +10,7 @@ export const OPEN_SIDEBAR_ID = 'open-sidebar-button';
 
 export default function OpenSidebar({ className }: { className?: string }) {
   const localize = useLocalize();
-  const setSidebarExpanded = useSetRecoilState(store.sidebarExpanded);
+  const setSidebarExpanded = useSetAtom(store.sidebarExpanded);
 
   const handleClick = () => {
     startTransition(() => {

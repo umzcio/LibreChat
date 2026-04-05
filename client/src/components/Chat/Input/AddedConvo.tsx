@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { isAgentsEndpoint } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
-import type { SetterOrUpdater } from 'recoil';
+import type { AtomSetter } from '~/common';
 import { useGetEndpointsQuery } from '~/data-provider';
 import { EndpointIcon } from '~/components/Endpoints';
 import { useAgentsMapContext } from '~/Providers';
@@ -11,7 +11,7 @@ export default function AddedConvo({
   setAddedConvo,
 }: {
   addedConvo: TConversation | null;
-  setAddedConvo: SetterOrUpdater<TConversation | null>;
+  setAddedConvo: AtomSetter<TConversation | null>;
 }) {
   const agentsMap = useAgentsMapContext();
   const { data: endpointsConfig } = useGetEndpointsQuery();

@@ -349,11 +349,22 @@ export function createMessageMethods(mongoose: typeof import('mongoose')): Messa
     const Message = mongoose.models.Message as Model<IMessage>;
     const { sortField = 'createdAt', sortOrder = -1, limit = 25, cursor } = options;
     const queryFilter = { ...filter };
+    const op = sortOrder === 1 ? '$gt' : '$lt';
     if (cursor) {
-      queryFilter[sortField] = sortOrder === 1 ? { $gt: cursor } : { $lt: cursor };
+      try {
+        const decoded = JSON.parse(Buffer.from(cursor, 'base64').toString());
+        const { primary, secondary } = decoded;
+        const secondaryValue = new mongoose.Types.ObjectId(secondary);
+        queryFilter.$or = [
+          { [sortField]: { [op]: primary } },
+          { [sortField]: primary, _id: { [op]: secondaryValue } },
+        ];
+      } catch {
+        queryFilter[sortField] = { [op]: cursor };
+      }
     }
     const messages = await Message.find(queryFilter)
-      .sort({ [sortField]: sortOrder })
+      .sort({ [sortField]: sortOrder, _id: sortOrder })
       .limit(limit + 1)
       .lean();
 
@@ -361,7 +372,8 @@ export function createMessageMethods(mongoose: typeof import('mongoose')): Messa
     if (messages.length > limit) {
       messages.pop();
       const last = messages[messages.length - 1] as Record<string, unknown>;
-      nextCursor = String(last[sortField] ?? '');
+      const composite = { primary: String(last[sortField] ?? ''), secondary: String(last._id) };
+      nextCursor = Buffer.from(JSON.stringify(composite)).toString('base64');
     }
     return { messages, nextCursor };
   }

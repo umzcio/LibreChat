@@ -227,7 +227,8 @@ describe('ConnectionsRepository', () => {
       // Verify repository still has the same connection
       expect(repository['connections'].get('server1')).toBe(freshConnection);
     });
-    //todo revist later when async getAll(): in packages/api/src/mcp/ConnectionsRepository.ts is refactored
+    /** Stale: ConnectionsRepository.get() now returns null for non-existent servers instead of throwing.
+     *  Remove this test or rewrite to assert the null-return behavior. */
     it.skip('should throw error for non-existent server configuration', async () => {
       await expect(repository.get('nonexistent')).rejects.toThrow(
         '[MCP][nonexistent] Server not found in configuration',

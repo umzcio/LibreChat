@@ -1,15 +1,35 @@
 import { useRef, useCallback } from 'react';
-import { useRecoilState } from 'recoil';
+import { useAtom } from 'jotai';
 import { useToastContext } from '@librechat/client';
+import type { SharePointFile } from '~/data-provider/Files/sharepoint';
 import type { SPPickerConfig } from '~/components/SidePanel/Agents/config';
 import { useLocalize, useAuthContext } from '~/hooks';
 import { useGetStartupConfig } from '~/data-provider';
 import useSharePointToken from './useSharePointToken';
 import store from '~/store';
 
+interface SharePointPickerItem {
+  id?: string;
+  shareId?: string;
+  name?: string;
+  size?: number;
+  webUrl?: string;
+  downloadUrl?: string;
+  driveId?: string;
+  parentReference?: { driveId?: string };
+  driveItem?: {
+    id?: string;
+    name?: string;
+    size?: number;
+    webUrl?: string;
+    parentReference?: { driveId?: string };
+    '@microsoft.graph.downloadUrl'?: string;
+  };
+}
+
 interface UseSharePointPickerProps {
   containerNode: HTMLDivElement | null;
-  onFilesSelected?: (files: any[]) => void;
+  onFilesSelected?: (files: SharePointFile[]) => void;
   onClose?: () => void;
   disabled?: boolean;
   maxSelectionCount?: number;
@@ -30,7 +50,7 @@ export default function useSharePointPicker({
   disabled = false,
   maxSelectionCount = 10,
 }: UseSharePointPickerProps): UseSharePointPickerReturn {
-  const [langcode] = useRecoilState(store.lang);
+  const [langcode] = useAtom(store.lang);
   const { user } = useAuthContext();
   const { showToast } = useToastContext();
   const localize = useLocalize();
@@ -129,7 +149,7 @@ export default function useSharePointPicker({
                 console.log('Extracted items:', items);
 
                 if (items && items.length > 0) {
-                  const selectedFiles = items.map((item: any) => ({
+                  const selectedFiles = items.map((item: SharePointPickerItem) => ({
                     id: item.id || item.shareId || item.driveItem?.id,
                     name: item.name || item.driveItem?.name,
                     size: item.size || item.driveItem?.size,

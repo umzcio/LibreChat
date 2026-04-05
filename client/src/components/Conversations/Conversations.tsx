@@ -1,11 +1,17 @@
 import { useMemo, memo, useState, type FC, useCallback, useEffect, useRef } from 'react';
 import throttle from 'lodash/throttle';
 import { ChevronDown, FolderKanban } from 'lucide-react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { Spinner, useMediaQuery } from '@librechat/client';
 import { List, AutoSizer, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import type { TConversation } from 'librechat-data-provider';
-import { useLocalize, TranslationKeys, useFavorites, useShowMarketplace, useLocalStorage } from '~/hooks';
+import {
+  useLocalize,
+  TranslationKeys,
+  useFavorites,
+  useShowMarketplace,
+  useLocalStorage,
+} from '~/hooks';
 import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
 import ProjectCreateDialog from '~/components/SidePanel/Projects/ProjectCreateDialog';
 import { ProjectCard } from '~/components/SidePanel/Projects';
@@ -116,10 +122,13 @@ DateLabel.displayName = 'DateLabel';
 
 type FlattenedItem =
   | { type: 'favorites' }
+  | { type: 'projects' }
   | { type: 'chats-header' }
   | { type: 'header'; groupName: string }
   | { type: 'convo'; convo: TConversation }
   | { type: 'loading' };
+
+type DynamicRowType = 'favorites' | 'projects';
 
 const MemoizedConvo = memo(
   ({
@@ -164,17 +173,22 @@ const Conversations: FC<ConversationsProps> = ({
   setIsChatsExpanded,
 }) => {
   const localize = useLocalize();
-  const search = useRecoilValue(store.search);
+  const search = useAtomValue(store.search);
   const { favorites, isLoading: isFavoritesLoading } = useFavorites();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const convoHeight = isSmallScreen ? 44 : 34;
   const showAgentMarketplace = useShowMarketplace();
 
   const favoritesContentKeyRef = useRef('');
+  const projectsContentKeyRef = useRef('');
   const [isProjectsExpanded, setIsProjectsExpanded] = useLocalStorage('projectsExpanded', true);
   const [createProjectOpen, setCreateProjectOpen] = useState(false);
   const { data: projectsData } = useListProjectsQuery();
   const projects = useMemo(() => projectsData?.projects ?? [], [projectsData]);
+  const projectsContentKey = useMemo(
+    () => projects.map(({ projectId }) => projectId).join(':'),
+    [projects],
+  );
 
   // Fetch active job IDs for showing generation indicators
   const { data: activeJobsData } = useActiveJobs();
@@ -187,7 +201,10 @@ const Conversations: FC<ConversationsProps> = ({
   const shouldShowFavorites =
     !search.query && (isFavoritesLoading || favorites.length > 0 || showAgentMarketplace);
 
-  favoritesContentKeyRef.current = `${favorites.length}-${showAgentMarketplace ? 1 : 0}-${isFavoritesLoading ? 1 : 0}`;
+  const favoritesContentKey = `${favorites.length}-${showAgentMarketplace ? 1 : 0}-${isFavoritesLoading ? 1 : 0}`;
+
+  favoritesContentKeyRef.current = favoritesContentKey;
+  projectsContentKeyRef.current = `${projectsContentKey}-${isProjectsExpanded ? 1 : 0}`;
 
   const filteredConversations = useMemo(
     () => rawConversations.filter(Boolean) as TConversation[],
@@ -215,7 +232,7 @@ const Conversations: FC<ConversationsProps> = ({
       });
 
       if (isLoading) {
-        items.push({ type: 'loading' } as any);
+        items.push({ type: 'loading' });
       }
     }
     return items;
@@ -240,7 +257,7 @@ const Conversations: FC<ConversationsProps> = ({
             return `favorites-${favoritesContentKeyRef.current}`;
           }
           if (item.type === 'projects') {
-            return `projects-${projects.length}-${isProjectsExpanded ? 1 : 0}`;
+            return `projects-${projectsContentKeyRef.current}`;
           }
           if (item.type === 'chats-header') {
             return 'chats-header';
@@ -260,28 +277,55 @@ const Conversations: FC<ConversationsProps> = ({
     [convoHeight],
   );
 
-  const clearFavoritesCache = useCallback(() => {
-    if (cache) {
-      cache.clear(0, 0);
-      if (containerRef.current && 'recomputeRowHeights' in containerRef.current) {
-        containerRef.current.recomputeRowHeights(0);
+  const clearMeasuredRows = useCallback(
+    (rowTypes: DynamicRowType[]) => {
+      const rowsToClear = new Set(rowTypes);
+      let firstRowIndex = -1;
+
+      for (let index = 0; index < flattenedItemsRef.current.length; index += 1) {
+        const item = flattenedItemsRef.current[index];
+
+        if (item.type !== 'favorites' && item.type !== 'projects') {
+          continue;
+        }
+
+        if (!rowsToClear.has(item.type)) {
+          continue;
+        }
+
+        cache.clear(index, 0);
+
+        if (firstRowIndex === -1) {
+          firstRowIndex = index;
+        }
+
+        rowsToClear.delete(item.type);
+
+        if (rowsToClear.size === 0) {
+          break;
+        }
       }
-    }
-  }, [cache, containerRef]);
+
+      if (containerRef.current && 'recomputeRowHeights' in containerRef.current) {
+        containerRef.current.recomputeRowHeights(firstRowIndex === -1 ? 0 : firstRowIndex);
+      }
+    },
+    [cache, containerRef],
+  );
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
-      clearFavoritesCache();
+      clearMeasuredRows(['favorites', 'projects']);
     });
     return () => cancelAnimationFrame(frameId);
-  }, [favorites.length, isFavoritesLoading, showAgentMarketplace, clearFavoritesCache]);
+  }, [favoritesContentKey, shouldShowFavorites, clearMeasuredRows]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
-      clearFavoritesCache();
+      clearMeasuredRows(['projects']);
     });
     return () => cancelAnimationFrame(frameId);
-  }, [projects.length, isProjectsExpanded, clearFavoritesCache]);
+  }, [projectsContentKey, isProjectsExpanded, clearMeasuredRows]);
 
   const rowRenderer = useCallback(
     ({ index, key, parent, style }) => {
@@ -315,7 +359,10 @@ const Conversations: FC<ConversationsProps> = ({
               >
                 <span className="select-none">{localize('com_ui_projects')}</span>
                 <ChevronDown
-                  className={cn('h-3 w-3 transition-transform duration-200', isProjectsExpanded ? 'rotate-180' : '')}
+                  className={cn(
+                    'h-3 w-3 transition-transform duration-200',
+                    isProjectsExpanded ? 'rotate-180' : '',
+                  )}
                 />
               </button>
               {isProjectsExpanded && (
@@ -353,9 +400,9 @@ const Conversations: FC<ConversationsProps> = ({
 
       if (item.type === 'header') {
         // First date header index depends on whether favorites row is included
-        // With favorites: [favorites, chats-header, first-header] → index 2
-        // Without favorites: [chats-header, first-header] → index 1
-        const firstHeaderIndex = shouldShowFavorites ? 2 : 1;
+        // With favorites: [favorites, projects, chats-header, first-header] → index 3
+        // Without favorites: [projects, chats-header, first-header] → index 2
+        const firstHeaderIndex = shouldShowFavorites ? 3 : 2;
         return (
           <MeasuredRow key={key} {...rowProps}>
             <DateLabel groupName={item.groupName} isFirst={index === firstHeaderIndex} />
@@ -389,6 +436,7 @@ const Conversations: FC<ConversationsProps> = ({
       setIsChatsExpanded,
       shouldShowFavorites,
       activeJobIds,
+      localize,
       isProjectsExpanded,
       setIsProjectsExpanded,
       createProjectOpen,

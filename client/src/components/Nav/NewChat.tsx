@@ -1,4 +1,4 @@
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { QueryKeys } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import { TooltipAnchor, Button, NewChatIcon } from '@librechat/client';
@@ -10,14 +10,14 @@ export default function NewChat({ className }: { className?: string }) {
   const localize = useLocalize();
   const queryClient = useQueryClient();
   const { newConversation } = useNewConvo();
-  const conversation = useRecoilValue(store.conversationByIndex(0));
+  const conversationId = useAtomValue(store.conversationIdByIndex(0));
 
   const clickHandler: React.MouseEventHandler<HTMLButtonElement> = (e) => {
     if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
       window.open('/c/new', '_blank');
       return;
     }
-    clearMessagesCache(queryClient, conversation?.conversationId);
+    clearMessagesCache(queryClient, conversationId);
     queryClient.invalidateQueries([QueryKeys.messages]);
     newConversation();
   };

@@ -1,28 +1,37 @@
-import { atom } from 'recoil';
-import { atomWithLocalStorage } from '~/store/utils';
+import { atom } from 'jotai';
+import { createStorageAtom } from '~/store/jotai-utils';
 import { PromptsEditorMode } from '~/common';
 
-// Static atoms without localStorage
-const staticAtoms = {
-  // `name` filter
-  promptsName: atom<string>({ key: 'promptsName', default: '' }),
-  // `category` filter
-  promptsCategory: atom<string>({ key: 'promptsCategory', default: '' }),
-  // `pageNumber` filter
-  promptsPageNumber: atom<number>({ key: 'promptsPageNumber', default: 1 }),
-  // `pageSize` filter
-  promptsPageSize: atom<number>({ key: 'promptsPageSize', default: 10 }),
-};
+const promptsName = atom<string>('');
+promptsName.debugLabel = 'promptsName';
 
-// Atoms with localStorage
-const localStorageAtoms = {
-  autoSendPrompts: atomWithLocalStorage('autoSendPrompts', true),
-  alwaysMakeProd: atomWithLocalStorage('alwaysMakeProd', true),
-  // Editor mode
-  promptsEditorMode: atomWithLocalStorage<PromptsEditorMode>(
-    'promptsEditorMode',
-    PromptsEditorMode.SIMPLE,
-  ),
-};
+const promptsCategory = atom<string>('');
+promptsCategory.debugLabel = 'promptsCategory';
 
-export default { ...staticAtoms, ...localStorageAtoms };
+const promptsPageNumber = atom<number>(1);
+promptsPageNumber.debugLabel = 'promptsPageNumber';
+
+const promptsPageSize = atom<number>(10);
+promptsPageSize.debugLabel = 'promptsPageSize';
+
+const autoSendPrompts = createStorageAtom('autoSendPrompts', true);
+autoSendPrompts.debugLabel = 'autoSendPrompts';
+
+const alwaysMakeProd = createStorageAtom('alwaysMakeProd', true);
+alwaysMakeProd.debugLabel = 'alwaysMakeProd';
+
+const promptsEditorMode = createStorageAtom<PromptsEditorMode>(
+  'promptsEditorMode',
+  PromptsEditorMode.SIMPLE,
+);
+promptsEditorMode.debugLabel = 'promptsEditorMode';
+
+export default {
+  promptsName,
+  promptsCategory,
+  promptsPageNumber,
+  promptsPageSize,
+  autoSendPrompts,
+  alwaysMakeProd,
+  promptsEditorMode,
+};

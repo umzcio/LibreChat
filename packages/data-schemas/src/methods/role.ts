@@ -7,9 +7,12 @@ import {
 } from 'librechat-data-provider';
 import type { Model } from 'mongoose';
 import type { IRole, IUser } from '~/types';
+import { getTransactionSupport } from '~/utils/transactions';
 import logger from '~/config/winston';
 
 const systemRoleValues = new Set<string>(Object.values(SystemRoles));
+
+let transactionSupportCache: boolean | null = null;
 
 /** Case-insensitive check — the legacy roles route uppercases params. */
 function isSystemRoleName(name: string): boolean {
@@ -428,11 +431,12 @@ export function createRoleMethods(mongoose: typeof import('mongoose'), deps: Rol
    * function idempotent — a retry after a partial failure will still clean up
    * orphaned user references and cache entries.
    *
-   * Without a MongoDB transaction the two writes are non-atomic — if the delete
-   * fails after the reassignment, users will already have been moved to USER
-   * while the role document still exists. Recovery requires the caller to retry
-   * the delete call, which will succeed since the `updateMany` is a no-op on
-   * the second pass.
+   * When MongoDB transactions are supported, the user reassignment and role
+   * deletion are wrapped in a single transaction for atomicity. Otherwise,
+   * falls back to the non-atomic approach where a partial failure may leave
+   * users reassigned while the role document still exists. Recovery requires
+   * the caller to retry the delete call, which will succeed since the
+   * `updateMany` is a no-op on the second pass.
    */
   async function deleteRoleByName(roleName: string): Promise<IRole | null> {
     if (isSystemRoleName(roleName)) {
@@ -440,20 +444,50 @@ export function createRoleMethods(mongoose: typeof import('mongoose'), deps: Rol
     }
     const Role = mongoose.models.Role;
     const User = mongoose.models.User as Model<IUser>;
-    await User.updateMany({ role: roleName }, { $set: { role: SystemRoles.USER } });
-    const deleted = await Role.findOneAndDelete({ name: roleName }).lean();
+
+    const supportsTransactions = await getTransactionSupport(mongoose, transactionSupportCache);
+    transactionSupportCache = supportsTransactions;
+
+    let deleted: IRole | null;
+
+    if (supportsTransactions) {
+      const session = await mongoose.startSession();
+      try {
+        session.startTransaction();
+        await User.updateMany(
+          { role: roleName },
+          { $set: { role: SystemRoles.USER } },
+          { session },
+        );
+        deleted = await Role.findOneAndDelete(
+          { name: roleName },
+          { session },
+        ).lean() as IRole | null;
+        await session.commitTransaction();
+      } catch (txError) {
+        try {
+          await session.abortTransaction();
+        } catch {
+          /** best-effort abort */
+        }
+        throw txError;
+      } finally {
+        await session.endSession();
+      }
+    } else {
+      await User.updateMany({ role: roleName }, { $set: { role: SystemRoles.USER } });
+      deleted = await Role.findOneAndDelete({ name: roleName }).lean() as IRole | null;
+    }
+
     try {
       const cache = deps.getCache?.(CacheKeys.ROLES);
       if (cache) {
-        // Setting null evicts the stale document. getRoleByName treats falsy cached
-        // values as a miss and falls through to the DB, so this does not provide
-        // negative caching — it only prevents serving the pre-deletion document.
         await cache.set(roleName, null);
       }
     } catch (cacheError) {
       logger.error(`[deleteRoleByName] cache invalidation failed for "${roleName}":`, cacheError);
     }
-    return deleted as IRole | null;
+    return deleted;
   }
 
   async function updateUsersByRole(oldRole: string, newRole: string): Promise<void> {

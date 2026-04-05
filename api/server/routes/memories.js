@@ -1,15 +1,11 @@
 const express = require('express');
-const { Tokenizer, generateCheckAccess } = require('@librechat/api');
+const { generateCheckAccess } = require('@librechat/api');
+const { logger } = require('@librechat/data-schemas');
 const { PermissionTypes, Permissions } = require('librechat-data-provider');
-const {
-  getAllUserMemories,
-  toggleUserMemories,
-  getRoleByName,
-  createMemory,
-  deleteMemory,
-  setMemory,
-} = require('~/models');
-const { requireJwtAuth, configMiddleware } = require('~/server/middleware');
+const { toggleUserMemories, getRoleByName } = require('~/models');
+const mem0 = require('~/server/services/Mem0Client');
+const asyncHandler = require('~/server/middleware/asyncHandler');
+const { requireJwtAuth } = require('~/server/middleware');
 
 const router = express.Router();
 
@@ -20,17 +16,7 @@ const checkMemoryRead = generateCheckAccess({
   permissions: [Permissions.USE, Permissions.READ],
   getRoleByName,
 });
-const checkMemoryCreate = generateCheckAccess({
-  permissionType: PermissionTypes.MEMORIES,
-  permissions: [Permissions.USE, Permissions.CREATE],
-  getRoleByName,
-});
 const checkMemoryUpdate = generateCheckAccess({
-  permissionType: PermissionTypes.MEMORIES,
-  permissions: [Permissions.USE, Permissions.UPDATE],
-  getRoleByName,
-});
-const checkMemoryDelete = generateCheckAccess({
   permissionType: PermissionTypes.MEMORIES,
   permissions: [Permissions.USE, Permissions.UPDATE],
   getRoleByName,
@@ -44,137 +30,86 @@ const checkMemoryOptOut = generateCheckAccess({
 router.use(requireJwtAuth);
 
 /**
- * GET /memories
- * Returns all memories for the authenticated user, sorted by updated_at (newest first).
- * Also includes memory usage percentage based on token limit.
+ * Maps a Mem0 memory record to the frontend TUserMemory shape.
  */
-router.get('/', checkMemoryRead, configMiddleware, async (req, res) => {
-  try {
-    const memories = await getAllUserMemories(req.user.id);
+function toUserMemory(mem) {
+  return {
+    key: mem.id,
+    value: mem.memory,
+    updated_at: mem.updated_at || mem.created_at || new Date().toISOString(),
+    tokenCount: 0,
+  };
+}
 
-    const sortedMemories = memories.sort(
+/**
+ * GET /memories
+ * Returns all memories for the authenticated user from Mem0.
+ */
+router.get(
+  '/',
+  checkMemoryRead,
+  asyncHandler(async (req, res) => {
+    const memories = await mem0.listMemories(req.user.id);
+    const mapped = memories.map(toUserMemory);
+    const sorted = mapped.sort(
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
     );
 
-    const totalTokens = memories.reduce((sum, memory) => {
-      return sum + (memory.tokenCount || 0);
-    }, 0);
-
-    const appConfig = req.config;
-    const memoryConfig = appConfig?.memory;
-    const tokenLimit = memoryConfig?.tokenLimit;
-    const charLimit = memoryConfig?.charLimit || 10000;
-
-    let usagePercentage = null;
-    if (tokenLimit && tokenLimit > 0) {
-      usagePercentage = Math.min(100, Math.round((totalTokens / tokenLimit) * 100));
-    }
-
     res.json({
-      memories: sortedMemories,
-      totalTokens,
-      tokenLimit: tokenLimit || null,
-      charLimit,
-      usagePercentage,
+      memories: sorted,
+      totalTokens: 0,
+      tokenLimit: null,
+      charLimit: 10000,
+      usagePercentage: null,
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+  }),
+);
 
 /**
  * POST /memories
- * Creates a new memory entry for the authenticated user.
- * Body: { key: string, value: string }
- * Returns 201 and { created: true, memory: <createdDoc> } when successful.
+ * Manually adds a memory via Mem0.
+ * Body: { key: string (ignored), value: string }
  */
-router.post('/', memoryPayloadLimit, checkMemoryCreate, configMiddleware, async (req, res) => {
-  const { key, value } = req.body;
+router.post(
+  '/',
+  memoryPayloadLimit,
+  checkMemoryRead,
+  asyncHandler(async (req, res) => {
+    const { value } = req.body;
 
-  if (typeof key !== 'string' || key.trim() === '') {
-    return res.status(400).json({ error: 'Key is required and must be a non-empty string.' });
-  }
-
-  if (typeof value !== 'string' || value.trim() === '') {
-    return res.status(400).json({ error: 'Value is required and must be a non-empty string.' });
-  }
-
-  const appConfig = req.config;
-  const memoryConfig = appConfig?.memory;
-  const charLimit = memoryConfig?.charLimit || 10000;
-
-  if (key.length > 1000) {
-    return res.status(400).json({
-      error: `Key exceeds maximum length of 1000 characters. Current length: ${key.length} characters.`,
-    });
-  }
-
-  if (value.length > charLimit) {
-    return res.status(400).json({
-      error: `Value exceeds maximum length of ${charLimit} characters. Current length: ${value.length} characters.`,
-    });
-  }
-
-  try {
-    const tokenCount = Tokenizer.getTokenCount(value, 'o200k_base');
-
-    const memories = await getAllUserMemories(req.user.id);
-
-    const appConfig = req.config;
-    const memoryConfig = appConfig?.memory;
-    const tokenLimit = memoryConfig?.tokenLimit;
-
-    if (tokenLimit) {
-      const currentTotalTokens = memories.reduce(
-        (sum, memory) => sum + (memory.tokenCount || 0),
-        0,
-      );
-      if (currentTotalTokens + tokenCount > tokenLimit) {
-        return res.status(400).json({
-          error: `Adding this memory would exceed the token limit of ${tokenLimit}. Current usage: ${currentTotalTokens} tokens.`,
-        });
-      }
+    if (typeof value !== 'string' || value.trim() === '') {
+      return res.status(400).json({ error: 'Value is required and must be a non-empty string.' });
     }
 
-    const result = await createMemory({
-      userId: req.user.id,
-      key: key.trim(),
+    const result = await mem0.addMemories([{ role: 'user', content: value.trim() }], req.user.id);
+
+    const newId = result?.results?.[0]?.id;
+    const memory = {
+      key: newId || 'new',
       value: value.trim(),
-      tokenCount,
-    });
+      updated_at: new Date().toISOString(),
+      tokenCount: 0,
+    };
 
-    if (!result.ok) {
-      return res.status(500).json({ error: 'Failed to create memory.' });
-    }
-
-    const updatedMemories = await getAllUserMemories(req.user.id);
-    const newMemory = updatedMemories.find((m) => m.key === key.trim());
-
-    res.status(201).json({ created: true, memory: newMemory });
-  } catch (error) {
-    if (error.message && error.message.includes('already exists')) {
-      return res.status(409).json({ error: 'Memory with this key already exists.' });
-    }
-    res.status(500).json({ error: error.message });
-  }
-});
+    res.status(201).json({ created: true, memory });
+  }),
+);
 
 /**
  * PATCH /memories/preferences
- * Updates the user's memory preferences (e.g., enabling/disabling memories).
- * Body: { memories: boolean }
- * Returns 200 and { updated: true, preferences: { memories: boolean } } when successful.
+ * Updates the user's memory preferences (enable/disable).
  */
-router.patch('/preferences', checkMemoryOptOut, async (req, res) => {
-  const { memories } = req.body;
+router.patch(
+  '/preferences',
+  checkMemoryOptOut,
+  asyncHandler(async (req, res) => {
+    const { memories } = req.body;
 
-  if (typeof memories !== 'boolean') {
-    return res.status(400).json({ error: 'memories must be a boolean value.' });
-  }
+    if (typeof memories !== 'boolean') {
+      return res.status(400).json({ error: 'memories must be a boolean value.' });
+    }
 
-  try {
     const updatedUser = await toggleUserMemories(req.user.id, memories);
-
     if (!updatedUser) {
       return res.status(404).json({ error: 'User not found.' });
     }
@@ -185,114 +120,71 @@ router.patch('/preferences', checkMemoryOptOut, async (req, res) => {
         memories: updatedUser.personalization?.memories ?? true,
       },
     });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+  }),
+);
 
 /**
  * PATCH /memories/:key
- * Updates the value of an existing memory entry for the authenticated user.
- * Body: { key?: string, value: string }
- * Returns 200 and { updated: true, memory: <updatedDoc> } when successful.
+ * Mem0 memories are immutable — create new first, then delete old (safe ordering).
+ * :key is the Mem0 memory ID.
  */
-router.patch('/:key', memoryPayloadLimit, checkMemoryUpdate, configMiddleware, async (req, res) => {
-  const { key: urlKey } = req.params;
-  const { key: bodyKey, value } = req.body || {};
+router.patch(
+  '/:key',
+  memoryPayloadLimit,
+  checkMemoryUpdate,
+  asyncHandler(async (req, res) => {
+    const { key: memoryId } = req.params;
+    const { value } = req.body || {};
 
-  if (typeof value !== 'string' || value.trim() === '') {
-    return res.status(400).json({ error: 'Value is required and must be a non-empty string.' });
-  }
-
-  const newKey = bodyKey || urlKey;
-  const appConfig = req.config;
-  const memoryConfig = appConfig?.memory;
-  const charLimit = memoryConfig?.charLimit || 10000;
-
-  if (newKey.length > 1000) {
-    return res.status(400).json({
-      error: `Key exceeds maximum length of 1000 characters. Current length: ${newKey.length} characters.`,
-    });
-  }
-
-  if (value.length > charLimit) {
-    return res.status(400).json({
-      error: `Value exceeds maximum length of ${charLimit} characters. Current length: ${value.length} characters.`,
-    });
-  }
-
-  try {
-    const tokenCount = Tokenizer.getTokenCount(value, 'o200k_base');
-
-    const memories = await getAllUserMemories(req.user.id);
-    const existingMemory = memories.find((m) => m.key === urlKey);
-
-    if (!existingMemory) {
-      return res.status(404).json({ error: 'Memory not found.' });
+    if (typeof value !== 'string' || value.trim() === '') {
+      return res.status(400).json({ error: 'Value is required and must be a non-empty string.' });
     }
 
-    if (newKey !== urlKey) {
-      const keyExists = memories.find((m) => m.key === newKey);
-      if (keyExists) {
-        return res.status(409).json({ error: 'Memory with this key already exists.' });
-      }
+    const result = await mem0.addMemories([{ role: 'user', content: value.trim() }], req.user.id);
 
-      const createResult = await createMemory({
-        userId: req.user.id,
-        key: newKey,
-        value,
-        tokenCount,
-      });
-
-      if (!createResult.ok) {
-        return res.status(500).json({ error: 'Failed to create new memory.' });
-      }
-
-      const deleteResult = await deleteMemory({ userId: req.user.id, key: urlKey });
-      if (!deleteResult.ok) {
-        return res.status(500).json({ error: 'Failed to delete old memory.' });
-      }
-    } else {
-      const result = await setMemory({
-        userId: req.user.id,
-        key: newKey,
-        value,
-        tokenCount,
-      });
-
-      if (!result.ok) {
-        return res.status(500).json({ error: 'Failed to update memory.' });
-      }
+    const newId = result?.results?.[0]?.id;
+    if (!newId) {
+      return res.status(500).json({ error: 'Failed to create replacement memory' });
     }
 
-    const updatedMemories = await getAllUserMemories(req.user.id);
-    const updatedMemory = updatedMemories.find((m) => m.key === newKey);
+    try {
+      await mem0.deleteMemory(memoryId);
+    } catch (deleteError) {
+      logger.warn('[PATCH /memories/:key] New memory created but old memory deletion failed', {
+        oldId: memoryId,
+        newId,
+        error: deleteError.message,
+      });
+    }
 
-    res.json({ updated: true, memory: updatedMemory });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+    res.json({
+      updated: true,
+      memory: {
+        key: newId,
+        value: value.trim(),
+        updated_at: new Date().toISOString(),
+        tokenCount: 0,
+      },
+    });
+  }),
+);
 
 /**
  * DELETE /memories/:key
- * Deletes a memory entry for the authenticated user.
- * Returns 200 and { deleted: true } when successful.
+ * Deletes a memory by its Mem0 ID.
  */
-router.delete('/:key', checkMemoryDelete, async (req, res) => {
-  const { key } = req.params;
+router.delete(
+  '/:key',
+  checkMemoryUpdate,
+  asyncHandler(async (req, res) => {
+    const { key: memoryId } = req.params;
 
-  try {
-    const result = await deleteMemory({ userId: req.user.id, key });
-
-    if (!result.ok) {
+    const success = await mem0.deleteMemory(memoryId);
+    if (!success) {
       return res.status(404).json({ error: 'Memory not found.' });
     }
-
     res.json({ deleted: true });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
+  }),
+);
 
 module.exports = router;

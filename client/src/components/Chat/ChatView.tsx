@@ -1,5 +1,5 @@
 import { memo, useCallback } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { useForm } from 'react-hook-form';
 import { Spinner } from '@librechat/client';
 import { useParams } from 'react-router-dom';
@@ -29,10 +29,16 @@ function LoadingSpinner() {
   );
 }
 
-function ChatView({ index = 0 }: { index?: number }) {
+function ChatView({
+  index = 0,
+  showArtifactsPanel = true,
+}: {
+  index?: number;
+  showArtifactsPanel?: boolean;
+}) {
   const { conversationId } = useParams();
-  const rootSubmission = useRecoilValue(store.submissionByIndex(index));
-  const centerFormOnLanding = useRecoilValue(store.centerFormOnLanding);
+  const rootSubmission = useAtomValue(store.submissionByIndex(index));
+  const centerFormOnLanding = useAtomValue(store.centerFormOnLanding);
 
   const methods = useForm<ChatFormValues>({
     defaultValues: { text: '' },
@@ -80,7 +86,7 @@ function ChatView({ index = 0 }: { index?: number }) {
     <ChatFormProvider {...methods}>
       <ChatContext.Provider value={chatHelpers}>
         <AddedChatContext.Provider value={addedChatHelpers}>
-          <Presentation>
+          <Presentation showArtifactsPanel={showArtifactsPanel}>
             <div className="relative flex h-full w-full flex-col">
               <Header />
               <>

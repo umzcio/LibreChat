@@ -277,6 +277,9 @@ export const mcp = {
 
 export const mcpServer = (serverName: string) => `${BASE_URL}/api/mcp/servers/${serverName}`;
 
+export const mcpServerCosmetics = (serverName: string) =>
+  `${BASE_URL}/api/mcp/servers/${encodeURIComponent(serverName)}/cosmetics`;
+
 export const revertAgentVersion = (agent_id: string) => `${agents({ path: `${agent_id}/revert` })}`;
 
 export const files = () => `${BASE_URL}/api/files`;
@@ -411,6 +414,17 @@ export const projectConversations = (projectId: string) =>
   `${project(projectId)}/conversations`;
 export const projectConversation = (projectId: string, conversationId: string) =>
   `${projectConversations(projectId)}/${encodeURIComponent(conversationId)}`;
+
+const codeRoot = `${BASE_URL}/api/code`;
+export const codeSession = () => `${codeRoot}/session`;
+export const codeFiles = () => `${codeRoot}/files`;
+export const codeRename = () => `${codeRoot}/files`;
+export const codeFileContent = () => `${codeRoot}/files/content`;
+export const codeChanges = () => `${codeRoot}/changes`;
+export const codeDiff = () => `${codeRoot}/diff`;
+export const codeApply = () => `${codeRoot}/apply`;
+export const codeDiscard = () => `${codeRoot}/discard`;
+export const codePromote = () => `${codeRoot}/promote`;
 
 /* Memories */
 export const memories = () => `${BASE_URL}/api/memories`;

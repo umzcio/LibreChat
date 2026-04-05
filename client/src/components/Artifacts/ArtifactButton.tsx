@@ -1,7 +1,7 @@
-import { useEffect, useRef } from 'react';
-import debounce from 'lodash/debounce';
+import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useRecoilState, useSetRecoilState, useResetRecoilState } from 'recoil';
+import { useAtom, useSetAtom } from 'jotai';
+import { RESET } from 'jotai/utils';
 import type { Artifact } from '~/common';
 import FilePreview from '~/components/Chat/Input/Files/FilePreview';
 import { cn, getFileType, logger, isArtifactRoute } from '~/utils';
@@ -11,26 +11,11 @@ import store from '~/store';
 const ArtifactButton = ({ artifact }: { artifact: Artifact | null }) => {
   const localize = useLocalize();
   const location = useLocation();
-  const setVisible = useSetRecoilState(store.artifactsVisibility);
-  const [artifacts, setArtifacts] = useRecoilState(store.artifactsState);
-  const [currentArtifactId, setCurrentArtifactId] = useRecoilState(store.currentArtifactId);
-  const resetCurrentArtifactId = useResetRecoilState(store.currentArtifactId);
+  const setVisible = useSetAtom(store.artifactsVisibility);
+  const [artifacts, setArtifacts] = useAtom(store.artifactsState);
+  const [currentArtifactId, setCurrentArtifactId] = useAtom(store.currentArtifactId);
   const isSelected = artifact?.id === currentArtifactId;
-  const [visibleArtifacts, setVisibleArtifacts] = useRecoilState(store.visibleArtifacts);
-
-  const debouncedSetVisibleRef = useRef(
-    debounce((artifactToSet: Artifact) => {
-      logger.log(
-        'artifacts_visibility',
-        'Setting artifact to visible state from Artifact button',
-        artifactToSet,
-      );
-      setVisibleArtifacts((prev) => ({
-        ...prev,
-        [artifactToSet.id]: artifactToSet,
-      }));
-    }, 750),
-  );
+  const [visibleArtifacts, setVisibleArtifacts] = useAtom(store.visibleArtifacts);
 
   useEffect(() => {
     if (artifact == null || artifact?.id == null || artifact.id === '') {
@@ -41,12 +26,23 @@ const ArtifactButton = ({ artifact }: { artifact: Artifact | null }) => {
       return;
     }
 
-    const debouncedSetVisible = debouncedSetVisibleRef.current;
-    debouncedSetVisible(artifact);
-    return () => {
-      debouncedSetVisible.cancel();
-    };
-  }, [artifact, location.pathname]);
+    logger.log('artifacts_visibility', 'Caching visible artifact from Artifact button', artifact);
+    setVisibleArtifacts((prev) => {
+      const cachedArtifact = prev?.[artifact.id];
+      if (
+        cachedArtifact != null &&
+        cachedArtifact.content === artifact.content &&
+        cachedArtifact.lastUpdateTime === artifact.lastUpdateTime
+      ) {
+        return prev;
+      }
+
+      return {
+        ...(prev ?? {}),
+        [artifact.id]: artifact,
+      };
+    });
+  }, [artifact, location.pathname, setVisibleArtifacts]);
 
   if (artifact === null || artifact === undefined) {
     return null;
@@ -58,16 +54,20 @@ const ArtifactButton = ({ artifact }: { artifact: Artifact | null }) => {
       {(() => {
         const handleClick = () => {
           if (isSelected) {
-            resetCurrentArtifactId();
+            setCurrentArtifactId(RESET);
             setVisible(false);
             return;
           }
 
-          resetCurrentArtifactId();
+          setCurrentArtifactId(RESET);
           setVisible(true);
 
           if (artifacts?.[artifact.id] == null) {
-            setArtifacts(visibleArtifacts);
+            setArtifacts((prev) => ({
+              ...(visibleArtifacts ?? {}),
+              ...(prev ?? {}),
+              [artifact.id]: artifact,
+            }));
           }
 
           setTimeout(() => {

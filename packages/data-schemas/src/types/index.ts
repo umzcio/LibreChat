@@ -25,6 +25,7 @@ export * from './memory';
 export * from './prompts';
 /* Projects */
 export * from './project';
+export * from './workspace';
 /* Access Control */
 export * from './accessRole';
 export * from './aclEntry';

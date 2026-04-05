@@ -137,6 +137,10 @@ router.get('/', async function (req, res) {
         }
       }
 
+      if (baseConfig?.branding) {
+        payload.branding = baseConfig.branding;
+      }
+
       return res.status(200).send(payload);
     }
 
@@ -170,6 +174,10 @@ router.get('/', async function (req, res) {
     const webSearch = buildWebSearchConfig(appConfig);
     if (webSearch) {
       payload.webSearch = webSearch;
+    }
+
+    if (appConfig?.branding) {
+      payload.branding = appConfig.branding;
     }
 
     return res.status(200).send(payload);

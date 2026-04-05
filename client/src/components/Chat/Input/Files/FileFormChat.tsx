@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import type { TConversation } from 'librechat-data-provider';
 import type { ExtendedFile, FileSetter } from '~/common';
 import { useFileHandlingNoChatContext } from '~/hooks';
@@ -17,7 +17,7 @@ function FileFormChat({
   setFiles: FileSetter;
   setFilesLoading: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const chatDirection = useRecoilValue(store.chatDirection).toLowerCase();
+  const chatDirection = useAtomValue(store.chatDirection).toLowerCase();
   const { endpoint: _endpoint } = conversation ?? { endpoint: null };
   const { abortUpload } = useFileHandlingNoChatContext(undefined, {
     files,

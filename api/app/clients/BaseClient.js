@@ -816,6 +816,14 @@ class BaseClient {
       unsetFields,
     });
 
+    if (options?.req?.body?.projectId) {
+      const { synthesizeProjectMemory } = require('~/server/services/ProjectMemory/synthesize');
+      synthesizeProjectMemory(
+        options.req.body.projectId,
+        options.req.user.id,
+      ).catch((err) => logger.error('[BaseClient] Project memory synthesis failed', err));
+    }
+
     return { message: savedMessage, conversation };
   }
 

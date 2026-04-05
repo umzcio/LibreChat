@@ -1,22 +1,151 @@
-import { FolderClosed } from 'lucide-react';
-import type { TProject } from 'librechat-data-provider';
+import { useState, useId, useCallback, useMemo } from 'react';
+import * as Ariakit from '@ariakit/react';
 import { useNavigate } from 'react-router-dom';
+import { DropdownPopup, useToastContext } from '@librechat/client';
+import { Ellipsis, Pen, Trash } from 'lucide-react';
+import type { MouseEvent } from 'react';
+import type { TProject } from 'librechat-data-provider';
+import { useUpdateProjectMutation, useDeleteProjectMutation } from '~/data-provider';
+import { getProjectIcon } from '~/components/SidePanel/Projects/ProjectCreateDialog';
+import RenameForm from '~/components/Conversations/RenameForm';
+import { useLocalize } from '~/hooks';
+import { cn } from '~/utils';
 
 export default function ProjectCard({ project }: { project: TProject }) {
   const navigate = useNavigate();
+  const localize = useLocalize();
+  const { showToast } = useToastContext();
+  const menuId = useId();
+
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
+  const [titleInput, setTitleInput] = useState(project.name);
+
+  const updateMutation = useUpdateProjectMutation({
+    onSuccess: () => {
+      setRenaming(false);
+    },
+    onError: () => {
+      showToast({ message: localize('com_ui_error_save_project'), status: 'error' });
+    },
+  });
+
+  const deleteMutation = useDeleteProjectMutation({
+    onSuccess: () => {
+      showToast({ message: localize('com_ui_project_deleted'), status: 'success' });
+    },
+    onError: () => {
+      showToast({ message: localize('com_ui_error_delete_project'), status: 'error' });
+    },
+  });
+
+  const handleRename = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      setTitleInput(project.name);
+      setRenaming(true);
+      setIsMenuOpen(false);
+    },
+    [project.name],
+  );
+
+  const handleSubmitRename = useCallback(
+    (title: string) => {
+      const trimmed = title.trim() || project.name;
+      updateMutation.mutate({
+        projectId: project.projectId,
+        data: { name: trimmed },
+      });
+    },
+    [project.projectId, project.name, updateMutation],
+  );
+
+  const handleDelete = useCallback(
+    (e: MouseEvent) => {
+      e.stopPropagation();
+      setIsMenuOpen(false);
+      deleteMutation.mutate(project.projectId);
+    },
+    [project.projectId, deleteMutation],
+  );
+
+  const dropdownItems = useMemo(
+    () => [
+      {
+        label: localize('com_ui_rename'),
+        onClick: handleRename,
+        icon: <Pen className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
+      },
+      {
+        label: localize('com_ui_delete'),
+        onClick: handleDelete,
+        icon: <Trash className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
+      },
+    ],
+    [localize, handleRename, handleDelete],
+  );
 
   return (
-    <button
-      type="button"
-      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-primary hover:bg-surface-hover"
-      onClick={() => navigate(`/p/${project.projectId}`)}
-    >
-      <FolderClosed
-        className="size-4 shrink-0"
-        style={{ color: project.color || '#3b82f6' }}
-        aria-hidden="true"
-      />
-      <span className="truncate">{project.name}</span>
-    </button>
+    <div className="group relative flex w-full items-center rounded-lg text-sm text-text-primary hover:bg-surface-hover">
+      {renaming ? (
+        <RenameForm
+          titleInput={titleInput}
+          setTitleInput={setTitleInput}
+          onSubmit={handleSubmitRename}
+          onCancel={() => {
+            setRenaming(false);
+            setTitleInput(project.name);
+          }}
+          localize={localize}
+        />
+      ) : null}
+      <button
+        type="button"
+        className="flex flex-1 items-center gap-2 overflow-hidden px-2 py-1.5"
+        onClick={() => navigate(`/p/${project.projectId}`)}
+      >
+        {(() => {
+          const Icon = getProjectIcon(project.icon);
+          return (
+            <Icon
+              className="size-4 shrink-0"
+              style={{ color: project.color || '#3b82f6' }}
+              aria-hidden="true"
+            />
+          );
+        })()}
+        <span className="truncate">{project.name}</span>
+      </button>
+      <div className="flex shrink-0 items-center pr-1">
+        <DropdownPopup
+          portal={true}
+          menuId={menuId}
+          focusLoop={true}
+          className="z-[125]"
+          unmountOnHide={true}
+          isOpen={isMenuOpen}
+          setIsOpen={setIsMenuOpen}
+          trigger={
+            <Ariakit.MenuButton
+              id={`project-menu-${project.projectId}`}
+              aria-label={localize('com_ui_project_options')}
+              aria-expanded={isMenuOpen}
+              className={cn(
+                'inline-flex h-7 w-7 items-center justify-center rounded-md border-none p-0 text-sm ring-ring-primary transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:opacity-50',
+                isMenuOpen
+                  ? 'opacity-100'
+                  : 'opacity-0 focus:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100 data-[open]:opacity-100',
+              )}
+              onClick={(e: MouseEvent<HTMLButtonElement>) => {
+                e.stopPropagation();
+              }}
+            >
+              <Ellipsis className="icon-md text-text-secondary" aria-hidden={true} />
+            </Ariakit.MenuButton>
+          }
+          items={dropdownItems}
+        />
+      </div>
+    </div>
   );
 }

@@ -20,6 +20,7 @@ export type RefreshListAvatarsParams = {
   userId: string;
   refreshS3Url: RefreshS3UrlFn;
   updateAgent: UpdateAgentFn;
+  persistUpdates?: boolean;
 };
 
 export type RefreshStats = {
@@ -49,6 +50,7 @@ export const refreshListAvatars = async ({
   userId,
   refreshS3Url,
   updateAgent,
+  persistUpdates = false,
 }: RefreshListAvatarsParams): Promise<RefreshStats> => {
   const stats: RefreshStats = {
     updated: 0,
@@ -96,16 +98,20 @@ export const refreshListAvatars = async ({
 
           stats.urlCache[agent.id] = newPath;
 
-          try {
-            await updateAgent(
-              { id: agent.id },
-              { avatar: { filepath: newPath, source: agent.avatar.source } },
-              { updatingUserId: userId, skipVersioning: true },
-            );
+          if (persistUpdates) {
+            try {
+              await updateAgent(
+                { id: agent.id },
+                { avatar: { filepath: newPath, source: agent.avatar.source } },
+                { updatingUserId: userId, skipVersioning: true },
+              );
+              stats.updated++;
+            } catch (persistErr) {
+              logger.error('[refreshListAvatars] Avatar refresh persist error: %o', persistErr);
+              stats.persist_error++;
+            }
+          } else {
             stats.updated++;
-          } catch (persistErr) {
-            logger.error('[refreshListAvatars] Avatar refresh persist error: %o', persistErr);
-            stats.persist_error++;
           }
         } catch (err) {
           logger.error('[refreshListAvatars] S3 avatar refresh error: %o', err);

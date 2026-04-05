@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { logger } from '~/utils';
 
 export default function useLocalStorage<T>(key: string, defaultValue: T): [T, (value: T) => void] {
   const [value, setValue] = useState(defaultValue);
@@ -17,7 +18,11 @@ export default function useLocalStorage<T>(key: string, defaultValue: T): [T, (v
       localStorage.setItem(key, JSON.stringify(defaultValue));
     }
 
-    setValue(item ? JSON.parse(item) : defaultValue);
+    try {
+      setValue(item ? JSON.parse(item) : defaultValue);
+    } catch {
+      setValue(defaultValue);
+    }
 
     function handler(e: StorageEvent) {
       if (e.key !== key) {
@@ -25,7 +30,11 @@ export default function useLocalStorage<T>(key: string, defaultValue: T): [T, (v
       }
 
       const lsi = localStorage.getItem(key);
-      setValue(JSON.parse(lsi ?? ''));
+      try {
+        setValue(JSON.parse(lsi ?? ''));
+      } catch {
+        setValue(defaultValue);
+      }
     }
 
     window.addEventListener('storage', handler);
@@ -45,7 +54,7 @@ export default function useLocalStorage<T>(key: string, defaultValue: T): [T, (v
         window.dispatchEvent(new StorageEvent('storage', { key }));
       }
     } catch (e) {
-      console.error(e);
+      logger.error('localStorage', e);
     }
   };
 

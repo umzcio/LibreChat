@@ -1,12 +1,13 @@
 import { useCallback } from 'react';
 import type { EModelEndpoint } from 'librechat-data-provider';
-import type { SharePointFile } from '~/data-provider/Files/sharepoint';
+import type { SharePointBatchProgress, SharePointFile } from '~/data-provider/Files/sharepoint';
 import type { FileHandlingState } from './useFileHandling';
+import type { FileSetter } from '~/common';
 import useFileHandling, { useFileHandlingNoChatContext } from './useFileHandling';
 import useSharePointDownload from './useSharePointDownload';
 
 interface UseSharePointFileHandlingProps {
-  fileSetter?: any;
+  fileSetter?: FileSetter;
   toolResource?: string;
   fileFilter?: (file: File) => boolean;
   additionalMetadata?: Record<string, string | undefined>;
@@ -17,7 +18,7 @@ interface UseSharePointFileHandlingProps {
 interface UseSharePointFileHandlingReturn {
   handleSharePointFiles: (files: SharePointFile[]) => Promise<void>;
   isProcessing: boolean;
-  downloadProgress: any;
+  downloadProgress: SharePointBatchProgress | null;
   error: string | null;
 }
 

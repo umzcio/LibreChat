@@ -1,5 +1,6 @@
 import mongoose, { FilterQuery } from 'mongoose';
 import type { IUser, BalanceConfig, CreateUserRequest, UserDeleteResult } from '~/types';
+import { escapeRegExp } from '~/utils/string';
 import { signPayload } from '~/crypto';
 
 /** Default JWT session expiry: 15 minutes in milliseconds */
@@ -258,7 +259,8 @@ export function createUserMethods(mongoose: typeof import('mongoose')) {
       return [];
     }
 
-    const regex = new RegExp(searchPattern.trim(), 'i');
+    const escaped = escapeRegExp(searchPattern.trim());
+    const regex = new RegExp(escaped, 'i');
     const User = mongoose.models.User;
 
     const query = User.find({
@@ -272,7 +274,7 @@ export function createUserMethods(mongoose: typeof import('mongoose')) {
     const users = await query.lean();
 
     // Score results by relevance
-    const exactRegex = new RegExp(`^${searchPattern.trim()}$`, 'i');
+    const exactRegex = new RegExp(`^${escaped}$`, 'i');
     const startsWithPattern = searchPattern.trim().toLowerCase();
 
     const scoredUsers = users.map((user) => {

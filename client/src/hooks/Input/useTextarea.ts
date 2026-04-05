@@ -1,6 +1,6 @@
 import debounce from 'lodash/debounce';
 import { useEffect, useRef, useCallback } from 'react';
-import { useRecoilValue, useRecoilState } from 'recoil';
+import { useAtom, useAtomValue } from 'jotai';
 import type { TEndpointOption } from 'librechat-data-provider';
 import type { KeyboardEvent } from 'react';
 import {
@@ -40,11 +40,11 @@ export default function useTextarea({
   const { handleFiles } = useFileHandling();
   const assistantMap = useAssistantsMapContext();
   const checkHealth = useInteractionHealthCheck();
-  const enterToSend = useRecoilValue(store.enterToSend);
+  const enterToSend = useAtomValue(store.enterToSend);
 
   const { index, conversation, isSubmitting, filesLoading, setFilesLoading } = useChatContext();
-  const latestMessage = useRecoilValue(store.latestMessageFamily(index));
-  const [activePrompt, setActivePrompt] = useRecoilState(store.activePromptByIndex(index));
+  const latestMessageError = useAtomValue(store.latestMessageErrorFamily(index));
+  const [activePrompt, setActivePrompt] = useAtom(store.activePromptByIndex(index));
 
   const { endpoint = '' } = conversation || {};
   const { entity, isAgent, isAssistant } = getEntity({
@@ -56,7 +56,7 @@ export default function useTextarea({
   });
   const entityName = entity?.name ?? '';
 
-  const isNotAppendable = latestMessage?.error === true && !isAssistant;
+  const isNotAppendable = latestMessageError === true && !isAssistant;
   // && (conversationId?.length ?? 0) > 6; // also ensures that we don't show the wrong placeholder
 
   useEffect(() => {
@@ -134,7 +134,7 @@ export default function useTextarea({
     isAssistant,
     assistantMap,
     conversation,
-    latestMessage,
+    latestMessageError,
     isNotAppendable,
   ]);
 

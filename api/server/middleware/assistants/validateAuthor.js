@@ -50,4 +50,35 @@ const validateAuthor = async ({ req, openai, overrideEndpoint, overrideAssistant
   }
 };
 
-module.exports = validateAuthor;
+/**
+ * Validates ownership for mutation operations (patch, delete, action changes).
+ * Always enforces ownership regardless of privateAssistants setting.
+ * Only MANAGE_ASSISTANTS capability can bypass.
+ */
+const validateMutationAuthor = async ({ req, openai, overrideEndpoint, overrideAssistantId }) => {
+  const assistant_id =
+    overrideAssistantId ?? req.params.id ?? req.body.assistant_id ?? req.query.assistant_id;
+
+  let canManageAssistants = false;
+  try {
+    canManageAssistants = await hasCapability(req.user, SystemCapabilities.MANAGE_ASSISTANTS);
+  } catch (err) {
+    logger.warn(`[validateMutationAuthor] capability check failed, denying bypass: ${err.message}`);
+  }
+
+  if (canManageAssistants) {
+    logger.debug(`[validateMutationAuthor] MANAGE_ASSISTANTS bypass for user ${req.user.id}`);
+    return;
+  }
+
+  const assistantDoc = await getAssistant({ assistant_id, user: req.user.id });
+  if (assistantDoc) {
+    return;
+  }
+  const assistant = await openai.beta.assistants.retrieve(assistant_id);
+  if (req.user.id !== assistant?.metadata?.author) {
+    throw new Error(`Assistant ${assistant_id} is not authored by the user.`);
+  }
+};
+
+module.exports = { validateAuthor, validateMutationAuthor };

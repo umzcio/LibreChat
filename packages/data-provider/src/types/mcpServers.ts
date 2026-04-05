@@ -44,6 +44,17 @@ export type MCPServerDBObjectResponse = {
   serverName: string;
   /** True if access is only via agent (not directly shared with user) */
   consumeOnly?: boolean;
+  /** Origin of this server definition — yaml, config, or user */
+  source?: 'yaml' | 'config' | 'user';
 } & MCPOptions;
 
 export type MCPServersListResponse = Record<string, MCPServerDBObjectResponse>;
+
+/**
+ * Parameters for updating cosmetic metadata on yaml/config-defined MCP servers
+ */
+export type MCPServerCosmeticUpdateParams = {
+  title?: string;
+  description?: string;
+  iconPath?: string;
+};

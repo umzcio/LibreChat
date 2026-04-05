@@ -11,6 +11,8 @@ export type TProject = {
   isArchived?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  memory?: string[];
+  memoryUpdatedAt?: string;
 };
 
 export type TProjectListParams = {

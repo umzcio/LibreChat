@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useMemo, useState } from 'react';
 import { v4 } from 'uuid';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { useToastContext } from '@librechat/client';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -54,7 +54,7 @@ const useFileHandlingCore = (params: UseFileHandling | undefined, fileState: Fil
   const { startUploadTimer, clearUploadTimer } = useDelayedUploadToast();
   const { files, setFiles, conversation } = fileState;
   const setFilesLoading = fileState.setFilesLoading ?? noop;
-  const setEphemeralAgent = useSetRecoilState(
+  const setEphemeralAgent = useSetAtom(
     ephemeralAgentByConvoId(conversation?.conversationId ?? Constants.NEW_CONVO),
   );
   const setError = (error: string) => setErrors((prevErrors) => [...prevErrors, error]);
@@ -118,7 +118,7 @@ const useFileHandlingCore = (params: UseFileHandling | undefined, fileState: Fil
     {
       onSuccess: (data) => {
         clearUploadTimer(data.temp_file_id);
-        console.log('upload success', data);
+        logger.log('FileHandling', 'upload success', data);
         if (agent_id) {
           queryClient.refetchQueries([QueryKeys.agent, agent_id]);
           return;
@@ -158,7 +158,7 @@ const useFileHandlingCore = (params: UseFileHandling | undefined, fileState: Fil
       },
       onError: (_error, body) => {
         const error = _error as TError | undefined;
-        console.log('upload error', error);
+        logger.error('FileHandling', 'upload error', error);
         const file_id = body.get('file_id');
         const tool_resource = body.get('tool_resource');
         if (tool_resource === EToolResources.execute_code) {
@@ -293,7 +293,7 @@ const useFileHandlingCore = (params: UseFileHandling | undefined, fileState: Fil
         toolResource: _toolResource,
       });
     } catch (error) {
-      console.error('file validation error', error);
+      logger.error('FileHandling', 'file validation error', error);
       setError('com_error_files_validation');
       return;
     }
@@ -377,7 +377,7 @@ const useFileHandlingCore = (params: UseFileHandling | undefined, fileState: Fil
               });
             }
           } catch (resizeError) {
-            console.warn('Image resize failed, using original:', resizeError);
+            logger.warn('FileHandling', 'Image resize failed, using original:', resizeError);
             // Continue with HEIC processed file if resizing fails
           }
         }
@@ -426,7 +426,7 @@ const useFileHandlingCore = (params: UseFileHandling | undefined, fileState: Fil
         }
       } catch (error) {
         deleteFileById(file_id);
-        console.log('file handling error', error);
+        logger.error('FileHandling', 'file handling error', error);
         if (error instanceof Error && error.message.includes('HEIC')) {
           setError('com_error_heic_conversion');
         } else {

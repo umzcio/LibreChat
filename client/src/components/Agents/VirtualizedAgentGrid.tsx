@@ -1,5 +1,6 @@
 import React, { useMemo, useEffect, useCallback, useRef } from 'react';
 import { AutoSizer, List as VirtualList, WindowScroller } from 'react-virtualized';
+import type { ListRowProps } from 'react-virtualized';
 import { throttle } from 'lodash';
 import { Spinner } from '@librechat/client';
 import { PermissionBits } from 'librechat-data-provider';
@@ -153,7 +154,7 @@ const VirtualizedAgentGrid: React.FC<VirtualizedAgentGridProps> = ({
 
   // Row renderer for virtual list
   const rowRenderer = useCallback(
-    ({ index, key, style, parent }: any) => {
+    ({ index, key, style, parent }: ListRowProps) => {
       const containerWidth = parent?.props?.width || 800;
       const cardsPerRow = getCardsPerRow(containerWidth);
       const rowAgents = getRowItems(index, cardsPerRow);

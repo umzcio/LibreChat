@@ -1,6 +1,7 @@
 import { mergeFileConfig } from 'librechat-data-provider';
 import { useCallback } from 'react';
 import { useGetFileConfig } from '~/data-provider';
+import { logger } from '~/utils';
 import {
   resizeImage,
   shouldResizeImage,
@@ -20,7 +21,7 @@ export const useClientResize = () => {
 
   // Safe access to clientImageResize config with fallbacks
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const config = (fileConfig as any)?.clientImageResize ?? {
+  const config = fileConfig?.clientImageResize ?? {
     enabled: false,
     maxWidth: 1900,
     maxHeight: 1900,
@@ -46,7 +47,7 @@ export const useClientResize = () => {
 
       // Return original file if browser doesn't support resizing
       if (!supportsClientResize()) {
-        console.warn('Client-side image resizing not supported in this browser');
+        logger.warn('ClientResize','Client-side image resizing not supported in this browser');
         return { file, resized: false };
       }
 
@@ -66,7 +67,7 @@ export const useClientResize = () => {
         const result = await resizeImage(file, resizeOptions);
         return { file: result.file, resized: true, result };
       } catch (error) {
-        console.warn('Client-side image resizing failed:', error);
+        logger.warn('ClientResize','Client-side image resizing failed:', error);
         return { file, resized: false };
       }
     },

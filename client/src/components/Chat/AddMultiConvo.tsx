@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useSetRecoilState, useRecoilValue } from 'recoil';
+import { useSetAtom, useAtomValue } from 'jotai';
 import { PlusCircle } from 'lucide-react';
 import { TooltipAnchor } from '@librechat/client';
 import { isAssistantsEndpoint } from 'librechat-data-provider';
@@ -11,8 +11,8 @@ import store from '~/store';
 function AddMultiConvo() {
   const localize = useLocalize();
   const getConversation = useGetConversation(0);
-  const endpoint = useRecoilValue(store.conversationEndpointByIndex(0));
-  const setAddedConvo = useSetRecoilState(store.conversationByIndex(1));
+  const endpoint = useAtomValue(store.conversationEndpointByIndex(0));
+  const setAddedConvo = useSetAtom(store.conversationByIndex(1));
 
   const clickHandler = useCallback(() => {
     const conversation = getConversation();

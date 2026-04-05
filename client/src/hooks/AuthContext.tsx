@@ -8,7 +8,7 @@ import {
   createContext,
 } from 'react';
 import { debounce } from 'lodash';
-import { useRecoilState, useSetRecoilState } from 'recoil';
+import { useAtom, useSetAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
 import {
   apiBaseUrl,
@@ -40,12 +40,12 @@ const AuthContextProvider = ({
   children: ReactNode;
 }) => {
   const isExternalRedirectRef = useRef(false);
-  const [user, setUser] = useRecoilState(store.user);
+  const [user, setUser] = useAtom(store.user);
   const logoutRedirectRef = useRef<string | undefined>(undefined);
   const [token, setToken] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | undefined>(undefined);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const setQueriesEnabled = useSetRecoilState<boolean>(store.queriesEnabled);
+  const setQueriesEnabled = useSetAtom(store.queriesEnabled);
 
   const { data: userRole = null } = useGetRole(SystemRoles.USER, {
     enabled: !!(isAuthenticated && (user?.role ?? '')),

@@ -3,7 +3,7 @@ const { logger } = require('@librechat/data-schemas');
 const { FileContext } = require('librechat-data-provider');
 const { deleteFileByFilter, updateAssistantDoc, getAssistants } = require('~/models');
 const { uploadImageBuffer, filterFile } = require('~/server/services/Files/process');
-const validateAuthor = require('~/server/middleware/assistants/validateAuthor');
+const { validateAuthor, validateMutationAuthor } = require('~/server/middleware/assistants/validateAuthor');
 const { getStrategyFunctions } = require('~/server/services/Files/strategies');
 const { deleteAssistantActions } = require('~/server/services/ActionService');
 const { getOpenAIClient, fetchAssistants } = require('./helpers');
@@ -125,7 +125,7 @@ const retrieveAssistant = async (req, res) => {
 const patchAssistant = async (req, res) => {
   try {
     const { openai } = await getOpenAIClient({ req, res });
-    await validateAuthor({ req, openai });
+    await validateMutationAuthor({ req, openai });
 
     const assistant_id = req.params.id;
     const {
@@ -193,7 +193,7 @@ const patchAssistant = async (req, res) => {
 const deleteAssistant = async (req, res) => {
   try {
     const { openai } = await getOpenAIClient({ req, res });
-    await validateAuthor({ req, openai });
+    await validateMutationAuthor({ req, openai });
 
     const assistant_id = req.params.id;
     const deletionStatus = await openai.beta.assistants.delete(assistant_id);
@@ -260,8 +260,16 @@ const getAssistantDocuments = async (req, res) => {
     const appConfig = req.config;
     const endpoint = req.query?.endpoint;
     const assistantsConfig = appConfig.endpoints?.[endpoint];
+    let query = { user: req.user.id };
+    if (assistantsConfig && !assistantsConfig.privateAssistants) {
+      if (assistantsConfig.supportedIds?.length) {
+        query = { assistant_id: { $in: assistantsConfig.supportedIds } };
+      } else if (assistantsConfig.excludedIds?.length) {
+        query = { assistant_id: { $nin: assistantsConfig.excludedIds } };
+      }
+    }
     const documents = await getAssistants(
-      {},
+      query,
       {
         user: 1,
         assistant_id: 1,

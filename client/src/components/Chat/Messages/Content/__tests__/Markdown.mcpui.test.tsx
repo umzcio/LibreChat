@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import Markdown from '../Markdown';
-import { RecoilRoot } from 'recoil';
 import { UI_RESOURCE_MARKER } from '~/components/MCPUIResource/plugin';
 import {
   useMessageContext,
@@ -97,9 +96,7 @@ describe('Markdown with MCP UI markers (resource IDs)', () => {
     ].join('\n');
 
     render(
-      <RecoilRoot>
-        <Markdown content={content} isLatestMessage={false} />
-      </RecoilRoot>,
+      <Markdown content={content} isLatestMessage={false} />,
     );
 
     const renderers = screen.getAllByTestId('ui-resource-renderer');

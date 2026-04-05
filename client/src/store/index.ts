@@ -1,10 +1,6 @@
 import * as artifacts from './artifacts';
 import families from './families';
-import endpoints from './endpoints';
 import user from './user';
-import text from './text';
-import toast from './toast';
-import submission from './submission';
 import search from './search';
 import preset from './preset';
 import prompts from './prompts';
@@ -15,16 +11,11 @@ import isTemporary from './temporary';
 export * from './agents';
 export * from './mcp';
 export * from './favorites';
-export * from './project';
 
 export default {
   ...artifacts,
   ...families,
-  ...endpoints,
   ...user,
-  ...text,
-  ...toast,
-  ...submission,
   ...search,
   ...prompts,
   ...preset,

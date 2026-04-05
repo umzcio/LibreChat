@@ -1,6 +1,6 @@
 const { logger } = require('@librechat/data-schemas');
 const { ToolCallTypes } = require('librechat-data-provider');
-const validateAuthor = require('~/server/middleware/assistants/validateAuthor');
+const { validateAuthor, validateMutationAuthor } = require('~/server/middleware/assistants/validateAuthor');
 const { validateAndUpdateTool } = require('~/server/services/ActionService');
 const { getCachedTools } = require('~/server/services/Config');
 const { manifestToolMap } = require('~/app/clients/tools');
@@ -101,7 +101,7 @@ const createAssistant = async (req, res) => {
  * @returns {Promise<Assistant>} The updated assistant.
  */
 const updateAssistant = async ({ req, openai, assistant_id, updateData }) => {
-  await validateAuthor({ req, openai });
+  await validateMutationAuthor({ req, openai });
   const tools = [];
   let conversation_starters = null;
 

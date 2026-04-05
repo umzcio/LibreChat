@@ -1,18 +1,23 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import copy from 'copy-to-clipboard';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Code, Play, RefreshCw, X } from 'lucide-react';
-import { useSetRecoilState, useResetRecoilState } from 'recoil';
+import { Code, Code2, Maximize2, Minimize2, Play, RefreshCw, X } from 'lucide-react';
+import { useAtom, useSetAtom, useAtomValue } from 'jotai';
+import { RESET } from 'jotai/utils';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Spinner, useMediaQuery, Radio } from '@librechat/client';
+import { Constants } from 'librechat-data-provider';
 import type { SandpackPreviewRef } from '@codesandbox/sandpack-react';
 import CopyButton from '~/components/Messages/Content/CopyButton';
 import { useShareContext, useMutationState } from '~/Providers';
 import useArtifacts from '~/hooks/Artifacts/useArtifacts';
 import DownloadArtifact from './DownloadArtifact';
 import ArtifactVersion from './ArtifactVersion';
+import ArtifactTabBar from './ArtifactTabBar';
 import ArtifactTabs from './ArtifactTabs';
 import { useLocalize } from '~/hooks';
-import { cn } from '~/utils';
+import { buildConversationPath, cn } from '~/utils';
 import store from '~/store';
 
 const MAX_BLUR_AMOUNT = 32;
@@ -20,8 +25,11 @@ const MAX_BACKDROP_OPACITY = 0.3;
 
 export default function Artifacts() {
   const localize = useLocalize();
+  const navigate = useNavigate();
   const { isMutating } = useMutationState();
   const { isSharedConvo } = useShareContext();
+  const { conversationId: routeConversationId = '', projectId: routeProjectId } = useParams();
+  const conversation = useAtomValue(store.conversationByIndex(0));
   const isMobile = useMediaQuery('(max-width: 868px)');
   const previewRef = useRef<SandpackPreviewRef>();
   const [isVisible, setIsVisible] = useState(false);
@@ -34,8 +42,10 @@ export default function Artifacts() {
   const [isCopied, setIsCopied] = useState(false);
   const dragStartY = useRef(0);
   const dragStartHeight = useRef(90);
-  const setArtifactsVisible = useSetRecoilState(store.artifactsVisibility);
-  const resetCurrentArtifactId = useResetRecoilState(store.currentArtifactId);
+  const setArtifactsVisible = useSetAtom(store.artifactsVisibility);
+  const resetCurrentArtifactId = useSetAtom(store.currentArtifactId);
+  const [panelMode, setPanelMode] = useAtom(store.artifactsPanelMode);
+  const isFullscreen = panelMode === 'fullscreen' && !isMobile;
 
   const tabOptions = [
     {
@@ -79,7 +89,21 @@ export default function Artifacts() {
     }
   }, [height, isMobile]);
 
+  useEffect(() => {
+    if (!isFullscreen) {
+      return;
+    }
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPanelMode('side');
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen, setPanelMode]);
+
   const {
+    artifacts,
     activeTab,
     setActiveTab,
     currentIndex,
@@ -142,6 +166,15 @@ export default function Artifacts() {
     return null;
   }
 
+  const targetConversationId =
+    conversation?.conversationId && conversation.conversationId !== Constants.SEARCH
+      ? conversation.conversationId
+      : routeConversationId && routeConversationId !== Constants.SEARCH
+        ? routeConversationId
+        : '';
+  const targetProjectId = conversation?.projectId ?? routeProjectId;
+  const canOpenInCode = !isSharedConvo && !!targetConversationId && !!currentArtifact.id;
+
   const handleRefresh = () => {
     setIsRefreshing(true);
     const client = previewRef.current?.getClient();
@@ -152,6 +185,7 @@ export default function Artifacts() {
   };
 
   const closeArtifacts = () => {
+    setPanelMode('side');
     if (isMobile) {
       setIsClosing(true);
       setIsVisible(false);
@@ -161,7 +195,7 @@ export default function Artifacts() {
         setHeight(90);
       }, 250);
     } else {
-      resetCurrentArtifactId();
+      resetCurrentArtifactId(RESET);
       setArtifactsVisible(false);
     }
   };
@@ -171,9 +205,23 @@ export default function Artifacts() {
       ? (Math.min(blurAmount, MAX_BLUR_AMOUNT) / MAX_BLUR_AMOUNT) * MAX_BACKDROP_OPACITY
       : 0;
 
-  return (
+  const handleOpenInCode = () => {
+    if (!canOpenInCode) {
+      return;
+    }
+
+    navigate(
+      `${buildConversationPath({
+        conversationId: targetConversationId,
+        mode: 'code',
+        projectId: targetProjectId,
+      })}?openArtifact=${encodeURIComponent(currentArtifact.id)}`,
+    );
+  };
+
+  const panelContent = (
     <Tabs.Root value={activeTab} onValueChange={setActiveTab} asChild>
-      <div className="flex h-full w-full flex-col">
+      <div className={cn('flex flex-col', isFullscreen ? 'fixed inset-0 z-[200] h-screen w-screen' : 'h-full w-full')}>
         {/* Mobile backdrop with dynamic blur */}
         {isMobile && (
           <div
@@ -281,6 +329,17 @@ export default function Artifacts() {
               {activeTab !== 'preview' && isMutating && (
                 <RefreshCw size={16} className="animate-spin text-text-secondary" />
               )}
+              {canOpenInCode ? (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9"
+                  onClick={handleOpenInCode}
+                  aria-label={localize('com_ui_open_in_librecode')}
+                >
+                  <Code2 size={16} aria-hidden="true" />
+                </Button>
+              ) : null}
               {orderedArtifactIds.length > 1 && (
                 <ArtifactVersion
                   currentIndex={currentIndex}
@@ -295,6 +354,21 @@ export default function Artifacts() {
               )}
               <CopyButton isCopied={isCopied} iconOnly onClick={handleCopyArtifact} />
               <DownloadArtifact artifact={currentArtifact} />
+              {!isMobile && (
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-9 w-9"
+                  onClick={() => setPanelMode(isFullscreen ? 'side' : 'fullscreen')}
+                  aria-label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+                >
+                  {isFullscreen ? (
+                    <Minimize2 size={16} aria-hidden="true" />
+                  ) : (
+                    <Maximize2 size={16} aria-hidden="true" />
+                  )}
+                </Button>
+              )}
               <Button
                 size="icon"
                 variant="ghost"
@@ -307,12 +381,20 @@ export default function Artifacts() {
             </div>
           </div>
 
+          <ArtifactTabBar
+            artifacts={artifacts}
+            orderedIds={orderedArtifactIds}
+            currentId={currentArtifact?.id ?? null}
+            onSelect={setCurrentArtifactId}
+          />
+
           <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-surface-primary">
             <div className="absolute inset-0 flex flex-col">
               <ArtifactTabs
                 artifact={currentArtifact}
                 previewRef={previewRef as React.MutableRefObject<SandpackPreviewRef>}
                 isSharedConvo={isSharedConvo}
+                onSwitchToCode={() => setActiveTab('code')}
               />
             </div>
 
@@ -350,4 +432,10 @@ export default function Artifacts() {
       </div>
     </Tabs.Root>
   );
+
+  if (isFullscreen) {
+    return createPortal(panelContent, document.body);
+  }
+
+  return panelContent;
 }

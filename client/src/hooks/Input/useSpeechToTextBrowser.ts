@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo } from 'react';
-import { useRecoilState } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { useToastContext } from '@librechat/client';
 import SpeechRecognition, { useSpeechRecognition } from 'react-speech-recognition';
 import { useGetCustomConfigSpeechQuery } from 'librechat-data-provider/react-query';
@@ -21,9 +21,9 @@ const useSpeechToTextBrowser = (
   const lastTranscript = useRef<string | null>(null);
   const lastInterim = useRef<string | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>();
-  const [autoSendText] = useRecoilState(store.autoSendText);
-  const [languageSTT] = useRecoilState<string>(store.languageSTT);
-  const [autoTranscribeAudio] = useRecoilState<boolean>(store.autoTranscribeAudio);
+  const autoSendText = useAtomValue(store.autoSendText);
+  const languageSTT = useAtomValue(store.languageSTT);
+  const autoTranscribeAudio = useAtomValue(store.autoTranscribeAudio);
 
   const {
     listening,

@@ -1,17 +1,18 @@
 const express = require('express');
 const { v4: uuidv4 } = require('uuid');
-const { logger } = require('@librechat/data-schemas');
 const { ContentTypes } = require('librechat-data-provider');
 const { unescapeLaTeX, countTokens } = require('@librechat/api');
 const { findAllArtifacts, replaceArtifactContent } = require('~/server/services/Artifacts/update');
 const { requireJwtAuth, validateMessageReq } = require('~/server/middleware');
+const asyncHandler = require('~/server/middleware/asyncHandler');
 const db = require('~/models');
 
 const router = express.Router();
 router.use(requireJwtAuth);
 
-router.get('/', async (req, res) => {
-  try {
+router.get(
+  '/',
+  asyncHandler(async (req, res) => {
     const user = req.user.id ?? '';
     const {
       cursor = null,
@@ -87,24 +88,15 @@ router.get('/', async (req, res) => {
     }
 
     res.status(200).json(response);
-  } catch (error) {
-    logger.error('Error fetching messages:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  }),
+);
 
 /**
  * Creates a new branch message from a specific agent's content within a parallel response message.
- * Filters the original message's content to only include parts attributed to the specified agentId.
- * Only available for non-user messages with content attributions.
- *
- * @route POST /branch
- * @param {string} req.body.messageId - The ID of the source message
- * @param {string} req.body.agentId - The agentId to filter content by
- * @returns {TMessage} The newly created branch message
  */
-router.post('/branch', async (req, res) => {
-  try {
+router.post(
+  '/branch',
+  asyncHandler(async (req, res) => {
     const { messageId, agentId } = req.body;
     const userId = req.user.id;
 
@@ -178,14 +170,12 @@ router.post('/branch', async (req, res) => {
     }
 
     res.status(201).json(savedMessage);
-  } catch (error) {
-    logger.error('Error creating branch message:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-router.post('/artifact/:messageId', async (req, res) => {
-  try {
+router.post(
+  '/artifact/:messageId',
+  asyncHandler(async (req, res) => {
     const { messageId } = req.params;
     const { index, original, updated } = req.body;
 
@@ -203,8 +193,6 @@ router.post('/artifact/:messageId', async (req, res) => {
       return res.status(400).json({ error: 'Artifact index out of bounds' });
     }
 
-    // Unescape LaTeX preprocessing done by the frontend
-    // The frontend escapes $ signs for display, but the database has unescaped versions
     const unescapedOriginal = unescapeLaTeX(original);
     const unescapedUpdated = unescapeLaTeX(updated);
 
@@ -259,26 +247,24 @@ router.post('/artifact/:messageId', async (req, res) => {
       content: savedMessage.content,
       text: savedMessage.text,
     });
-  } catch (error) {
-    logger.error('Error editing artifact:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  }),
+);
 
 /* Note: It's necessary to add `validateMessageReq` within route definition for correct params */
-router.get('/:conversationId', validateMessageReq, async (req, res) => {
-  try {
+router.get(
+  '/:conversationId',
+  validateMessageReq,
+  asyncHandler(async (req, res) => {
     const { conversationId } = req.params;
     const messages = await db.getMessages({ conversationId }, '-_id -__v -user');
     res.status(200).json(messages);
-  } catch (error) {
-    logger.error('Error fetching messages:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-router.post('/:conversationId', validateMessageReq, async (req, res) => {
-  try {
+router.post(
+  '/:conversationId',
+  validateMessageReq,
+  asyncHandler(async (req, res) => {
     const message = req.body;
     const reqCtx = {
       userId: req?.user?.id,
@@ -295,28 +281,26 @@ router.post('/:conversationId', validateMessageReq, async (req, res) => {
     }
     await db.saveConvo(reqCtx, savedMessage, { context: 'POST /api/messages/:conversationId' });
     res.status(201).json(savedMessage);
-  } catch (error) {
-    logger.error('Error saving message:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-router.get('/:conversationId/:messageId', validateMessageReq, async (req, res) => {
-  try {
+router.get(
+  '/:conversationId/:messageId',
+  validateMessageReq,
+  asyncHandler(async (req, res) => {
     const { conversationId, messageId } = req.params;
     const message = await db.getMessages({ conversationId, messageId }, '-_id -__v -user');
     if (!message) {
       return res.status(404).json({ error: 'Message not found' });
     }
     res.status(200).json(message);
-  } catch (error) {
-    logger.error('Error fetching message:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-router.put('/:conversationId/:messageId', validateMessageReq, async (req, res) => {
-  try {
+router.put(
+  '/:conversationId/:messageId',
+  validateMessageReq,
+  asyncHandler(async (req, res) => {
     const { conversationId, messageId } = req.params;
     const { text, index, model } = req.body;
 
@@ -368,14 +352,13 @@ router.put('/:conversationId/:messageId', validateMessageReq, async (req, res) =
       tokenCount,
     });
     return res.status(200).json(result);
-  } catch (error) {
-    logger.error('Error updating message:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  }),
+);
 
-router.put('/:conversationId/:messageId/feedback', validateMessageReq, async (req, res) => {
-  try {
+router.put(
+  '/:conversationId/:messageId/feedback',
+  validateMessageReq,
+  asyncHandler(async (req, res) => {
     const { conversationId, messageId } = req.params;
     const { feedback } = req.body;
 
@@ -393,21 +376,17 @@ router.put('/:conversationId/:messageId/feedback', validateMessageReq, async (re
       conversationId,
       feedback: updatedMessage.feedback,
     });
-  } catch (error) {
-    logger.error('Error updating message feedback:', error);
-    res.status(500).json({ error: 'Failed to update feedback' });
-  }
-});
+  }),
+);
 
-router.delete('/:conversationId/:messageId', validateMessageReq, async (req, res) => {
-  try {
+router.delete(
+  '/:conversationId/:messageId',
+  validateMessageReq,
+  asyncHandler(async (req, res) => {
     const { conversationId, messageId } = req.params;
     await db.deleteMessages({ messageId, conversationId, user: req.user.id });
     res.status(204).send();
-  } catch (error) {
-    logger.error('Error deleting message:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+  }),
+);
 
 module.exports = router;

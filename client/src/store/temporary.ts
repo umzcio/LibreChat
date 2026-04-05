@@ -1,7 +1,10 @@
-import { atomWithLocalStorage } from '~/store/utils';
+import { createStorageAtom } from '~/store/jotai-utils';
 
-const isTemporary = atomWithLocalStorage('isTemporary', false);
-const defaultTemporaryChat = atomWithLocalStorage('defaultTemporaryChat', false);
+const isTemporary = createStorageAtom('isTemporary', false);
+isTemporary.debugLabel = 'isTemporary';
+
+const defaultTemporaryChat = createStorageAtom('defaultTemporaryChat', false);
+defaultTemporaryChat.debugLabel = 'defaultTemporaryChat';
 
 export default {
   isTemporary,

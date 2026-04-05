@@ -1,4 +1,4 @@
-import { atom } from 'recoil';
+import { atom } from 'jotai';
 
 export type SearchState = {
   enabled: boolean | null;
@@ -8,16 +8,14 @@ export type SearchState = {
   isTyping: boolean;
 };
 
-export const search = atom<SearchState>({
-  key: 'search',
-  default: {
-    enabled: null,
-    query: '',
-    debouncedQuery: '',
-    isSearching: false,
-    isTyping: false,
-  },
+const search = atom<SearchState>({
+  enabled: null,
+  query: '',
+  debouncedQuery: '',
+  isSearching: false,
+  isTyping: false,
 });
+search.debugLabel = 'search';
 
 export default {
   search,

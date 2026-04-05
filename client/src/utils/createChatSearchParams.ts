@@ -7,6 +7,7 @@ import {
 import type { TPreset, TConversation } from 'librechat-data-provider';
 import type { ZodAny } from 'zod';
 import { isEphemeralAgent } from '~/common';
+import logger from './logger';
 
 const parseQueryValue = (value: string) => {
   if (value === 'true') {
@@ -38,7 +39,7 @@ export function processValidSettings(queryParams: Record<string, string>) {
         validSettings[key] = validValue;
       }
     } catch (error) {
-      console.warn(`Invalid value for setting ${key}:`, error);
+      logger.warn('QueryParams', `Invalid value for setting ${key}:`, error);
     }
   }
 
@@ -105,13 +106,19 @@ export default function createChatSearchParams(
     params.set('model', conversation.model);
   }
 
-  const paramMap: Record<string, any> = {};
+  const paramMap: Record<string, string | number | boolean | string[] | null | undefined> = {};
   allowedParams.forEach((key) => {
     if (key === 'agent_id' && isEphemeralAgent(conversation.agent_id)) {
       return;
     }
     if (key !== 'endpoint' && key !== 'model') {
-      paramMap[key] = (conversation as any)[key];
+      paramMap[key] = (conversation as Record<string, unknown>)[key] as
+        | string
+        | number
+        | boolean
+        | string[]
+        | null
+        | undefined;
     }
   });
 

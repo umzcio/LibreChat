@@ -14,6 +14,7 @@ const {
   Constants,
   FileSources,
   ResourceType,
+  PrincipalType,
 } = require('librechat-data-provider');
 const { updateUserPluginAuth, deleteUserPluginAuth } = require('~/server/services/PluginService');
 const { verifyOTPOrBackupCode } = require('~/server/services/twoFactorService');
@@ -169,11 +170,10 @@ const updateUserPluginsController = async (req, res) => {
   const { user } = req;
   const { pluginKey, action, auth, isEntityTool } = req.body;
   try {
-    if (!isEntityTool) {
-      await db.updateUserPlugins(user._id, user.plugins, pluginKey, action);
-    }
-
     if (auth == null) {
+      if (!isEntityTool) {
+        await db.updateUserPlugins(user._id, user.plugins, pluginKey, action);
+      }
       return res.status(200).send();
     }
 
@@ -258,6 +258,9 @@ const updateUserPluginsController = async (req, res) => {
     }
 
     if (status === 200) {
+      if (!isEntityTool) {
+        await db.updateUserPlugins(user._id, user.plugins, pluginKey, action);
+      }
       // If auth was updated successfully, disconnect MCP sessions as they might use these credentials
       if (pluginKey.startsWith(Constants.mcp_prefix)) {
         try {
@@ -310,34 +313,39 @@ const deleteUserController = async (req, res) => {
       }
     }
 
-    await db.deleteMessages({ user: user.id });
-    await db.deleteAllUserSessions({ userId: user.id });
-    await db.deleteTransactions({ user: user.id });
-    await db.deleteUserKey({ userId: user.id, all: true });
-    await db.deleteBalances({ user: user._id });
-    await db.deletePresets(user.id);
-    try {
-      await db.deleteConvos(user.id);
-    } catch (error) {
-      logger.error('[deleteUserController] Error deleting user convos, likely no convos', error);
+    const ops = [
+      () => db.deleteMessages({ user: user.id }),
+      () => db.deleteAllUserSessions({ userId: user.id }),
+      () => db.deleteTransactions({ user: user.id }),
+      () => db.deleteUserKey({ userId: user.id, all: true }),
+      () => db.deleteBalances({ user: user._id }),
+      () => db.deletePresets(user.id),
+      () => db.deleteConvos(user.id),
+      () => deleteUserPluginAuth(user.id, null, true),
+      () => db.deleteAllSharedLinks(user.id),
+      () => deleteUserFiles(req),
+      () => db.deleteFiles(null, user.id),
+      () => db.deleteToolCalls(user.id),
+      () => db.deleteUserAgents(user.id),
+      () => db.deleteAllAgentApiKeys(user._id),
+      () => db.deleteAssistants({ user: user.id }),
+      () => db.deleteConversationTags({ user: user.id }),
+      () => db.deleteAllUserMemories(user.id),
+      () => db.deleteUserPrompts(user.id),
+      () => deleteUserMcpServers(user.id),
+      () => db.deleteActions({ user: user.id }),
+      () => db.deleteTokens({ userId: user.id }),
+      () => db.removeUserFromAllGroups(user.id),
+      () => db.deleteConfig(PrincipalType.USER, user.id),
+      () => db.deleteAclEntries({ principalType: PrincipalType.USER, principalId: user._id }),
+    ];
+    const results = await Promise.allSettled(ops.map((op) => op()));
+    for (const r of results) {
+      if (r.status === 'rejected') {
+        logger.warn('[deleteUserController] cleanup step failed:', r.reason);
+      }
     }
-    await deleteUserPluginAuth(user.id, null, true);
     await db.deleteUserById(user.id);
-    await db.deleteAllSharedLinks(user.id);
-    await deleteUserFiles(req);
-    await db.deleteFiles(null, user.id);
-    await db.deleteToolCalls(user.id);
-    await db.deleteUserAgents(user.id);
-    await db.deleteAllAgentApiKeys(user._id);
-    await db.deleteAssistants({ user: user.id });
-    await db.deleteConversationTags({ user: user.id });
-    await db.deleteAllUserMemories(user.id);
-    await db.deleteUserPrompts(user.id);
-    await deleteUserMcpServers(user.id);
-    await db.deleteActions({ user: user.id });
-    await db.deleteTokens({ userId: user.id });
-    await db.removeUserFromAllGroups(user.id);
-    await db.deleteAclEntries({ principalId: user._id });
     logger.info(`User deleted account. Email: ${user.email} ID: ${user.id}`);
     res.status(200).send({ message: 'User deleted' });
   } catch (err) {

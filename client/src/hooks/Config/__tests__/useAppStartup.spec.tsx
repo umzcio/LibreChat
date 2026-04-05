@@ -1,5 +1,4 @@
 import React from 'react';
-import { RecoilRoot } from 'recoil';
 import { renderHook } from '@testing-library/react';
 import { PermissionTypes, Permissions } from 'librechat-data-provider';
 import type { TUser } from 'librechat-data-provider';
@@ -47,7 +46,7 @@ const mockUser = {
 } as TUser;
 
 const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <RecoilRoot>{children}</RecoilRoot>
+  <>{children}</>
 );
 
 describe('useAppStartup — MCP permission gating', () => {

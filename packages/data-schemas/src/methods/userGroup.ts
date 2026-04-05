@@ -63,7 +63,7 @@ export function createUserGroupMethods(mongoose: typeof import('mongoose')) {
     session?: ClientSession,
   ): Promise<IGroup[]> {
     const Group = mongoose.models.Group as Model<IGroup>;
-    const regex = new RegExp(namePattern, 'i');
+    const regex = new RegExp(escapeRegExp(namePattern), 'i');
     const query: Record<string, unknown> = {
       $or: [{ name: regex }, { email: regex }, { description: regex }],
     };
@@ -533,7 +533,7 @@ export function createUserGroupMethods(mongoose: typeof import('mongoose')) {
       const userFields = 'name email username avatar provider idOnTheSource';
       /** For now, we'll use a direct query instead of searchUsers */
       const User = mongoose.models.User as Model<IUser>;
-      const regex = new RegExp(trimmedPattern, 'i');
+      const regex = new RegExp(escapeRegExp(trimmedPattern), 'i');
       const userQuery = User.find({
         $or: [{ name: regex }, { email: regex }, { username: regex }],
       })
@@ -576,8 +576,8 @@ export function createUserGroupMethods(mongoose: typeof import('mongoose')) {
     if (!typeFilter || typeFilter.includes(PrincipalType.ROLE)) {
       const Role = mongoose.models.Role as Model<IRole>;
       if (Role) {
-        const regex = new RegExp(trimmedPattern, 'i');
-        const roleQuery = Role.find({ name: regex }).select('name').limit(limitPerType);
+        const roleRegex = new RegExp(escapeRegExp(trimmedPattern), 'i');
+        const roleQuery = Role.find({ name: roleRegex }).select('name').limit(limitPerType);
 
         if (session) {
           roleQuery.session(session);

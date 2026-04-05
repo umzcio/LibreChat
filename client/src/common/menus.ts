@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- React render-prop generics require `any` for element-type flexibility */
 export type RenderProp<
   P = React.HTMLAttributes<any> & {
     ref?: React.Ref<any>;

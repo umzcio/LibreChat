@@ -5,7 +5,6 @@ import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom/extend-expect';
 import { ThemeSelector } from './General';
-import { RecoilRoot } from 'recoil';
 
 describe('ThemeSelector', () => {
   let mockOnChange;
@@ -21,9 +20,7 @@ describe('ThemeSelector', () => {
       disconnect = jest.fn();
     };
     const { getByText, getByRole } = render(
-      <RecoilRoot>
-        <ThemeSelector theme="system" onChange={mockOnChange} />
-      </RecoilRoot>,
+      <ThemeSelector theme="system" onChange={mockOnChange} />,
     );
 
     expect(getByText('Theme')).toBeInTheDocument();
@@ -38,9 +35,7 @@ describe('ThemeSelector', () => {
       disconnect = jest.fn();
     };
     const { getByText, getByTestId } = render(
-      <RecoilRoot>
-        <ThemeSelector theme="system" onChange={mockOnChange} />
-      </RecoilRoot>,
+      <ThemeSelector theme="system" onChange={mockOnChange} />,
     );
 
     expect(getByText('Theme')).toBeInTheDocument();

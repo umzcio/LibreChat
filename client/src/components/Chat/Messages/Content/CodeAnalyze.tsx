@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { Terminal } from 'lucide-react';
 import { useProgress, useLocalize } from '~/hooks';
 import ProgressText from './ProgressText';
@@ -18,7 +18,7 @@ export default function CodeAnalyze({
 }) {
   const localize = useLocalize();
   const progress = useProgress(initialProgress);
-  const autoExpand = useRecoilValue(store.autoExpandTools);
+  const autoExpand = useAtomValue(store.autoExpandTools);
   const [showCode, setShowCode] = useState(autoExpand);
 
   useEffect(() => {

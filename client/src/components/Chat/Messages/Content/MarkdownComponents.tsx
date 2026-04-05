@@ -1,5 +1,5 @@
 import React, { memo, useMemo, useRef, useEffect } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { useToastContext } from '@librechat/client';
 import { PermissionTypes, Permissions, apiBaseUrl } from 'librechat-data-provider';
 import Mermaid, { MermaidErrorBoundary } from '~/components/Messages/Content/Mermaid';
@@ -96,7 +96,7 @@ type TAnchorProps = {
 };
 
 export const a: React.ElementType = memo(function MarkdownAnchor({ href, children }: TAnchorProps) {
-  const user = useRecoilValue(store.user);
+  const user = useAtomValue(store.user);
   const { showToast } = useToastContext();
   const localize = useLocalize();
 

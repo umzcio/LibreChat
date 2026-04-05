@@ -18,7 +18,7 @@ export interface ConversationMethods {
     data: { conversationId: string; newConversationId?: string; [key: string]: unknown },
     metadata?: { context?: string; unsetFields?: Record<string, number>; noUpsert?: boolean },
   ): Promise<IConversation | { message: string } | null>;
-  bulkSaveConvos(conversations: Array<Record<string, unknown>>): Promise<unknown>;
+  bulkSaveConvos(conversations: Array<Partial<IConversation>>): Promise<unknown>;
   getConvosByCursor(
     user: string,
     options?: {
@@ -39,7 +39,7 @@ export interface ConversationMethods {
   ): Promise<{
     conversations: IConversation[];
     nextCursor: string | null;
-    convoMap: Record<string, unknown>;
+    convoMap: Record<string, IConversation>;
   }>;
   getConvo(user: string, conversationId: string): Promise<IConversation | null>;
   getConvoTitle(user: string, conversationId: string): Promise<string | null>;
@@ -217,7 +217,7 @@ export function createConversationMethods(
   /**
    * Saves multiple conversations in bulk.
    */
-  async function bulkSaveConvos(conversations: Array<Record<string, unknown>>) {
+  async function bulkSaveConvos(conversations: Array<Partial<IConversation>>) {
     try {
       const Conversation = mongoose.models.Conversation as Model<IConversation>;
       const bulkOps = conversations.map((convo) => ({
@@ -328,7 +328,7 @@ export function createConversationMethods(
         const decoded = JSON.parse(Buffer.from(cursor, 'base64').toString());
         const { primary, secondary } = decoded;
         const primaryValue = finalSortBy === 'title' ? primary : new Date(primary);
-        const secondaryValue = new Date(secondary);
+        const secondaryValue = new mongoose.Types.ObjectId(secondary);
         const op = finalSortDirection === 'asc' ? '$gt' : '$lt';
 
         cursorFilter = {
@@ -336,7 +336,7 @@ export function createConversationMethods(
             { [finalSortBy]: { [op]: primaryValue } },
             {
               [finalSortBy]: primaryValue,
-              updatedAt: { [op]: secondaryValue },
+              _id: { [op]: secondaryValue },
             },
           ],
         } as FilterQuery<IConversation>;
@@ -353,11 +353,7 @@ export function createConversationMethods(
 
     try {
       const sortOrder: SortOrder = finalSortDirection === 'asc' ? 1 : -1;
-      const sortObj: Record<string, SortOrder> = { [finalSortBy]: sortOrder };
-
-      if (finalSortBy !== 'updatedAt') {
-        sortObj.updatedAt = sortOrder;
-      }
+      const sortObj: Record<string, SortOrder> = { [finalSortBy]: sortOrder, _id: sortOrder };
 
       const convos = await Conversation.find(query)
         .select(
@@ -370,11 +366,11 @@ export function createConversationMethods(
       let nextCursor: string | null = null;
       if (convos.length > limit) {
         convos.pop();
-        const lastReturned = convos[convos.length - 1] as Record<string, unknown>;
-        const primaryValue = lastReturned[finalSortBy];
+        const lastReturned = convos[convos.length - 1];
+        const primaryValue = lastReturned[finalSortBy as keyof IConversation];
         const primaryStr =
-          finalSortBy === 'title' ? primaryValue : (primaryValue as Date).toISOString();
-        const secondaryStr = (lastReturned.updatedAt as Date).toISOString();
+          finalSortBy === 'title' ? primaryValue : (primaryValue as unknown as Date).toISOString();
+        const secondaryStr = String(lastReturned._id);
         const composite = { primary: primaryStr, secondary: secondaryStr };
         nextCursor = Buffer.from(JSON.stringify(composite)).toString('base64');
       }
@@ -426,7 +422,7 @@ export function createConversationMethods(
         nextCursor = (limited[limited.length - 1].updatedAt as Date).toISOString();
       }
 
-      const convoMap: Record<string, unknown> = {};
+      const convoMap: Record<string, IConversation> = {};
       limited.forEach((convo) => {
         convoMap[convo.conversationId] = convo;
       });

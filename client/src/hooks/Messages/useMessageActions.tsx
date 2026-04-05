@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { useUpdateFeedbackMutation } from 'librechat-data-provider/react-query';
 import {
   TFeedback,
@@ -17,6 +17,7 @@ import useCopyToClipboard from './useCopyToClipboard';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { useGetAddedConvo } from '~/hooks/Chat';
 import { useLocalize } from '~/hooks';
+import { logger } from '~/utils';
 import store from '~/store';
 
 export type TMessageActions = Pick<
@@ -36,7 +37,7 @@ export type TMessageActions = Pick<
 export default function useMessageActions(props: TMessageActions) {
   const localize = useLocalize();
   const { user } = useAuthContext();
-  const UsernameDisplay = useRecoilValue<boolean>(store.UsernameDisplay);
+  const UsernameDisplay = useAtomValue(store.UsernameDisplay);
   const { message, currentEditId, setCurrentEditId, searchResults, chatContext } = props;
 
   const {
@@ -160,7 +161,7 @@ export default function useMessageActions(props: TMessageActions) {
           }
         },
         onError: (error) => {
-          console.error('Failed to update feedback:', error);
+          logger.error('MessageActions', 'Failed to update feedback:', error);
         },
       });
     },

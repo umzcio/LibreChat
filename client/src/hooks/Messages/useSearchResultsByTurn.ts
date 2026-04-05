@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { TAttachment, Tools, SearchResultData } from 'librechat-data-provider';
+import { TAttachment, Tools, SearchResultData, ResultReference } from 'librechat-data-provider';
 import { useLocalize } from '~/hooks';
 
 interface FileSource {
@@ -8,7 +8,7 @@ interface FileSource {
   pages?: number[];
   relevance?: number;
   pageRelevance?: Record<string, number>;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 interface DeduplicatedSource {
@@ -17,7 +17,7 @@ interface DeduplicatedSource {
   pages: number[];
   relevance: number;
   pageRelevance: Record<string, number>;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -103,7 +103,7 @@ export function useSearchResultsByTurn(attachments?: TAttachment[]) {
                 pages: source.pages,
                 pageRelevance: source.pageRelevance,
                 metadata: source.metadata,
-              }) as any,
+              }) as unknown as ResultReference,
           ),
         };
 

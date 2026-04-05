@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import type { UseMutationResult } from '@tanstack/react-query';
+import { logger } from '~/utils';
 
 export interface SharePointFile {
   id: string;
@@ -9,7 +10,7 @@ export interface SharePointFile {
   downloadUrl: string;
   driveId: string;
   itemId: string;
-  sharePointItem: any;
+  sharePointItem: Record<string, unknown>;
 }
 
 export interface SharePointDownloadProgress {
@@ -160,7 +161,7 @@ export const useSharePointBatchDownload = (): UseMutationResult<
 
             return downloadedFile;
           } catch (error) {
-            console.error(`Failed to download ${file.name}:`, error);
+            logger.error('SharePoint', `Failed to download ${file.name}:`, error);
             failed.push(file.name);
             completed++;
             onProgress?.({
@@ -183,7 +184,7 @@ export const useSharePointBatchDownload = (): UseMutationResult<
       }
 
       if (failed.length > 0) {
-        console.warn(`Failed to download ${failed.length} files:`, failed);
+        logger.warn('SharePoint', `Failed to download ${failed.length} files:`, failed);
       }
 
       return downloadedFiles;

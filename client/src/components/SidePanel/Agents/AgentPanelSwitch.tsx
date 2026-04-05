@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { AgentPanelProvider, useAgentPanelContext } from '~/Providers/AgentPanelContext';
 import { Panel, isEphemeralAgent } from '~/common';
 import VersionPanel from './Version/VersionPanel';
@@ -17,7 +17,7 @@ export default function AgentPanelSwitch() {
 
 function AgentPanelSwitchWithContext() {
   const { activePanel, setCurrentAgentId } = useAgentPanelContext();
-  const agentId = useRecoilValue(store.conversationAgentIdByIndex(0));
+  const agentId = useAtomValue(store.conversationAgentIdByIndex(0));
 
   useEffect(() => {
     const agent_id = agentId ?? '';

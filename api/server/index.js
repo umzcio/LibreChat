@@ -4,6 +4,7 @@ const path = require('path');
 require('module-alias')({ base: path.resolve(__dirname, '..') });
 const cors = require('cors');
 const axios = require('axios');
+const helmet = require('helmet');
 const express = require('express');
 const passport = require('passport');
 const compression = require('compression');
@@ -114,7 +115,22 @@ const startServer = async () => {
   });
 
   app.use(mongoSanitize());
-  app.use(cors());
+
+  app.use(helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }));
+
+  const allowedOrigins = [
+    process.env.DOMAIN_CLIENT,
+    process.env.DOMAIN_SERVER,
+  ].filter(Boolean);
+  app.use(cors({
+    origin: allowedOrigins.length > 0 ? allowedOrigins : true,
+    credentials: true,
+  }));
+
   app.use(cookieParser());
 
   if (!isEnabled(DISABLE_COMPRESSION)) {
@@ -186,6 +202,7 @@ const startServer = async () => {
   app.use('/api/tags', routes.tags);
   app.use('/api/mcp', routes.mcp);
   app.use('/api/projects', routes.projects);
+  app.use('/api/code', routes.code);
 
   /** 404 for unmatched API routes */
   app.use('/api', apiNotFound);

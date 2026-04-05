@@ -5,6 +5,7 @@ import {
   useCreateMCPServerMutation,
   useUpdateMCPServerMutation,
   useDeleteMCPServerMutation,
+  useUpdateMCPServerCosmeticsMutation,
 } from '~/data-provider/MCP';
 import { useToastContext } from '@librechat/client';
 import { useLocalize } from '~/hooks';
@@ -53,11 +54,12 @@ export interface MCPServerFormData {
 
 interface UseMCPServerFormProps {
   server?: MCPServerDefinition | null;
+  cosmeticOnly?: boolean;
   onSuccess?: (serverName: string, isOAuth: boolean) => void;
   onClose?: () => void;
 }
 
-export function useMCPServerForm({ server, onSuccess, onClose }: UseMCPServerFormProps) {
+export function useMCPServerForm({ server, cosmeticOnly = false, onSuccess, onClose }: UseMCPServerFormProps) {
   const localize = useLocalize();
   const { showToast } = useToastContext();
 
@@ -65,6 +67,7 @@ export function useMCPServerForm({ server, onSuccess, onClose }: UseMCPServerFor
   const createMutation = useCreateMCPServerMutation();
   const updateMutation = useUpdateMCPServerMutation();
   const deleteMutation = useDeleteMCPServerMutation();
+  const cosmeticMutation = useUpdateMCPServerCosmeticsMutation();
 
   // State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -175,6 +178,29 @@ export function useMCPServerForm({ server, onSuccess, onClose }: UseMCPServerFor
   const onSubmit = methods.handleSubmit(async (formData: MCPServerFormData) => {
     setIsSubmitting(true);
     try {
+      // Cosmetic-only mode: only send title, description, iconPath
+      if (cosmeticOnly && server) {
+        const cosmeticData = {
+          ...(formData.title && { title: formData.title }),
+          ...(formData.description && { description: formData.description }),
+          ...(formData.icon && { iconPath: formData.icon }),
+        };
+
+        await cosmeticMutation.mutateAsync({
+          serverName: server.serverName,
+          data: cosmeticData,
+        });
+
+        showToast({
+          message: localize('com_ui_mcp_server_updated'),
+          status: 'success',
+        });
+
+        onSuccess?.(server.serverName, false);
+        setIsSubmitting(false);
+        return;
+      }
+
       const config: Record<string, unknown> = {
         type: formData.type,
         url: formData.url,

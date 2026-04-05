@@ -2,7 +2,7 @@ import React, { useCallback } from 'react';
 import { Trans } from 'react-i18next';
 import { QueryKeys } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import {
   Button,
   Spinner,
@@ -17,6 +17,7 @@ import type { TMessage } from 'librechat-data-provider';
 import { useDeleteConversationMutation } from '~/data-provider';
 import { useLocalize, useNewConvo } from '~/hooks';
 import { NotificationSeverity } from '~/common';
+import { buildConversationPath, getConversationModeFromPath } from '~/utils';
 
 type DeleteButtonProps = {
   conversationId: string;
@@ -42,18 +43,26 @@ export function DeleteConversationDialog({
   title: string;
 }) {
   const localize = useLocalize();
+  const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showToast } = useToastContext();
   const { newConversation } = useNewConvo();
-  const { conversationId: currentConvoId } = useParams();
+  const { conversationId: currentConvoId, projectId } = useParams();
 
   const deleteMutation = useDeleteConversationMutation({
     onSuccess: () => {
       setShowDeleteDialog(false);
       if (currentConvoId === conversationId || currentConvoId === 'new') {
         newConversation();
-        navigate('/c/new', { replace: true });
+        navigate(
+          buildConversationPath({
+            conversationId: 'new',
+            mode: getConversationModeFromPath(location.pathname),
+            projectId,
+          }),
+          { replace: true },
+        );
       }
       setMenuOpen?.(false);
       retainView();

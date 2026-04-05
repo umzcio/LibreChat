@@ -23,18 +23,6 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-// Mock Recoil
-jest.mock('recoil', () => ({
-  useRecoilValue: jest.fn(() => 'en'),
-  RecoilRoot: ({ children }: any) => children,
-  atom: jest.fn(() => ({})),
-  atomFamily: jest.fn(() => ({})),
-  selector: jest.fn(() => ({})),
-  selectorFamily: jest.fn(() => ({})),
-  useRecoilState: jest.fn(() => ['en', jest.fn()]),
-  useSetRecoilState: jest.fn(() => jest.fn()),
-}));
-
 // Mock react-i18next
 jest.mock('react-i18next', () => ({
   useTranslation: () => ({

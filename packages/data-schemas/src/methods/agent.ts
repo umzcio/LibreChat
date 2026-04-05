@@ -1,10 +1,23 @@
 import crypto from 'node:crypto';
 import { Constants, ResourceType, actionDelimiter } from 'librechat-data-provider';
 import type { FilterQuery, Model, Types } from 'mongoose';
-import type { IAgent, IAclEntry } from '~/types';
+import type { IAgent, IAclEntry, ISupportContact } from '~/types';
 import logger from '~/config/winston';
 
 const { mcp_delimiter } = Constants;
+
+export interface AgentListItem {
+  id: string;
+  _id: Types.ObjectId;
+  name?: string;
+  avatar?: { filepath: string; source: string };
+  author: string | Types.ObjectId;
+  description?: string;
+  updatedAt?: Date;
+  category: string;
+  support_contact?: ISupportContact;
+  is_promoted?: boolean;
+}
 
 export interface AgentDeps {
   /** Removes all ACL permissions for a resource. Injected from PermissionService. */
@@ -231,7 +244,7 @@ export function createAgentMethods(mongoose: typeof import('mongoose'), deps: Ag
   /**
    * Create an agent with the provided data.
    */
-  async function createAgent(agentData: Record<string, unknown>): Promise<IAgent> {
+  async function createAgent(agentData: Partial<IAgent> & { id: string }): Promise<IAgent> {
     const Agent = mongoose.models.Agent as Model<IAgent>;
     const { author: _author, ...versionData } = agentData;
     const timestamp = new Date();
@@ -609,7 +622,7 @@ export function createAgentMethods(mongoose: typeof import('mongoose'), deps: Ag
     after?: string | null;
   }): Promise<{
     object: string;
-    data: Array<Record<string, unknown>>;
+    data: Array<AgentListItem>;
     first_id: string | null;
     last_id: string | null;
     has_more: boolean;
@@ -671,7 +684,7 @@ export function createAgentMethods(mongoose: typeof import('mongoose'), deps: Ag
       query = query.limit(normalizedLimit + 1);
     }
 
-    const agents = (await query.lean()) as Array<Record<string, unknown>>;
+    const agents = (await query.lean()) as unknown as Array<AgentListItem>;
 
     const hasMore = isPaginated && normalizedLimit ? agents.length > normalizedLimit : false;
     const data = (isPaginated && normalizedLimit ? agents.slice(0, normalizedLimit) : agents).map(

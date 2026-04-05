@@ -177,3 +177,11 @@ claude-flow
 hive-mind-prompt-*.txt
 CLAUDE.md
 .gsd
+
+# Audit/remediation working artifacts
+audit-results/
+remediation-results/
+*-results/
+
+# Local MCP server repos
+zr-mcp-*/

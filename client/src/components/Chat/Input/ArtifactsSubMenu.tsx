@@ -114,7 +114,7 @@ const ArtifactsSubMenu = React.forwardRef<HTMLDivElement, ArtifactsSubMenuProps>
                     isShadcnEnabled && 'bg-surface-active',
                   )}
                 >
-                  <span className="text-sm">{localize('com_ui_include_shadcnui' as any)}</span>
+                  <span className="text-sm">{localize('com_ui_include_shadcnui')}</span>
                   <div className="ml-auto flex items-center">
                     <Ariakit.MenuItemCheck checked={isShadcnEnabled} />
                   </div>
@@ -135,7 +135,7 @@ const ArtifactsSubMenu = React.forwardRef<HTMLDivElement, ArtifactsSubMenuProps>
                     isCustomEnabled && 'bg-surface-active',
                   )}
                 >
-                  <span className="text-sm">{localize('com_ui_custom_prompt_mode' as any)}</span>
+                  <span className="text-sm">{localize('com_ui_custom_prompt_mode')}</span>
                   <div className="ml-auto flex items-center">
                     <Ariakit.MenuItemCheck checked={isCustomEnabled} />
                   </div>

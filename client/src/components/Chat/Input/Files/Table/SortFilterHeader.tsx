@@ -12,7 +12,7 @@ interface SortFilterHeaderProps<TData, TValue> extends React.HTMLAttributes<HTML
   title: string;
   column: Column<TData, TValue>;
   filters?: Record<string, string[] | number[]>;
-  valueMap?: Record<any, TranslationKeys>;
+  valueMap?: Record<string | number, TranslationKeys>;
   ariaLabel?: string;
 }
 
@@ -43,7 +43,7 @@ export function SortFilterHeader<TData, TValue>({
     ];
 
     if (filters) {
-      items.push({ separate: true } as any);
+      items.push({ separate: true } as MenuItemProps);
       Object.entries(filters).forEach(([_key, values]) => {
         values.forEach((value?: string | number) => {
           const translationKey = valueMap?.[value ?? ''];
@@ -64,7 +64,7 @@ export function SortFilterHeader<TData, TValue>({
         });
       });
 
-      items.push({ separate: true } as any);
+      items.push({ separate: true } as MenuItemProps);
       items.push({
         label: localize('com_ui_show_all'),
         onClick: () => column.setFilterValue(undefined),

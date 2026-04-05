@@ -22,7 +22,7 @@ import {
   useGetExpandedAgentByIdQuery,
   useUploadAgentAvatarMutation,
 } from '~/data-provider';
-import { createProviderOption, getDefaultAgentFormValues } from '~/utils';
+import { createProviderOption, getDefaultAgentFormValues, logger } from '~/utils';
 import { useResourcePermissions } from '~/hooks/useResourcePermissions';
 import { useSelectAgent, useLocalize, useAuthContext } from '~/hooks';
 import { useAgentPanelContext } from '~/Providers/AgentPanelContext';
@@ -287,7 +287,7 @@ export default function AgentPanel() {
           uploadAvatar: uploadAvatarMutation.mutateAsync,
         });
       } catch (error) {
-        console.error('[AgentPanel] Avatar upload failed', error);
+        logger.error('AgentPanel', 'Avatar upload failed', error);
         throw error;
       } finally {
         setIsAvatarUploadInFlight(false);
@@ -344,7 +344,7 @@ export default function AgentPanel() {
       try {
         await handleAvatarUpload(data.id ?? agent_id);
       } catch (error) {
-        console.error('[AgentPanel] Avatar upload failed after update', error);
+        logger.error('AgentPanel', 'Avatar upload failed after update', error);
         showToast({
           message: localize('com_agents_avatar_upload_error'),
           status: 'error',
@@ -383,7 +383,7 @@ export default function AgentPanel() {
       try {
         await handleAvatarUpload(data.id);
       } catch (error) {
-        console.error('[AgentPanel] Avatar upload failed after create', error);
+        logger.error('AgentPanel', 'Avatar upload failed after create', error);
         showToast({
           message: localize('com_agents_avatar_upload_error'),
           status: 'error',
@@ -428,7 +428,7 @@ export default function AgentPanel() {
               });
             }
           } catch (error) {
-            console.error('[AgentPanel] Avatar upload failed for avatar-only submission', error);
+            logger.error('AgentPanel', 'Avatar upload failed for avatar-only submission', error);
             showToast({
               message: localize('com_agents_avatar_upload_error'),
               status: 'error',

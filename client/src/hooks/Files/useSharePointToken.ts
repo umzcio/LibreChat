@@ -1,3 +1,5 @@
+import type { GraphTokenResponse } from 'librechat-data-provider';
+import type { QueryObserverResult } from '@tanstack/react-query';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { useGraphTokenQuery, useGetStartupConfig } from '~/data-provider';
 
@@ -7,10 +9,10 @@ interface UseSharePointTokenProps {
 }
 
 interface UseSharePointTokenReturn {
-  token: any;
+  token: GraphTokenResponse | undefined;
   isLoading: boolean;
-  error: any;
-  refetch: () => Promise<any>;
+  error: unknown;
+  refetch: () => Promise<QueryObserverResult<GraphTokenResponse>>;
 }
 
 export default function useSharePointToken({

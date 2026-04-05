@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useSetRecoilState } from 'recoil';
+import { useSetAtom } from 'jotai';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,6 +20,7 @@ import {
   getDefaultEndpoint,
   clearMessagesCache,
   buildDefaultConvo,
+  buildConversationPath,
   logger,
 } from '~/utils';
 import { useApplyModelSpecEffects } from '~/hooks/Agents';
@@ -28,10 +29,11 @@ import store from '~/store';
 
 const useNavigateToConvo = (index = 0) => {
   const navigate = useNavigate();
+
   const queryClient = useQueryClient();
   const clearAllConversations = store.useClearConvoState();
   const applyModelSpecEffects = useApplyModelSpecEffects();
-  const setSubmission = useSetRecoilState(store.submissionByIndex(index));
+  const setSubmission = useSetAtom(store.submissionByIndex(index));
   const clearAllLatestMessages = store.useClearLatestMessages(`useNavigateToConvo ${index}`);
   const { hasSetConversation, setConversation: setConvo } = store.useCreateConversationAtom(index);
 
@@ -54,8 +56,10 @@ const useNavigateToConvo = (index = 0) => {
 
   const buildConvoPath = (convo?: Partial<TConversation>, convoId?: string) => {
     const id = convoId ?? convo?.conversationId ?? Constants.NEW_CONVO;
-    const prefix = convo?.projectId ? `/p/${convo.projectId}` : '';
-    return `${prefix}/c/${id}`;
+    return buildConversationPath({
+      conversationId: id,
+      projectId: convo?.projectId,
+    });
   };
 
   const fetchFreshData = async (conversation?: Partial<TConversation>) => {
@@ -74,7 +78,7 @@ const useNavigateToConvo = (index = 0) => {
       setConversation(convoData);
       navigate(buildConvoPath(convoData, conversationId), { state: { focusChat: true } });
     } catch (error) {
-      console.error('Error fetching conversation data on navigation', error);
+      logger.error('Navigation', 'Error fetching conversation data on navigation', error);
       if (conversation) {
         setConversation(conversation as TConversation);
         navigate(buildConvoPath(conversation, conversationId), { state: { focusChat: true } });

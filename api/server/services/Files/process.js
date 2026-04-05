@@ -217,8 +217,15 @@ const processDeleteRequest = async ({ req, files }) => {
     );
   }
 
-  await Promise.allSettled(promises);
-  await db.deleteFiles(resolvedFileIds);
+  const results = await Promise.allSettled(promises);
+  for (const result of results) {
+    if (result.status === 'rejected') {
+      logger.error('[processDeleteRequest] External cleanup failed:', result.reason);
+    }
+  }
+  if (resolvedFileIds.length > 0) {
+    await db.deleteFiles(resolvedFileIds);
+  }
 };
 
 /**
@@ -296,22 +303,35 @@ const processImageFile = async ({ req, res, metadata, returnFile = false }) => {
     endpoint,
   });
 
-  const result = await db.createFile(
-    {
-      user: req.user.id,
-      file_id,
-      temp_file_id,
-      bytes,
-      filepath,
-      filename: file.originalname,
-      context: FileContext.message_attachment,
-      source,
-      type: `image/${appConfig.imageOutputType}`,
-      width,
-      height,
-    },
-    true,
-  );
+  let result;
+  try {
+    result = await db.createFile(
+      {
+        user: req.user.id,
+        file_id,
+        temp_file_id,
+        bytes,
+        filepath,
+        filename: file.originalname,
+        context: FileContext.message_attachment,
+        source,
+        type: `image/${appConfig.imageOutputType}`,
+        width,
+        height,
+      },
+      true,
+    );
+  } catch (dbError) {
+    const { deleteFile } = getStrategyFunctions(source);
+    if (deleteFile) {
+      try {
+        await deleteFile(req, { filepath, source });
+      } catch (cleanupErr) {
+        logger.error('[processImageFile] Failed to clean up remote file after DB error', cleanupErr);
+      }
+    }
+    throw dbError;
+  }
 
   if (returnFile) {
     return result;

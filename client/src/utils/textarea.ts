@@ -1,3 +1,5 @@
+import logger from './logger';
+
 /**
  * Insert text at the cursor position in a textarea.
  */
@@ -8,7 +10,7 @@ export function insertTextAtCursor(element: HTMLTextAreaElement, textToInsert: s
   if (window.getSelection() && document.queryCommandSupported('insertText')) {
     document.execCommand('insertText', false, textToInsert);
   } else {
-    console.warn('insertTextAtCursor: document.execCommand is not supported');
+    logger.warn('Textarea', 'insertTextAtCursor: document.execCommand is not supported');
     const startPos = element.selectionStart;
     const endPos = element.selectionEnd;
     const beforeText = element.value.substring(0, startPos);

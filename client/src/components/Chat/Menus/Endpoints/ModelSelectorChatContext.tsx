@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import type { EModelEndpoint, TConversation } from 'librechat-data-provider';
 import type { ConvoGenerator } from '~/common';
 import { useGetConversation, useNewConvo } from '~/hooks';
@@ -23,11 +23,11 @@ export function ModelSelectorChatProvider({ children }: { children: React.ReactN
   const getConversation = useGetConversation(0);
   const { newConversation: nextNewConversation } = useNewConvo();
 
-  const spec = useRecoilValue(store.conversationSpecByIndex(0));
-  const model = useRecoilValue(store.conversationModelByIndex(0));
-  const agent_id = useRecoilValue(store.conversationAgentIdByIndex(0));
-  const endpoint = useRecoilValue(store.conversationEndpointByIndex(0));
-  const assistant_id = useRecoilValue(store.conversationAssistantIdByIndex(0));
+  const spec = useAtomValue(store.conversationSpecByIndex(0));
+  const model = useAtomValue(store.conversationModelByIndex(0));
+  const agent_id = useAtomValue(store.conversationAgentIdByIndex(0));
+  const endpoint = useAtomValue(store.conversationEndpointByIndex(0));
+  const assistant_id = useAtomValue(store.conversationAssistantIdByIndex(0));
 
   const newConversationRef = useRef(nextNewConversation);
   newConversationRef.current = nextNewConversation;

@@ -1,6 +1,5 @@
 const express = require('express');
 const { isEnabled } = require('@librechat/api');
-const { logger } = require('@librechat/data-schemas');
 const {
   getSharedMessages,
   createSharedLink,
@@ -10,6 +9,7 @@ const {
   getSharedLink,
 } = require('~/models');
 const requireJwtAuth = require('~/server/middleware/requireJwtAuth');
+const asyncHandler = require('~/server/middleware/asyncHandler');
 const router = express.Router();
 
 /**
@@ -23,28 +23,25 @@ if (allowSharedLinks) {
   router.get(
     '/:shareId',
     allowSharedLinksPublic ? (req, res, next) => next() : requireJwtAuth,
-    async (req, res) => {
-      try {
-        const share = await getSharedMessages(req.params.shareId);
+    asyncHandler(async (req, res) => {
+      const share = await getSharedMessages(req.params.shareId);
 
-        if (share) {
-          res.status(200).json(share);
-        } else {
-          res.status(404).end();
-        }
-      } catch (error) {
-        logger.error('Error getting shared messages:', error);
-        res.status(500).json({ message: 'Error getting shared messages' });
+      if (share) {
+        res.status(200).json(share);
+      } else {
+        res.status(404).end();
       }
-    },
+    }),
   );
 }
 
 /**
  * Shared links
  */
-router.get('/', requireJwtAuth, async (req, res) => {
-  try {
+router.get(
+  '/',
+  requireJwtAuth,
+  asyncHandler(async (req, res) => {
     const params = {
       pageParam: req.query.cursor,
       pageSize: Math.max(1, parseInt(req.query.pageSize) || 10),
@@ -71,17 +68,13 @@ router.get('/', requireJwtAuth, async (req, res) => {
       nextCursor: result.nextCursor,
       hasNextPage: result.hasNextPage,
     });
-  } catch (error) {
-    logger.error('Error getting shared links:', error);
-    res.status(500).json({
-      message: 'Error getting shared links',
-      error: error.message,
-    });
-  }
-});
+  }),
+);
 
-router.get('/link/:conversationId', requireJwtAuth, async (req, res) => {
-  try {
+router.get(
+  '/link/:conversationId',
+  requireJwtAuth,
+  asyncHandler(async (req, res) => {
     const share = await getSharedLink(req.user.id, req.params.conversationId);
 
     return res.status(200).json({
@@ -89,14 +82,13 @@ router.get('/link/:conversationId', requireJwtAuth, async (req, res) => {
       shareId: share.shareId,
       conversationId: req.params.conversationId,
     });
-  } catch (error) {
-    logger.error('Error getting shared link:', error);
-    res.status(500).json({ message: 'Error getting shared link' });
-  }
-});
+  }),
+);
 
-router.post('/:conversationId', requireJwtAuth, async (req, res) => {
-  try {
+router.post(
+  '/:conversationId',
+  requireJwtAuth,
+  asyncHandler(async (req, res) => {
     const { targetMessageId } = req.body;
     const created = await createSharedLink(req.user.id, req.params.conversationId, targetMessageId);
     if (created) {
@@ -104,28 +96,26 @@ router.post('/:conversationId', requireJwtAuth, async (req, res) => {
     } else {
       res.status(404).end();
     }
-  } catch (error) {
-    logger.error('Error creating shared link:', error);
-    res.status(500).json({ message: 'Error creating shared link' });
-  }
-});
+  }),
+);
 
-router.patch('/:shareId', requireJwtAuth, async (req, res) => {
-  try {
+router.patch(
+  '/:shareId',
+  requireJwtAuth,
+  asyncHandler(async (req, res) => {
     const updatedShare = await updateSharedLink(req.user.id, req.params.shareId);
     if (updatedShare) {
       res.status(200).json(updatedShare);
     } else {
       res.status(404).end();
     }
-  } catch (error) {
-    logger.error('Error updating shared link:', error);
-    res.status(500).json({ message: 'Error updating shared link' });
-  }
-});
+  }),
+);
 
-router.delete('/:shareId', requireJwtAuth, async (req, res) => {
-  try {
+router.delete(
+  '/:shareId',
+  requireJwtAuth,
+  asyncHandler(async (req, res) => {
     const result = await deleteSharedLink(req.user.id, req.params.shareId);
 
     if (!result) {
@@ -133,10 +123,7 @@ router.delete('/:shareId', requireJwtAuth, async (req, res) => {
     }
 
     return res.status(200).json(result);
-  } catch (error) {
-    logger.error('Error deleting shared link:', error);
-    return res.status(400).json({ message: 'Error deleting shared link' });
-  }
-});
+  }),
+);
 
 module.exports = router;

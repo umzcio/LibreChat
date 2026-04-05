@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ThemeSelector } from '@librechat/client';
 import { TStartupConfig } from 'librechat-data-provider';
 import { ErrorMessage } from '~/components/Auth/ErrorMessage';
@@ -25,6 +26,21 @@ function AuthLayout({
   error: TranslationKeys | null;
 }) {
   const localize = useLocalize();
+
+  useEffect(() => {
+    const favicon = startupConfig?.branding?.favicon;
+    if (!favicon) {
+      return;
+    }
+    const link32 = document.querySelector<HTMLLinkElement>('link[sizes="32x32"]');
+    const link16 = document.querySelector<HTMLLinkElement>('link[sizes="16x16"]');
+    if (link32) {
+      link32.href = favicon;
+    }
+    if (link16) {
+      link16.href = favicon;
+    }
+  }, [startupConfig?.branding?.favicon]);
 
   const hasStartupConfigError = startupConfigError !== null && startupConfigError !== undefined;
   const DisplayError = () => {
@@ -61,11 +77,26 @@ function AuthLayout({
       <Banner />
       <BlinkAnimation active={isFetching}>
         <div className="mt-6 h-10 w-full bg-cover">
-          <img
-            src="assets/logo.svg"
-            className="h-full w-full object-contain"
-            alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
-          />
+          {startupConfig?.branding?.logoLight || startupConfig?.branding?.logoDark ? (
+            <>
+              <img
+                src={startupConfig.branding.logoLight ?? startupConfig.branding.logoDark ?? 'assets/logo.svg'}
+                className="h-full w-full object-contain dark:hidden"
+                alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
+              />
+              <img
+                src={startupConfig.branding.logoDark ?? startupConfig.branding.logoLight ?? 'assets/logo.svg'}
+                className="hidden h-full w-full object-contain dark:block"
+                alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
+              />
+            </>
+          ) : (
+            <img
+              src="assets/logo.svg"
+              className="h-full w-full object-contain"
+              alt={localize('com_ui_logo', { 0: startupConfig?.appTitle ?? 'LibreChat' })}
+            />
+          )}
         </div>
       </BlinkAnimation>
       <DisplayError />

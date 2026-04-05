@@ -6,13 +6,13 @@ import {
   OGDialogOverlay,
   OGDialogContent,
 } from '@librechat/client';
-import type { SharePointBatchProgress } from '~/data-provider/Files/sharepoint';
+import type { SharePointBatchProgress, SharePointFile } from '~/data-provider/Files/sharepoint';
 import { useSharePointPicker, useLocalize } from '~/hooks';
 
 interface SharePointPickerDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onFilesSelected?: (files: any[]) => void;
+  onFilesSelected?: (files: SharePointFile[]) => void;
   disabled?: boolean;
   isDownloading?: boolean;
   downloadProgress?: SharePointBatchProgress | null;

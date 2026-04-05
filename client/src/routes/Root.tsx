@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { Outlet } from 'react-router-dom';
 import { useMediaQuery } from '@librechat/client';
 import {
@@ -26,7 +26,7 @@ import { Banner } from '~/components/Banners';
 export default function Root() {
   const [showTerms, setShowTerms] = useState(false);
   const [bannerHeight, setBannerHeight] = useState(0);
-  const sidebarExpanded = useRecoilValue(store.sidebarExpanded);
+  const sidebarExpanded = useAtomValue(store.sidebarExpanded);
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
 
   const { isAuthenticated, logout } = useAuthContext();
