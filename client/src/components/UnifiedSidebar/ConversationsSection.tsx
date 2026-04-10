@@ -1,14 +1,12 @@
 import { useCallback, useEffect, useState, useMemo, memo, lazy, Suspense, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAtomValue, useSetAtom } from 'jotai';
-import { useMediaQuery, NewChatIcon } from '@librechat/client';
-import { PermissionTypes, Permissions, QueryKeys } from 'librechat-data-provider';
+import { useSetRecoilState, useRecoilValue } from 'recoil';
+import { useMediaQuery } from '@librechat/client';
+import { PermissionTypes, Permissions } from 'librechat-data-provider';
 import type { InfiniteQueryObserverResult } from '@tanstack/react-query';
 import type { ConversationListResponse } from 'librechat-data-provider';
 import type { List } from 'react-virtualized';
 import {
   useLocalize,
-  useNewConvo,
   useHasAccess,
   useAuthContext,
   useLocalStorage,
@@ -17,18 +15,14 @@ import {
 import { useConversationsInfiniteQuery, useTitleGeneration } from '~/data-provider';
 import { Conversations } from '~/components/Conversations';
 import SearchBar from '~/components/Nav/SearchBar';
-import { clearMessagesCache } from '~/utils';
 import store from '~/store';
 
 const BookmarkNav = lazy(() => import('~/components/Nav/Bookmarks/BookmarkNav'));
 
 const ConversationsSection = memo(() => {
   const localize = useLocalize();
-  const queryClient = useQueryClient();
-  const { newConversation } = useNewConvo();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
-  const setSidebarExpanded = useSetAtom(store.sidebarExpanded);
-  const conversationId = useAtomValue(store.conversationIdByIndex(0));
+  const setSidebarExpanded = useSetRecoilState(store.sidebarExpanded);
   const { isAuthenticated } = useAuthContext();
   useTitleGeneration(isAuthenticated);
 
@@ -41,7 +35,7 @@ const ConversationsSection = memo(() => {
     permission: Permissions.USE,
   });
 
-  const search = useAtomValue(store.search);
+  const search = useRecoilValue(store.search);
 
   const { data, fetchNextPage, isFetchingNextPage, isLoading, isFetching } =
     useConversationsInfiniteQuery(
@@ -122,32 +116,6 @@ const ConversationsSection = memo(() => {
         )}
         {search.enabled && <SearchBar isSmallScreen={isSmallScreen} />}
       </div>
-      {isSmallScreen && (
-        <div
-          role="button"
-          tabIndex={0}
-          aria-label={localize('com_ui_new_chat')}
-          className="flex w-full cursor-pointer items-center rounded-lg px-2.5 py-2 text-sm text-text-primary outline-none hover:bg-surface-active-alt focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
-          onClick={() => {
-            clearMessagesCache(queryClient, conversationId);
-            queryClient.invalidateQueries([QueryKeys.messages]);
-            newConversation();
-            setSidebarExpanded(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              clearMessagesCache(queryClient, conversationId);
-              queryClient.invalidateQueries([QueryKeys.messages]);
-              newConversation();
-              setSidebarExpanded(false);
-            }
-          }}
-        >
-          <NewChatIcon className="mr-2 h-5 w-5" />
-          <span className="truncate">{localize('com_ui_new_chat')}</span>
-        </div>
-      )}
       <div className="flex min-h-0 flex-grow flex-col overflow-hidden">
         <Conversations
           conversations={conversations}

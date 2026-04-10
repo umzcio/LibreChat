@@ -1,12 +1,12 @@
 import { memo, useCallback, lazy, Suspense } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAtomValue } from 'jotai';
+import { useRecoilValue } from 'recoil';
+import { SquarePen } from 'lucide-react';
 import { QueryKeys } from 'librechat-data-provider';
-import { Skeleton, Sidebar, Button, TooltipAnchor, NewChatIcon } from '@librechat/client';
+import { Skeleton, Sidebar, Button, TooltipAnchor } from '@librechat/client';
 import type { NavLink } from '~/common';
 import { CLOSE_SIDEBAR_ID } from '~/components/Chat/Menus/OpenSidebar';
 import { useActivePanel, resolveActivePanel } from '~/Providers';
-import { useGetStartupConfig } from '~/data-provider';
 import { useLocalize, useNewConvo } from '~/hooks';
 import { clearMessagesCache, cn } from '~/utils';
 import store from '~/store';
@@ -17,19 +17,18 @@ const NewChatButton = memo(function NewChatButton() {
   const localize = useLocalize();
   const queryClient = useQueryClient();
   const { newConversation } = useNewConvo();
-  const conversationId = useAtomValue(store.conversationIdByIndex(0));
+  const conversation = useRecoilValue(store.conversationByIndex(0));
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>) => {
-      if (e.button === 0 && (e.ctrlKey || e.metaKey)) {
-        return;
+      if (e.button === 0 && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        clearMessagesCache(queryClient, conversation?.conversationId);
+        queryClient.invalidateQueries([QueryKeys.messages]);
+        newConversation();
       }
-      e.preventDefault();
-      clearMessagesCache(queryClient, conversationId);
-      queryClient.invalidateQueries([QueryKeys.messages]);
-      newConversation();
     },
-    [queryClient, conversationId, newConversation],
+    [queryClient, conversation?.conversationId, newConversation],
   );
 
   return (
@@ -44,9 +43,7 @@ const NewChatButton = memo(function NewChatButton() {
           className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
           onClick={handleClick}
         >
-          <div className="flex size-6 items-center justify-center rounded-full bg-text-primary">
-            <NewChatIcon className="size-3.5 text-white dark:text-black" />
-          </div>
+          <SquarePen className="h-5 w-5 text-text-primary" />
         </a>
       }
     />
@@ -100,7 +97,7 @@ const NavIconButton = memo(function NavIconButton({
           )}
           onClick={handleClick}
         >
-          <link.icon className="h-4 w-4" aria-hidden="true" />
+          <link.icon className="h-5 w-5" aria-hidden="true" />
         </Button>
       }
     />
@@ -121,11 +118,9 @@ function ExpandedPanel({
   const localize = useLocalize();
   const { active, setActive } = useActivePanel();
   const effectiveActive = resolveActivePanel(active, links);
-  const { data: startupConfig } = useGetStartupConfig();
 
   const toggleLabel = expanded ? 'com_nav_close_sidebar' : 'com_nav_open_sidebar';
   const toggleClick = expanded ? onCollapse : onExpand;
-  const hasLogo = startupConfig?.branding?.logoLight || startupConfig?.branding?.logoDark;
 
   return (
     <div className="flex h-full flex-shrink-0 flex-col gap-2 border-r border-border-light bg-surface-primary-alt px-2 py-2">
@@ -140,35 +135,15 @@ function ExpandedPanel({
             variant="ghost"
             aria-label={localize(toggleLabel)}
             aria-expanded={expanded}
-            className="group/toggle h-9 w-9 rounded-lg"
+            className="h-9 w-9 rounded-lg"
             onClick={toggleClick}
           >
-            {hasLogo ? (
-              <>
-                <img
-                  src={startupConfig.branding?.logoLight}
-                  className="h-6 w-6 rounded object-contain group-hover/toggle:hidden dark:hidden"
-                  alt=""
-                  aria-hidden="true"
-                />
-                <img
-                  src={startupConfig.branding?.logoDark}
-                  className="hidden h-6 w-6 rounded object-contain group-hover/toggle:!hidden dark:block"
-                  alt=""
-                  aria-hidden="true"
-                />
-                <Sidebar
-                  aria-hidden="true"
-                  className="hidden h-5 w-5 text-text-primary group-hover/toggle:!block"
-                />
-              </>
-            ) : (
-              <Sidebar aria-hidden="true" className="h-5 w-5 text-text-primary" />
-            )}
+            <Sidebar aria-hidden="true" className="h-5 w-5 text-text-primary" />
           </Button>
         }
       />
       <NewChatButton />
+      <div className="mx-2 border-b border-border-light" />
       <div className="flex flex-col gap-1 overflow-y-auto">
         {links.map((link) => (
           <NavIconButton

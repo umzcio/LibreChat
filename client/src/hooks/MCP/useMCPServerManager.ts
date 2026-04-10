@@ -17,12 +17,11 @@ import {
   useGetAllEffectivePermissionsQuery,
 } from 'librechat-data-provider/react-query';
 import type { TUpdateUserPlugins, TPlugin, MCPServersResponse } from 'librechat-data-provider';
+import type { MCPServerInitState } from '~/store/mcp';
 import type { ConfigFieldDetail } from '~/common';
 import { useLocalize, useHasAccess, useMCPSelect, useMCPConnectionStatus } from '~/hooks';
 import { useGetStartupConfig, useMCPServersQuery } from '~/data-provider';
 import { mcpServerInitStatesAtom, getServerInitState } from '~/store/mcp';
-import type { MCPServerInitState } from '~/store/mcp';
-import { logger } from '~/utils';
 
 export interface MCPServerDefinition {
   serverName: string;
@@ -30,7 +29,6 @@ export interface MCPServerDefinition {
   dbId?: string; // MongoDB ObjectId for database servers (used for permissions)
   effectivePermissions: number; // Permission bits (VIEW=1, EDIT=2, DELETE=4, SHARE=8)
   consumeOnly?: boolean;
-  source?: 'yaml' | 'config' | 'user';
 }
 
 // Poll intervals are kept local since they're timer references that can't be serialized
@@ -66,7 +64,7 @@ export function useMCPServerManager({
     const definitions: MCPServerDefinition[] = [];
     if (loadedServers) {
       for (const [serverName, metadata] of Object.entries(loadedServers)) {
-        const { dbId, consumeOnly, source, ...config } = metadata;
+        const { dbId, consumeOnly, ...config } = metadata;
 
         // Get effective permissions from the permissions map using _id
         // Fall back to 1 (VIEW) for YAML-based servers without _id
@@ -77,7 +75,6 @@ export function useMCPServerManager({
           dbId,
           effectivePermissions,
           consumeOnly,
-          source,
           config,
         });
       }
@@ -138,7 +135,7 @@ export function useMCPServerManager({
       ]);
     },
     onError: (error: unknown) => {
-      logger.error('MCPManager', 'Error updating MCP auth:', error);
+      console.error('Error updating MCP auth:', error);
       showToast({
         message: localize('com_nav_mcp_vars_update_error'),
         status: 'error',
@@ -193,7 +190,7 @@ export function useMCPServerManager({
     (serverName: string) => {
       // Prevent duplicate polling for the same server
       if (pollIntervalsRef.current[serverName]) {
-        logger.debug('MCPManager', `Polling already active for ${serverName}, skipping duplicate`);
+        console.debug(`[MCP Manager] Polling already active for ${serverName}, skipping duplicate`);
         return;
       }
 
@@ -223,9 +220,8 @@ export function useMCPServerManager({
             : pollAttempts * 5000; // Rough estimate if no start time
 
           if (pollAttempts > maxAttempts || elapsedTime > OAUTH_TIMEOUT_MS) {
-            logger.warn(
-              'MCPManager',
-              `OAuth timeout for ${serverName} after ${(elapsedTime / 1000).toFixed(0)}s (attempt ${pollAttempts})`,
+            console.warn(
+              `[MCP Manager] OAuth timeout for ${serverName} after ${(elapsedTime / 1000).toFixed(0)}s (attempt ${pollAttempts})`,
             );
             showToast({
               message: localize('com_ui_mcp_oauth_timeout', { 0: serverName }),
@@ -240,9 +236,9 @@ export function useMCPServerManager({
 
           await queryClient.refetchQueries([QueryKeys.mcpConnectionStatus]);
 
-          const freshConnectionData = queryClient.getQueryData<{
-            connectionStatus?: Record<string, { connectionState?: string }>;
-          }>([QueryKeys.mcpConnectionStatus]);
+          const freshConnectionData = queryClient.getQueryData([
+            QueryKeys.mcpConnectionStatus,
+          ]) as any;
           const freshConnectionStatus = freshConnectionData?.connectionStatus || {};
 
           const serverStatus = freshConnectionStatus[serverName];
@@ -302,16 +298,15 @@ export function useMCPServerManager({
 
           // Log progress periodically
           if (pollAttempts % 5 === 0 || pollAttempts <= 2) {
-            logger.debug(
-              'MCPManager',
-              `Polling ${serverName} attempt ${pollAttempts}/${maxAttempts}, next in ${nextInterval / 1000}s`,
+            console.debug(
+              `[MCP Manager] Polling ${serverName} attempt ${pollAttempts}/${maxAttempts}, next in ${nextInterval / 1000}s`,
             );
           }
 
           timeoutId = setTimeout(pollOnce, nextInterval);
           pollIntervalsRef.current[serverName] = timeoutId;
         } catch (error) {
-          logger.error('MCPManager', `Error polling server ${serverName}:`, error);
+          console.error(`[MCP Manager] Error polling server ${serverName}:`, error);
           if (timeoutId) {
             clearTimeout(timeoutId);
           }
@@ -376,7 +371,7 @@ export function useMCPServerManager({
         }
         return response;
       } catch (error) {
-        logger.error('MCPManager', `Failed to initialize ${serverName}:`, error);
+        console.error(`[MCP Manager] Failed to initialize ${serverName}:`, error);
         showToast({
           message: localize('com_ui_mcp_init_failed', { 0: serverName }),
           status: 'error',
@@ -415,7 +410,7 @@ export function useMCPServerManager({
           });
         },
         onError: (error) => {
-          logger.error('MCPManager', `Failed to cancel OAuth for ${serverName}:`, error);
+          console.error(`[MCP Manager] Failed to cancel OAuth for ${serverName}:`, error);
           showToast({
             message: localize('com_ui_mcp_init_failed', { 0: serverName }),
             status: 'error',

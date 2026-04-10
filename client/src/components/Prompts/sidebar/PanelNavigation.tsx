@@ -8,7 +8,6 @@ function PanelNavigation({
   hasNextPage,
   hasPreviousPage,
   isLoading,
-  isChatRoute,
   children,
 }: {
   onPrevious: () => void;
@@ -23,9 +22,7 @@ function PanelNavigation({
 
   return (
     <div className="flex items-center justify-between">
-      <div className="flex gap-2 pl-1">
-        {children}
-      </div>
+      <div className="flex gap-2 pl-1">{children}</div>
       <nav className="flex items-center gap-2" aria-label={localize('com_ui_pagination')}>
         <Button
           variant="outline"

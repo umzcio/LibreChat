@@ -1,23 +1,23 @@
 import React, { useRef, useCallback, useMemo, useEffect } from 'react';
-import { LayoutGrid, Code } from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
+import { useRecoilValue } from 'recoil';
 import { useDrag, useDrop } from 'react-dnd';
 import { Skeleton } from '@librechat/client';
 import { useNavigate } from 'react-router-dom';
 import { useQueries } from '@tanstack/react-query';
-import { useAtomValue } from 'jotai';
 import { QueryKeys, dataService } from 'librechat-data-provider';
-import type t from 'librechat-data-provider';
+import type { Agent, TEndpointsConfig, TModelSpec } from 'librechat-data-provider';
 import type { AgentQueryResult } from '~/common';
 import {
   useGetConversation,
-  useShowMarketplace,
   useFavorites,
   useLocalize,
+  useShowMarketplace,
   useNewConvo,
 } from '~/hooks';
+import { useGetEndpointsQuery, useGetStartupConfig } from '~/data-provider';
 import { useAssistantsMapContext, useAgentsMapContext } from '~/Providers';
 import useSelectMention from '~/hooks/Input/useSelectMention';
-import { useGetEndpointsQuery } from '~/data-provider';
 import FavoriteItem from './FavoriteItem';
 import store from '~/store';
 
@@ -52,7 +52,7 @@ const DraggableFavoriteItem = ({
   children,
 }: DraggableFavoriteItemProps) => {
   const ref = useRef<HTMLDivElement>(null);
-  const [{ handlerId }, drop] = useDrop<{ index: number; id: string }, unknown, { handlerId: string | symbol | null }>(
+  const [{ handlerId }, drop] = useDrop<{ index: number; id: string }, unknown, { handlerId: any }>(
     {
       accept: 'favorite-item',
       collect(monitor) {
@@ -125,7 +125,7 @@ export default function FavoritesList({
 }) {
   const navigate = useNavigate();
   const localize = useLocalize();
-  const search = useAtomValue(store.search);
+  const search = useRecoilValue(store.search);
   const getConversation = useGetConversation(0);
   const { favorites, reorderFavorites, isLoading: isFavoritesLoading } = useFavorites();
   const showAgentMarketplace = useShowMarketplace();
@@ -133,10 +133,24 @@ export default function FavoritesList({
   const { newConversation } = useNewConvo();
   const assistantsMap = useAssistantsMapContext();
   const agentsMap = useAgentsMapContext();
-  const { data: endpointsConfig = {} as t.TEndpointsConfig } = useGetEndpointsQuery();
+  const { data: endpointsConfig = {} as TEndpointsConfig } = useGetEndpointsQuery();
+  const { data: startupConfig } = useGetStartupConfig();
 
-  const { onSelectEndpoint: _onSelectEndpoint } = useSelectMention({
-    modelSpecs: [],
+  const modelSpecs = useMemo(
+    () => startupConfig?.modelSpecs?.list ?? [],
+    [startupConfig?.modelSpecs?.list],
+  );
+
+  const specsMap = useMemo(() => {
+    const map: Record<string, TModelSpec> = {};
+    for (const spec of modelSpecs) {
+      map[spec.name] = spec;
+    }
+    return map;
+  }, [modelSpecs]);
+
+  const { onSelectEndpoint: _onSelectEndpoint, onSelectSpec: _onSelectSpec } = useSelectMention({
+    modelSpecs,
     assistantsMap,
     endpointsConfig,
     getConversation,
@@ -152,6 +166,16 @@ export default function FavoritesList({
       }
     },
     [_onSelectEndpoint, isSmallScreen, toggleNav],
+  );
+
+  const onSelectSpec = useCallback(
+    (...args: Parameters<NonNullable<typeof _onSelectSpec>>) => {
+      _onSelectSpec?.(...args);
+      if (isSmallScreen && toggleNav) {
+        toggleNav();
+      }
+    },
+    [_onSelectSpec, isSmallScreen, toggleNav],
   );
 
   const marketplaceRef = useRef<HTMLDivElement>(null);
@@ -243,11 +267,36 @@ export default function FavoritesList({
     }
   }, [staleAgentIdsKey, safeFavorites, reorderFavorites]);
 
+  const staleSpecNamesKey = useMemo(() => {
+    if (startupConfig === undefined) {
+      return '';
+    }
+    return safeFavorites
+      .filter((f) => f.spec && !specsMap[f.spec])
+      .map((f) => f.spec as string)
+      .sort()
+      .join(',');
+  }, [safeFavorites, specsMap, startupConfig]);
+
+  const specCleanupAttemptedRef = useRef('');
+
+  useEffect(() => {
+    if (!staleSpecNamesKey || specCleanupAttemptedRef.current === staleSpecNamesKey) {
+      return;
+    }
+    const staleSet = new Set(staleSpecNamesKey.split(','));
+    const cleaned = safeFavorites.filter((f) => !f.spec || !staleSet.has(f.spec));
+    if (cleaned.length < safeFavorites.length) {
+      specCleanupAttemptedRef.current = staleSpecNamesKey;
+      reorderFavorites(cleaned, true);
+    }
+  }, [staleSpecNamesKey, safeFavorites, reorderFavorites]);
+
   const combinedAgentsMap = useMemo(() => {
     if (agentsMap === undefined) {
       return undefined;
     }
-    const combined: Record<string, t.Agent> = {};
+    const combined: Record<string, Agent> = {};
     for (const [key, value] of Object.entries(agentsMap)) {
       if (value) {
         combined[key] = value;
@@ -347,28 +396,6 @@ export default function FavoritesList({
                 </div>
               </div>
             )}
-            {/* Code environment button */}
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label={localize('com_ui_code')}
-              className="group relative flex w-full cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm text-text-primary outline-none hover:bg-surface-active-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
-              onClick={() => navigate('/code')}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  navigate('/code');
-                }
-              }}
-              data-testid="nav-code-button"
-            >
-              <div className="flex flex-1 items-center truncate pr-6">
-                <div className="mr-2 h-5 w-5">
-                  <Code className="h-5 w-5 text-text-primary" />
-                </div>
-                <span className="truncate">{localize('com_ui_code')}</span>
-              </div>
-            </div>
             {safeFavorites.map((fav, index) => {
               if (fav.agentId) {
                 const agent = combinedAgentsMap?.[fav.agentId];
@@ -388,6 +415,28 @@ export default function FavoritesList({
                       type="agent"
                       onSelectEndpoint={onSelectEndpoint}
                       onRemoveFocus={handleRemoveFocus}
+                    />
+                  </DraggableFavoriteItem>
+                );
+              } else if (fav.spec) {
+                const spec = specsMap[fav.spec];
+                if (!spec) {
+                  return null;
+                }
+                return (
+                  <DraggableFavoriteItem
+                    key={`spec-${fav.spec}`}
+                    id={`spec-${fav.spec}`}
+                    index={index}
+                    moveItem={moveItem}
+                    onDrop={handleDrop}
+                  >
+                    <FavoriteItem
+                      item={spec}
+                      type="spec"
+                      onSelectSpec={onSelectSpec}
+                      onRemoveFocus={handleRemoveFocus}
+                      endpointsConfig={endpointsConfig}
                     />
                   </DraggableFavoriteItem>
                 );
