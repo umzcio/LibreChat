@@ -7,6 +7,7 @@ import { Skeleton, Sidebar, Button, TooltipAnchor } from '@librechat/client';
 import type { NavLink } from '~/common';
 import { CLOSE_SIDEBAR_ID } from '~/components/Chat/Menus/OpenSidebar';
 import { useActivePanel, resolveActivePanel } from '~/Providers';
+import { useGetStartupConfig } from '~/data-provider';
 import { useLocalize, useNewConvo } from '~/hooks';
 import { clearMessagesCache, cn } from '~/utils';
 import store from '~/store';
@@ -118,9 +119,11 @@ function ExpandedPanel({
   const localize = useLocalize();
   const { active, setActive } = useActivePanel();
   const effectiveActive = resolveActivePanel(active, links);
+  const { data: startupConfig } = useGetStartupConfig();
 
   const toggleLabel = expanded ? 'com_nav_close_sidebar' : 'com_nav_open_sidebar';
   const toggleClick = expanded ? onCollapse : onExpand;
+  const hasLogo = startupConfig?.branding?.logoLight || startupConfig?.branding?.logoDark;
 
   return (
     <div className="flex h-full flex-shrink-0 flex-col gap-2 border-r border-border-light bg-surface-primary-alt px-2 py-2">
@@ -135,10 +138,31 @@ function ExpandedPanel({
             variant="ghost"
             aria-label={localize(toggleLabel)}
             aria-expanded={expanded}
-            className="h-9 w-9 rounded-lg"
+            className="group/toggle h-9 w-9 rounded-lg"
             onClick={toggleClick}
           >
-            <Sidebar aria-hidden="true" className="h-5 w-5 text-text-primary" />
+            {hasLogo ? (
+              <>
+                <img
+                  src={startupConfig.branding?.logoLight}
+                  className="h-6 w-6 rounded object-contain group-hover/toggle:hidden dark:hidden"
+                  alt=""
+                  aria-hidden="true"
+                />
+                <img
+                  src={startupConfig.branding?.logoDark}
+                  className="hidden h-6 w-6 rounded object-contain group-hover/toggle:!hidden dark:block"
+                  alt=""
+                  aria-hidden="true"
+                />
+                <Sidebar
+                  aria-hidden="true"
+                  className="hidden h-5 w-5 text-text-primary group-hover/toggle:!block"
+                />
+              </>
+            ) : (
+              <Sidebar aria-hidden="true" className="h-5 w-5 text-text-primary" />
+            )}
           </Button>
         }
       />

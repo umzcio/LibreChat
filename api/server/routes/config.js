@@ -142,6 +142,10 @@ router.get('/', async function (req, res) {
         }
       }
 
+      if (baseConfig?.branding) {
+        payload.branding = baseConfig.branding;
+      }
+
       return res.status(200).send(payload);
     }
 
@@ -171,6 +175,10 @@ router.get('/', async function (req, res) {
         ? parseInt(process.env.CONVERSATION_IMPORT_MAX_FILE_SIZE_BYTES, 10)
         : 0,
     };
+
+    if (appConfig?.branding) {
+      payload.branding = appConfig.branding;
+    }
 
     const webSearch = buildWebSearchConfig(appConfig);
     if (webSearch) {
