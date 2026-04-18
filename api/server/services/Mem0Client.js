@@ -80,7 +80,7 @@ async function addMemories(messages, userId, options = {}) {
     }
     return result;
   } catch (error) {
-    logger.error('[Mem0] Failed to add memories:', error.message);
+    logger.error('[Mem0] Failed to add memories:', { message: error.message, name: error.name, code: error.code, stack: error.stack?.split('\n')[1] });
     return { results: [], relations: {} };
   }
 }
@@ -113,7 +113,7 @@ async function searchMemories(query, userId, options = {}) {
     });
     return result?.results?.results || result?.results || [];
   } catch (error) {
-    logger.error('[Mem0] Failed to search memories:', error.message);
+    logger.error('[Mem0] Failed to search memories:', { message: error.message, name: error.name, code: error.code });
     return [];
   }
 }

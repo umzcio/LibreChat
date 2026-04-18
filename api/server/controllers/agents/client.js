@@ -541,10 +541,6 @@ class AgentClient extends BaseClient {
    */
   async runMemory(messages) {
     try {
-      if (!this._mem0Enabled) {
-        return;
-      }
-
       const appConfig = this.options.req.config;
       const memoryConfig = appConfig.memory;
       if (!memoryConfig || memoryConfig.disabled === true) {
