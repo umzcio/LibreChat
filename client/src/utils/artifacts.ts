@@ -84,6 +84,32 @@ export function getArtifactWorkspaceFilename(type: string, language?: string): s
   return getArtifactFilename(type, language);
 }
 
+export function getDownloadFilename(artifact: Artifact): string {
+  const workspaceFilename = getArtifactWorkspaceFilename(artifact.type ?? '', artifact.language);
+  const ext = workspaceFilename.includes('.') ? workspaceFilename.slice(workspaceFilename.lastIndexOf('.')) : '';
+  const title = artifact.title?.trim();
+
+  if (!title) {
+    return workspaceFilename;
+  }
+
+  const sanitized = title
+    .replace(/[<>:"/\\|?*\x00-\x1f]+/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 100);
+
+  if (!sanitized) {
+    return workspaceFilename;
+  }
+
+  if (sanitized.endsWith(ext)) {
+    return sanitized;
+  }
+
+  return `${sanitized}${ext}`;
+}
+
 export function getArtifactWorkspacePath(artifact: Artifact): string {
   const title = sanitizeArtifactPathSegment(artifact.title ?? '', 'artifact');
   const identifier = sanitizeArtifactPathSegment(artifact.identifier ?? '', 'artifact');
@@ -249,6 +275,7 @@ export const sharedFiles = {
     <!DOCTYPE html>
     <html lang="en">
       <head>
+        <base target="_blank">
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Document</title>

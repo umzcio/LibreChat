@@ -7,18 +7,24 @@ function hasReactImport(content: string): boolean {
 }
 
 function buildSrcdoc(content: string): string {
+  const baseTag = '<base target="_blank">';
   if (content.trim().toLowerCase().startsWith('<!doctype') || content.trim().startsWith('<html')) {
-    if (!content.includes('tailwindcss.com') && !content.includes('tailwind')) {
-      return content.replace(
+    let result = content;
+    if (!result.includes('tailwindcss.com') && !result.includes('tailwind')) {
+      result = result.replace(
         /<head([^>]*)>/i,
         `<head$1><script src="${TAILWIND_CDN}"><\/script>`,
       );
     }
-    return content;
+    if (!result.includes('<base')) {
+      result = result.replace(/<head([^>]*)>/i, `<head$1>${baseTag}`);
+    }
+    return result;
   }
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
+  ${baseTag}
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <script src="${TAILWIND_CDN}"><\/script>
@@ -45,7 +51,7 @@ export const HtmlRenderer = memo(function HtmlRenderer({
   return (
     <iframe
       srcDoc={srcdoc}
-      sandbox="allow-scripts"
+      sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"
       className="h-full w-full border-0"
       title="HTML Preview"
     />
