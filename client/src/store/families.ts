@@ -346,6 +346,14 @@ const showMentionPopoverFamily = atomFamily(
   },
 );
 
+/** Returns `endpointType ?? endpoint`, matching the effective endpoint used for feature gating. */
+const effectiveEndpointByIndex = atomFamily((index: string | number) =>
+  atom((get) => {
+    const convo = get(conversationByIndex(index));
+    return convo?.endpointType ?? convo?.endpoint ?? null;
+  }),
+);
+
 const showPlusPopoverFamily = atomFamily(
   (_param: string | number | null) => {
     const a = atom<boolean>(false);
@@ -550,6 +558,7 @@ export default {
   allConversationsSelector,
   conversationIdByIndex,
   conversationEndpointByIndex,
+  effectiveEndpointByIndex,
   conversationModelByIndex,
   conversationSpecByIndex,
   conversationAgentIdByIndex,

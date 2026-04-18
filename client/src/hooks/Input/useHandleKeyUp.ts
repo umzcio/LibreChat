@@ -1,19 +1,31 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { PermissionTypes, Permissions } from 'librechat-data-provider';
+import { PermissionTypes, Permissions, isAssistantsEndpoint } from 'librechat-data-provider';
 import useHasAccess from '~/hooks/Roles/useHasAccess';
 import store from '~/store';
 
-/** Event Keys that shouldn't trigger a command */
+/** Event keys that shouldn't trigger a command */
 const invalidKeys = {
   Escape: true,
   Backspace: true,
   Enter: true,
+  ArrowUp: true,
+  ArrowLeft: true,
+  ArrowRight: true,
+  ArrowDown: true,
+  Home: true,
+  End: true,
+  Delete: true,
 };
 
 /**
- * Utility function to determine if a command should trigger.
+ * Determines if a command popover should trigger.
+ * Uses `startPos === 1` for normal typing speed (cursor right after the command char)
+ * and a short text-length fallback for fast typists whose keyup fires after the cursor
+ * has already moved past position 1. The length cap prevents false triggers from
+ * pasted content that happens to start with a command character.
  */
+const MAX_COMMAND_TRIGGER_LENGTH = 5;
 const shouldTriggerCommand = (
   textAreaRef: React.RefObject<HTMLTextAreaElement>,
   commandChar: string,
@@ -28,7 +40,7 @@ const shouldTriggerCommand = (
     return false;
   }
 
-  return startPos === 1;
+  return startPos === 1 || (startPos === text.length && text.length <= MAX_COMMAND_TRIGGER_LENGTH);
 };
 
 /**
@@ -37,13 +49,9 @@ const shouldTriggerCommand = (
 const useHandleKeyUp = ({
   index,
   textAreaRef,
-  setShowPlusPopover,
-  setShowMentionPopover,
 }: {
   index: number;
   textAreaRef: React.RefObject<HTMLTextAreaElement>;
-  setShowPlusPopover: (value: boolean | ((prev: boolean) => boolean)) => void;
-  setShowMentionPopover: (value: boolean | ((prev: boolean) => boolean)) => void;
 }) => {
   const hasPromptsAccess = useHasAccess({
     permissionType: PermissionTypes.PROMPTS,
@@ -54,12 +62,20 @@ const useHandleKeyUp = ({
     permission: Permissions.USE,
   });
   const latestParentMessageId = useAtomValue(store.latestMessageParentIdFamily(index));
+  const endpoint = useAtomValue(store.effectiveEndpointByIndex(index));
+  const setShowMentionPopover = useSetAtom(store.showMentionPopoverFamily(index));
+  const setShowPlusPopover = useSetAtom(store.showPlusPopoverFamily(index));
   const setShowPromptsPopover = useSetAtom(store.showPromptsPopoverFamily(index));
 
-  // Get the current state of command toggles
   const atCommandEnabled = useAtomValue(store.atCommand);
   const plusCommandEnabled = useAtomValue(store.plusCommand);
   const slashCommandEnabled = useAtomValue(store.slashCommand);
+
+  useEffect(() => {
+    if (isAssistantsEndpoint(endpoint)) {
+      setShowPlusPopover(false);
+    }
+  }, [endpoint, setShowPlusPopover]);
 
   const handleAtCommand = useCallback(() => {
     if (atCommandEnabled && shouldTriggerCommand(textAreaRef, '@')) {
@@ -68,13 +84,13 @@ const useHandleKeyUp = ({
   }, [textAreaRef, setShowMentionPopover, atCommandEnabled]);
 
   const handlePlusCommand = useCallback(() => {
-    if (!hasMultiConvoAccess || !plusCommandEnabled) {
+    if (!hasMultiConvoAccess || !plusCommandEnabled || isAssistantsEndpoint(endpoint)) {
       return;
     }
     if (shouldTriggerCommand(textAreaRef, '+')) {
       setShowPlusPopover(true);
     }
-  }, [textAreaRef, setShowPlusPopover, plusCommandEnabled, hasMultiConvoAccess]);
+  }, [textAreaRef, setShowPlusPopover, plusCommandEnabled, hasMultiConvoAccess, endpoint]);
 
   const handlePromptsCommand = useCallback(() => {
     if (!hasPromptsAccess || !slashCommandEnabled) {

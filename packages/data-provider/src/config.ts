@@ -1250,6 +1250,7 @@ const sharedOpenAIModels = [
 ];
 
 const sharedAnthropicModels = [
+  'claude-opus-4-7',
   'claude-sonnet-4-6',
   'claude-opus-4-6',
   'claude-sonnet-4-5',
@@ -1272,6 +1273,7 @@ const sharedAnthropicModels = [
 ];
 
 export const bedrockModels = [
+  'anthropic.claude-opus-4-7',
   'anthropic.claude-sonnet-4-6',
   'anthropic.claude-opus-4-6-v1',
   'anthropic.claude-sonnet-4-5-20250929-v1:0',
