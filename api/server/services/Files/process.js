@@ -225,6 +225,11 @@ const processDeleteRequest = async ({ req, files }) => {
   }
   if (resolvedFileIds.length > 0) {
     await db.deleteFiles(resolvedFileIds);
+    try {
+      await db.removeAgentResourceFilesFromAllAgents({ file_ids: resolvedFileIds });
+    } catch (error) {
+      logger.error('Error cleaning up orphaned agent file references', error);
+    }
   }
 };
 
