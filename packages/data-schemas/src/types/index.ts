@@ -26,6 +26,8 @@ export * from './prompts';
 /* Projects */
 export * from './project';
 export * from './workspace';
+/* Skills */
+export * from './skill';
 /* Access Control */
 export * from './accessRole';
 export * from './aclEntry';

@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 import { FileSources, LocalStorageKeys } from 'librechat-data-provider';
 import type { ExtendedFile } from '~/common';
+import useResetArtifactsOnConversationChange from '~/hooks/Artifacts/useResetArtifactsOnConversationChange';
 import DragDropWrapper from '~/components/Chat/Input/Files/DragDropWrapper';
 import { EditorProvider, ArtifactsProvider } from '~/Providers';
 import { useDeleteFilesMutation } from '~/data-provider';
@@ -19,6 +20,16 @@ export default function Presentation({
 }) {
   const artifacts = useAtomValue(store.artifactsState);
   const artifactsVisibility = useAtomValue(store.artifactsVisibility);
+  // Render-gating the panel on `currentArtifactId != null` (in addition
+  // to visibility + non-empty artifacts) means the side panel only opens
+  // when *something* is actively focused. Conversation navigation
+  // resets `currentArtifactId` to null, so the panel stays closed when
+  // a user revisits an old conversation full of artifacts. New artifacts
+  // arriving via SSE auto-focus through `ToolArtifactCard`'s mount effect
+  // (gated on `isSubmitting`), restoring the legacy streaming UX.
+  const currentArtifactId = useAtomValue(store.currentArtifactId);
+
+  useResetArtifactsOnConversationChange();
 
   const setFilesToDelete = useSetFilesToDelete();
 
@@ -58,7 +69,11 @@ export default function Presentation({
       return null;
     }
 
-    if (artifactsVisibility === true && Object.keys(artifacts ?? {}).length > 0) {
+    if (
+      artifactsVisibility === true &&
+      currentArtifactId != null &&
+      Object.keys(artifacts ?? {}).length > 0
+    ) {
       return (
         <ArtifactsProvider>
           <EditorProvider>
@@ -68,7 +83,7 @@ export default function Presentation({
       );
     }
     return null;
-  }, [showArtifactsPanel, artifactsVisibility, artifacts]);
+  }, [showArtifactsPanel, artifactsVisibility, artifacts, currentArtifactId]);
 
   return (
     <DragDropWrapper className="relative flex w-full grow overflow-hidden bg-presentation">

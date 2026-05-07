@@ -410,6 +410,27 @@ const audioRunFamily = atomFamily(
   },
 );
 
+const showSkillsPopoverFamily = atomFamily((_param: string | number | null) => {
+  const a = atom<boolean>(false);
+  a.debugLabel = 'showSkillsPopoverFamily';
+  return a;
+});
+
+/**
+ * Per-conversation queue of skill names the user invoked manually via the
+ * `$` popover for the next submission. Structured channel that the submit
+ * pipeline (`useChatFunctions.ask`) drains and pins onto the user message's
+ * `manualSkills` field (also echoed at the top of the payload for the
+ * runtime resolver), then resets to `[]`. Compose-time chips above the
+ * textarea read this atom directly so users see (and can dismiss) their
+ * current selection before hitting send.
+ */
+const pendingManualSkillsByConvoId = atomFamily((_param: string) => {
+  const a = atom<string[]>([]);
+  a.debugLabel = 'pendingManualSkillsByConvoId';
+  return a;
+});
+
 const messagesSiblingIdxFamily = atomFamily((_param: string | null | undefined) => {
   const a = atom<number>(0);
   a.debugLabel = 'messagesSiblingIdxFamily';
@@ -583,5 +604,7 @@ export default {
   useClearSubmissionState,
   useClearLatestMessages,
   showPromptsPopoverFamily,
+  showSkillsPopoverFamily,
+  pendingManualSkillsByConvoId,
   updateConversationSelector,
 };

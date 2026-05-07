@@ -35,6 +35,7 @@ export default function useClearStates() {
         jotaiStore.set(store.showMentionPopoverFamily(key), false);
         jotaiStore.set(store.showPlusPopoverFamily(key), false);
         jotaiStore.set(store.showPromptsPopoverFamily(key), false);
+        jotaiStore.set(store.showSkillsPopoverFamily(key), false);
         jotaiStore.set(store.activePromptByIndex(key), undefined);
         jotaiStore.set(store.globalAudioURLFamily(key), null);
         jotaiStore.set(store.globalAudioFetchingFamily(key), false);
@@ -42,6 +43,7 @@ export default function useClearStates() {
         jotaiStore.set(store.activeRunFamily(key), null);
         jotaiStore.set(store.audioRunFamily(key), null);
         jotaiStore.set(store.messagesSiblingIdxFamily(key.toString()), 0);
+        jotaiStore.set(store.pendingManualSkillsByConvoId(key.toString()), []);
       }
 
       clearLocalStorage(skipFirst);

@@ -41,6 +41,8 @@ export * from './projects';
 export * from './code';
 /* Prompts */
 export * from './prompts';
+/* Skills */
+export * from './skills';
 /* Endpoints */
 export * from './endpoints';
 /* Files */

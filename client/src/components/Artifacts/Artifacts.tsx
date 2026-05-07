@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import copy from 'copy-to-clipboard';
 import * as Tabs from '@radix-ui/react-tabs';
@@ -16,6 +16,8 @@ import DownloadArtifact from './DownloadArtifact';
 import ArtifactVersion from './ArtifactVersion';
 import ArtifactTabBar from './ArtifactTabBar';
 import ArtifactTabs from './ArtifactTabs';
+import { isCodeOnlyArtifact, isPreviewOnlyArtifact } from '~/utils/artifacts';
+import { displayFilename } from '~/components/Chat/Messages/Content/Parts/attachmentTypes';
 import { useLocalize } from '~/hooks';
 import { buildConversationPath, cn } from '~/utils';
 import store from '~/store';
@@ -47,18 +49,21 @@ export default function Artifacts() {
   const [panelMode, setPanelMode] = useAtom(store.artifactsPanelMode);
   const isFullscreen = panelMode === 'fullscreen' && !isMobile;
 
-  const tabOptions = [
-    {
-      value: 'code',
-      label: localize('com_ui_code'),
-      icon: <Code className="size-4" />,
-    },
-    {
-      value: 'preview',
-      label: localize('com_ui_preview'),
-      icon: <Play className="size-4" />,
-    },
-  ];
+  const allTabOptions = useMemo(
+    () => [
+      {
+        value: 'code',
+        label: localize('com_ui_code'),
+        icon: <Code className="size-4" />,
+      },
+      {
+        value: 'preview',
+        label: localize('com_ui_preview'),
+        icon: <Play className="size-4" />,
+      },
+    ],
+    [localize],
+  );
 
   useEffect(() => {
     setIsMounted(true);
@@ -111,6 +116,36 @@ export default function Artifacts() {
     orderedArtifactIds,
     setCurrentArtifactId,
   } = useArtifacts();
+
+  /* Office artifacts have no source view, and source-code artifacts have
+   * no useful rendered preview. Filter each down to the only meaningful
+   * tab and label that tab with the file name instead of generic
+   * "Code" / "Preview" choices. */
+  const isPreviewOnly = isPreviewOnlyArtifact(currentArtifact?.type);
+  const isCodeOnly = isCodeOnlyArtifact(currentArtifact?.type);
+  let constrainedTab: 'preview' | 'code' | null = null;
+  if (isPreviewOnly) {
+    constrainedTab = 'preview';
+  } else if (isCodeOnly) {
+    constrainedTab = 'code';
+  }
+  const displayedTab = constrainedTab ?? activeTab;
+  const tabOptions = useMemo(() => {
+    if (constrainedTab == null) {
+      return allTabOptions;
+    }
+    const filename = displayFilename(currentArtifact?.title);
+    const tab = allTabOptions.find((opt) => opt.value === constrainedTab);
+    if (!tab) {
+      return allTabOptions;
+    }
+    return [filename ? { ...tab, label: filename } : tab];
+  }, [allTabOptions, constrainedTab, currentArtifact?.title]);
+  useEffect(() => {
+    if (constrainedTab != null && activeTab !== constrainedTab) {
+      setActiveTab(constrainedTab);
+    }
+  }, [constrainedTab, activeTab, setActiveTab]);
 
   const handleCopyArtifact = useCallback(() => {
     const content = currentArtifact?.content ?? '';
@@ -220,8 +255,13 @@ export default function Artifacts() {
   };
 
   const panelContent = (
-    <Tabs.Root value={activeTab} onValueChange={setActiveTab} asChild>
-      <div className={cn('flex flex-col', isFullscreen ? 'fixed inset-0 z-[200] h-screen w-screen' : 'h-full w-full')}>
+    <Tabs.Root value={displayedTab} onValueChange={setActiveTab} asChild>
+      <div
+        className={cn(
+          'flex flex-col',
+          isFullscreen ? 'fixed inset-0 z-[200] h-screen w-screen' : 'h-full w-full',
+        )}
+      >
         {/* Mobile backdrop with dynamic blur */}
         {isMobile && (
           <div
@@ -291,9 +331,9 @@ export default function Artifacts() {
               >
                 <Radio
                   options={tabOptions}
-                  value={activeTab}
+                  value={displayedTab}
                   onChange={setActiveTab}
-                  disabled={isMutating && activeTab !== 'code'}
+                  disabled={isMutating && displayedTab !== 'code'}
                   buttonClassName="h-9 px-3 gap-1.5"
                 />
               </div>
@@ -306,7 +346,7 @@ export default function Artifacts() {
                 isVisible && !isClosing ? 'translate-x-0 opacity-100' : 'translate-x-2 opacity-0',
               )}
             >
-              {activeTab === 'preview' && (
+              {displayedTab === 'preview' && (
                 <Button
                   size="icon"
                   variant="ghost"
@@ -326,7 +366,7 @@ export default function Artifacts() {
                   )}
                 </Button>
               )}
-              {activeTab !== 'preview' && isMutating && (
+              {displayedTab !== 'preview' && isMutating && (
                 <RefreshCw size={16} className="animate-spin text-text-secondary" />
               )}
               {canOpenInCode ? (
@@ -422,9 +462,9 @@ export default function Artifacts() {
               <Radio
                 fullWidth
                 options={tabOptions}
-                value={activeTab}
+                value={displayedTab}
                 onChange={setActiveTab}
-                disabled={isMutating && activeTab !== 'code'}
+                disabled={isMutating && displayedTab !== 'code'}
               />
             </div>
           )}

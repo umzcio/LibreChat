@@ -64,6 +64,10 @@ export enum PermissionTypes {
    * Type for Project Permissions
    */
   PROJECTS = 'PROJECTS',
+  /**
+   * Type for Skill Permissions
+   */
+  SKILLS = 'SKILLS',
 }
 
 /**
@@ -87,6 +91,7 @@ export const PERMISSION_TYPE_INTERFACE_FIELDS: Record<PermissionTypes, string> =
   [PermissionTypes.MCP_SERVERS]: 'mcpServers',
   [PermissionTypes.REMOTE_AGENTS]: 'remoteAgents',
   [PermissionTypes.PROJECTS]: 'projects',
+  [PermissionTypes.SKILLS]: 'skills',
 };
 
 /** Set of interface config field names that correspond to role permissions. */
@@ -231,6 +236,14 @@ export const projectPermissionsSchema = z.object({
 });
 export type TProjectPermissions = z.infer<typeof projectPermissionsSchema>;
 
+export const skillPermissionsSchema = z.object({
+  [Permissions.USE]: z.boolean().default(true),
+  [Permissions.CREATE]: z.boolean().default(true),
+  [Permissions.SHARE]: z.boolean().default(false),
+  [Permissions.SHARE_PUBLIC]: z.boolean().default(false),
+});
+export type TSkillPermissions = z.infer<typeof skillPermissionsSchema>;
+
 // Define a single permissions schema that holds all permission types.
 export const permissionsSchema = z.object({
   [PermissionTypes.PROMPTS]: promptPermissionsSchema,
@@ -248,4 +261,5 @@ export const permissionsSchema = z.object({
   [PermissionTypes.MCP_SERVERS]: mcpServersPermissionsSchema,
   [PermissionTypes.REMOTE_AGENTS]: remoteAgentsPermissionsSchema,
   [PermissionTypes.PROJECTS]: projectPermissionsSchema,
+  [PermissionTypes.SKILLS]: skillPermissionsSchema,
 });

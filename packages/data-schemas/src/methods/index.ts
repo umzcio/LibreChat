@@ -53,6 +53,20 @@ import { createPromptMethods, type PromptMethods, type PromptDeps } from './prom
 /* Projects */
 import { createProjectMethods, type ProjectMethods } from './project';
 import { createWorkspaceMethods, type WorkspaceMethods } from './workspace';
+/* Skills */
+import {
+  createSkillMethods,
+  type SkillMethods,
+  type SkillDeps,
+  type CreateSkillInput,
+  type CreateSkillResult,
+  type UpdateSkillInput,
+  type UpsertSkillFileInput,
+  type ListSkillsByAccessParams,
+  type ListSkillsByAccessResult,
+  type UpdateSkillResult,
+  type ValidationIssue,
+} from './skill';
 /* Tier 5 — Agent */
 import { createAgentMethods, type AgentMethods, type AgentDeps } from './agent';
 /* Config */
@@ -92,6 +106,7 @@ export type AllMethods = UserMethods &
   TransactionMethods &
   SpendTokensMethods &
   PromptMethods &
+  SkillMethods &
   AgentMethods &
   ProjectMethods &
   WorkspaceMethods &
@@ -166,6 +181,12 @@ export function createMethods(
   };
   const promptMethods = createPromptMethods(mongoose, promptDeps);
 
+  const skillDeps: SkillDeps = {
+    removeAllPermissions,
+    getSoleOwnedResourceIds: aclEntryMethods.getSoleOwnedResourceIds,
+  };
+  const skillMethods = createSkillMethods(mongoose, skillDeps);
+
   // Role methods with optional cache injection
   const roleDeps: RoleDeps = { getCache: deps.getCache };
   const roleMethods = createRoleMethods(mongoose, roleDeps);
@@ -218,6 +239,8 @@ export function createMethods(
     /* Projects */
     ...createProjectMethods(mongoose),
     ...createWorkspaceMethods(mongoose),
+    /* Skills */
+    ...skillMethods,
     /* Tier 5 */
     ...agentMethods,
     /* Config */
@@ -256,6 +279,16 @@ export type {
   TransactionMethods,
   SpendTokensMethods,
   PromptMethods,
+  SkillMethods,
+  SkillDeps,
+  CreateSkillInput,
+  CreateSkillResult,
+  UpdateSkillInput,
+  UpsertSkillFileInput,
+  ListSkillsByAccessParams,
+  ListSkillsByAccessResult,
+  UpdateSkillResult,
+  ValidationIssue,
   AgentMethods,
   ProjectMethods,
   WorkspaceMethods,
