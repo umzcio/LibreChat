@@ -1,18 +1,22 @@
 import React from 'react';
 import { RecoilRoot, useRecoilCallback } from 'recoil';
-import { render, screen, act, waitFor } from '@testing-library/react';
-import SubagentCall from '../SubagentCall';
-import { subagentProgressByToolCallId, type SubagentProgress } from '~/store/subagents';
+import { render, screen, act, fireEvent, waitFor, within } from '@testing-library/react';
+import type { SubagentUpdateEvent } from 'librechat-data-provider';
+import type {
+  SubagentContentPart,
+  SubagentTickerState,
+  SubagentAggregatorState,
+} from '~/utils/subagentContent';
+import type { SubagentProgress } from '~/store/subagents';
+
 import {
   foldSubagentEvent,
   foldSubagentEventIntoTicker,
   initSubagentAggregatorState,
   initSubagentTickerState,
-  type SubagentContentPart,
-  type SubagentAggregatorState,
-  type SubagentTickerState,
 } from '~/utils/subagentContent';
-import type { SubagentUpdateEvent } from 'librechat-data-provider';
+import { subagentProgressByToolCallId } from '~/store/subagents';
+import SubagentCall, { SUBAGENT_TICKER_THROTTLE_MS } from '../SubagentCall';
 
 jest.mock('~/hooks', () => ({
   useLocalize:
@@ -31,12 +35,15 @@ jest.mock('~/hooks', () => ({
         com_ui_subagent_dialog_description: 'Isolated child run.',
         com_ui_subagent_no_result_yet: 'No result yet.',
         com_ui_subagent_empty_result: 'No text.',
+        com_ui_collapse: 'Collapse',
+        com_ui_expand: 'Expand',
         com_ui_subagent_ticker_writing: 'Writing',
         com_ui_subagent_ticker_reasoning: 'Reasoning',
         com_ui_subagent_ticker_error: 'Error',
         com_ui_subagent_ticker_using: 'Using',
         com_ui_subagent_ticker_tool_done: 'done',
         com_ui_subagent_ticker_tool_output: `${arg0} → ${arg1}`,
+        com_ui_prompt: 'Prompt',
       };
       return translations[key] ?? key;
     },
@@ -65,28 +72,43 @@ jest.mock('~/components/Chat/Messages/Content/ToolCall', () => ({
   ),
 }));
 
+jest.mock('~/components/Chat/Messages/Content/MarkdownLite', () => ({
+  __esModule: true,
+  default: ({ content }: { content: string }) => <div data-testid="prompt-markdown">{content}</div>,
+}));
+
 jest.mock('../Attachment', () => ({
   AttachmentGroup: ({ attachments }: { attachments: unknown }) => (
     <div data-testid="attachment-group">{JSON.stringify(attachments)}</div>
   ),
 }));
 
-jest.mock('@librechat/client', () => ({
-  OGDialog: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  OGDialogContent: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="dialog-content">{children}</div>
-  ),
-  OGDialogTitle: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="dialog-title">{children}</div>
-  ),
-  OGDialogDescription: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="dialog-description">{children}</div>
-  ),
-}));
+jest.mock(
+  '@librechat/client',
+  () => ({
+    OGDialog: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    OGDialogContent: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="dialog-content">{children}</div>
+    ),
+    OGDialogTitle: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="dialog-title">{children}</div>
+    ),
+    OGDialogDescription: ({ children }: { children: React.ReactNode }) => (
+      <div data-testid="dialog-description">{children}</div>
+    ),
+  }),
+  { virtual: true },
+);
 
 jest.mock('lucide-react', () => ({
   // eslint-disable-next-line i18next/no-literal-string
+  ArrowDown: () => <span>arrow-down</span>,
+  // eslint-disable-next-line i18next/no-literal-string
   ChevronRight: () => <span>chevron</span>,
+  // eslint-disable-next-line i18next/no-literal-string
+  Maximize2: () => <span>maximize</span>,
+  // eslint-disable-next-line i18next/no-literal-string
+  Minimize2: () => <span>minimize</span>,
   // eslint-disable-next-line i18next/no-literal-string
   Users: () => <span>users</span>,
 }));
@@ -112,6 +134,10 @@ jest.mock('~/utils', () => ({
   ...jest.requireActual('~/utils/toolLabels'),
   cn: (...classes: unknown[]) => classes.filter(Boolean).join(' '),
 }));
+
+afterEach(() => {
+  jest.useRealTimers();
+});
 
 /** The dialog wraps single parts in `Container` and grouped tool_calls in
  *  `ToolCallGroup`. Stub both as transparent wrappers so the tests still
@@ -211,10 +237,13 @@ function renderWithState(args: {
       />
     </RecoilRoot>,
   );
-  act(() => {
-    setter.current?.(args.progress ?? null);
-  });
-  return rendered;
+  const setProgress = (next: SubagentProgress | null) => {
+    act(() => {
+      setter.current?.(next);
+    });
+  };
+  setProgress(args.progress ?? null);
+  return { ...rendered, setProgress };
 }
 
 describe('SubagentCall — status resolution', () => {
@@ -425,9 +454,86 @@ describe('SubagentCall — ticker', () => {
     /** Only one "Writing:" label, not three — deltas collapse into one live line. */
     expect(screen.getAllByText('Writing:')).toHaveLength(1);
   });
+
+  it('refreshes long live previews after the subagent ticker throttle window', () => {
+    jest.useFakeTimers();
+    const firstPreview = 'First live preview '.repeat(8).trim();
+    const secondPreview = 'Second live preview '.repeat(8).trim();
+    const eventForText = (text: string): SubagentUpdateEvent => ({
+      runId: 'p',
+      subagentRunId: 'run_a',
+      subagentType: 'self',
+      subagentAgentId: 'child',
+      phase: 'message_delta',
+      data: { delta: { content: [{ type: 'text', text }] } },
+      timestamp: '',
+    });
+    const progressForText = (text: string): SubagentProgress =>
+      progressFromEvents({
+        subagentRunId: 'run_a',
+        subagentType: 'self',
+        status: 'message_delta',
+        events: [eventForText(text)],
+      });
+
+    const { setProgress } = renderWithState({
+      toolCallId: 'call_throttled_writing',
+      initialProgress: 0.3,
+      isSubmitting: true,
+      progress: progressForText(firstPreview),
+    });
+    const ticker = within(screen.getByRole('button', { name: 'Running agent' }));
+
+    expect(ticker.getByText(firstPreview)).toBeInTheDocument();
+    setProgress(progressForText(secondPreview));
+    expect(ticker.getByText(firstPreview)).toBeInTheDocument();
+    expect(ticker.queryByText(secondPreview)).not.toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(SUBAGENT_TICKER_THROTTLE_MS - 1);
+    });
+    expect(ticker.getByText(firstPreview)).toBeInTheDocument();
+    expect(ticker.queryByText(secondPreview)).not.toBeInTheDocument();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(ticker.getByText(secondPreview)).toBeInTheDocument();
+  });
 });
 
 describe('SubagentCall — dialog content', () => {
+  it('renders the prompt through MarkdownLite and expands it inline with the activity area', () => {
+    render(
+      <RecoilRoot>
+        <SubagentCall
+          toolCallId="call_prompt"
+          initialProgress={1}
+          isSubmitting={false}
+          output="final answer"
+          args={{
+            subagent_type: 'self',
+            description: '# Review prompt\n\n**Focus:** edge cases',
+          }}
+        />
+      </RecoilRoot>,
+    );
+
+    expect(screen.getByTestId('prompt-markdown')).toHaveTextContent('# Review prompt');
+    expect(screen.getByText('final answer')).toBeInTheDocument();
+
+    const expandButton = screen.getByRole('button', { name: 'Expand' });
+    expect(expandButton).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(expandButton);
+
+    expect(screen.getByRole('button', { name: 'Collapse' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByText('final answer')).toBeInTheDocument();
+  });
+
   it('renders aggregated text, reasoning, and tool_call parts through leaf renderers', () => {
     renderWithState({
       toolCallId: 'call_dialog',

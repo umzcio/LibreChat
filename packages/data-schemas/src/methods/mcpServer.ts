@@ -59,7 +59,7 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
       ...(tenantId != null && { tenantId }),
     })
       .select('serverName')
-      .lean();
+      .lean<Array<{ serverName: string }>>();
 
     if (existing.length === 0) {
       return baseName;
@@ -145,7 +145,10 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
     tenantId?: string,
   ): Promise<MCPServerDocument | null> {
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
-    return await MCPServer.findOne({ serverName, ...(tenantId != null && { tenantId }) }).lean();
+    return await MCPServer.findOne({
+      serverName,
+      ...(tenantId != null && { tenantId }),
+    }).lean<MCPServerDocument>();
   }
 
   /**
@@ -157,7 +160,7 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
     _id: string | Types.ObjectId,
   ): Promise<MCPServerDocument | null> {
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
-    return await MCPServer.findById(_id).lean();
+    return await MCPServer.findById(_id).lean<MCPServerDocument>();
   }
 
   /**
@@ -169,7 +172,9 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
     authorId: string | Types.ObjectId,
   ): Promise<MCPServerDocument[]> {
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
-    return await MCPServer.find({ author: authorId }).sort({ updatedAt: -1 }).lean();
+    return await MCPServer.find({ author: authorId })
+      .sort({ updatedAt: -1 })
+      .lean<MCPServerDocument[]>();
   }
 
   /**
@@ -235,7 +240,9 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
 
     if (normalizedLimit === null) {
       // No pagination - return all matching servers
-      const servers = await MCPServer.find(baseQuery).sort({ updatedAt: -1, _id: 1 }).lean();
+      const servers = await MCPServer.find(baseQuery)
+        .sort({ updatedAt: -1, _id: 1 })
+        .lean<MCPServerDocument[]>();
 
       return {
         data: servers,
@@ -248,7 +255,7 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
     const servers = await MCPServer.find(baseQuery)
       .sort({ updatedAt: -1, _id: 1 })
       .limit(normalizedLimit + 1)
-      .lean();
+      .lean<MCPServerDocument[]>();
 
     const hasMore = servers.length > normalizedLimit;
     const data = hasMore ? servers.slice(0, normalizedLimit) : servers;
@@ -287,7 +294,7 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
       { serverName, ...(tenantId != null && { tenantId }) },
       { $set: updateData },
       { new: true, runValidators: true },
-    ).lean();
+    ).lean<MCPServerDocument>();
   }
 
   /**
@@ -300,7 +307,10 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
     tenantId?: string,
   ): Promise<MCPServerDocument | null> {
     const MCPServer = mongoose.models.MCPServer as Model<MCPServerDocument>;
-    return await MCPServer.findOneAndDelete({ serverName, ...(tenantId != null && { tenantId }) }).lean();
+    return await MCPServer.findOneAndDelete({
+      serverName,
+      ...(tenantId != null && { tenantId }),
+    }).lean<MCPServerDocument>();
   }
 
   /**
@@ -324,7 +334,7 @@ export function createMCPServerMethods(mongoose: typeof import('mongoose')) {
     const servers = await MCPServer.find({
       serverName: { $in: names },
       ...(tenantId != null && { tenantId }),
-    }).lean();
+    }).lean<MCPServerDocument[]>();
     return { data: servers };
   }
 

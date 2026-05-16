@@ -412,7 +412,7 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         ...(targetMessageId && { targetMessageId }),
       });
 
-      return { shareId, conversationId };
+      return { shareId, conversationId, targetMessageId };
     } catch (error) {
       if (error instanceof ShareServiceError) {
         throw error;
@@ -441,14 +441,19 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
     try {
       const SharedLink = mongoose.models.SharedLink as Model<t.ISharedLink>;
       const share = (await SharedLink.findOne({ conversationId, user, isPublic: true })
-        .select('shareId -_id')
-        .lean()) as { shareId?: string } | null;
+        .select('shareId targetMessageId -_id')
+        .sort({ updatedAt: -1 })
+        .lean()) as { shareId?: string; targetMessageId?: string } | null;
 
       if (!share) {
         return { shareId: null, success: false };
       }
 
-      return { shareId: share.shareId || null, success: true };
+      return {
+        shareId: share.shareId || null,
+        targetMessageId: share.targetMessageId,
+        success: true,
+      };
     } catch (error) {
       logger.error('[getSharedLink] Error getting shared link', {
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -462,7 +467,11 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
   /**
    * Update a shared link with new messages
    */
-  async function updateSharedLink(user: string, shareId: string): Promise<t.UpdateShareResult> {
+  async function updateSharedLink(
+    user: string,
+    shareId: string,
+    targetMessageId?: string,
+  ): Promise<t.UpdateShareResult> {
     if (!user || !shareId) {
       throw new ShareServiceError('Missing required parameters', 'INVALID_PARAMS');
     }
@@ -483,10 +492,12 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         .lean();
 
       const newShareId = nanoid();
+      const resolvedTargetMessageId = targetMessageId ?? share.targetMessageId;
       const update = {
         messages: updatedMessages,
         user,
         shareId: newShareId,
+        ...(resolvedTargetMessageId && { targetMessageId: resolvedTargetMessageId }),
       };
 
       const updatedShare = (await SharedLink.findOneAndUpdate({ shareId, user }, update, {
@@ -499,7 +510,13 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         throw new ShareServiceError('Share update failed', 'SHARE_UPDATE_ERROR');
       }
 
-      return { shareId: newShareId, conversationId: updatedShare.conversationId };
+      anonymizeConvo(updatedShare);
+
+      return {
+        shareId: newShareId,
+        conversationId: updatedShare.conversationId,
+        targetMessageId: updatedShare.targetMessageId,
+      };
     } catch (error) {
       logger.error('[updateSharedLink] Error updating shared link', {
         error: error instanceof Error ? error.message : 'Unknown error',

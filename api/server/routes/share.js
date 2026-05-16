@@ -80,6 +80,7 @@ router.get(
     return res.status(200).json({
       success: share.success,
       shareId: share.shareId,
+      targetMessageId: share.targetMessageId,
       conversationId: req.params.conversationId,
     });
   }),
@@ -103,7 +104,12 @@ router.patch(
   '/:shareId',
   requireJwtAuth,
   asyncHandler(async (req, res) => {
-    const updatedShare = await updateSharedLink(req.user.id, req.params.shareId);
+    const { targetMessageId } = req.body ?? {};
+    if (targetMessageId !== undefined && typeof targetMessageId !== 'string') {
+      return res.status(400).json({ message: 'targetMessageId must be a string' });
+    }
+
+    const updatedShare = await updateSharedLink(req.user.id, req.params.shareId, targetMessageId);
     if (updatedShare) {
       res.status(200).json(updatedShare);
     } else {
