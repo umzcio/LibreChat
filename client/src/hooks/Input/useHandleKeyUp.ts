@@ -4,6 +4,7 @@ import { PermissionTypes, Permissions, isAssistantsEndpoint } from 'librechat-da
 import useAgentCapabilities from '~/hooks/Agents/useAgentCapabilities';
 import useGetAgentsConfig from '~/hooks/Agents/useGetAgentsConfig';
 import useHasAccess from '~/hooks/Roles/useHasAccess';
+import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import store from '~/store';
 
 /** Event keys that shouldn't trigger a command */

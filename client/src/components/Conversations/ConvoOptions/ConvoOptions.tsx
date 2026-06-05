@@ -13,7 +13,7 @@ import {
   useGetStartupConfig,
   useArchiveConvoMutation,
 } from '~/data-provider';
-import { useLocalize, useNavigateToConvo, useNewConvo } from '~/hooks';
+import { useHasAccess, useLocalize, useNavigateToConvo, useNewConvo } from '~/hooks';
 import { NotificationSeverity } from '~/common';
 import MoveToProjectDialog from '~/components/Projects/MoveToProjectDialog';
 import DeleteButton from './DeleteButton';
@@ -22,6 +22,7 @@ import { buildConversationPath, cn, getConversationModeFromPath } from '~/utils'
 
 function ConvoOptions({
   conversationId,
+  chatProjectId,
   title,
   retainView,
   renameHandler,
@@ -33,6 +34,7 @@ function ConvoOptions({
   projectId,
 }: {
   conversationId: string | null;
+  chatProjectId?: string | null;
   title: string | null;
   retainView: () => void;
   renameHandler: (e: MouseEvent) => void;
@@ -62,6 +64,11 @@ function ConvoOptions({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [announcement, setAnnouncement] = useState('');
+
+  const canCreateSharedLinks = useHasAccess({
+    permissionType: PermissionTypes.SHARED_LINKS,
+    permission: Permissions.CREATE,
+  });
 
   const archiveConvoMutation = useArchiveConvoMutation();
 
@@ -211,7 +218,7 @@ function ConvoOptions({
         label: localize('com_ui_share'),
         onClick: shareHandler,
         icon: <Share2 className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
-        show: startupConfig && startupConfig.sharedLinksEnabled,
+        show: startupConfig && startupConfig.sharedLinksEnabled && canCreateSharedLinks,
         ariaHasPopup: 'dialog' as const,
         ariaControls: 'share-conversation-dialog',
         /** NOTE: THE FOLLOWING PROPS ARE REQUIRED FOR MENU ITEMS THAT OPEN DIALOGS */
@@ -336,6 +343,7 @@ function ConvoOptions({
       isArchiveLoading,
       isDuplicateLoading,
       handleArchiveClick,
+      canCreateSharedLinks,
       handleDuplicateClick,
       projectId,
       conversationId,
@@ -459,6 +467,7 @@ export default memo(ConvoOptions, (prevProps, nextProps) => {
   return (
     prevProps.conversationId === nextProps.conversationId &&
     prevProps.title === nextProps.title &&
+    prevProps.chatProjectId === nextProps.chatProjectId &&
     prevProps.isPopoverActive === nextProps.isPopoverActive &&
     prevProps.isActiveConvo === nextProps.isActiveConvo &&
     prevProps.isShiftHeld === nextProps.isShiftHeld &&

@@ -34,7 +34,7 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   const [isSubmitting, setIsSubmitting] = useAtom(store.isSubmittingFamily(index));
   const [latestMessage, setLatestMessage] = useAtom(store.latestMessageFamily(index));
 
-  const latestMessageId = latestMessage?.messageId;
+  const latestMessageId = useLatestMessageId(index, queryParam) ?? undefined;
   const latestMessageDepth = latestMessage?.depth;
   const latestMessageRef = useRef(latestMessage);
   latestMessageRef.current = latestMessage;
@@ -45,9 +45,9 @@ export default function useChatHelpers(index = 0, paramId?: string) {
 
   const setMessages = useCallback(
     (messages: TMessage[]) => {
-      queryClient.setQueryData<TMessage[]>([QueryKeys.messages, queryParam], messages);
-      if (queryParam === 'new' && conversationId && conversationId !== 'new') {
-        queryClient.setQueryData<TMessage[]>([QueryKeys.messages, conversationId], messages);
+      const messageCacheIds = getMessageCacheIds({ queryParam, conversationId, messages });
+      for (const messageCacheId of messageCacheIds) {
+        queryClient.setQueryData<TMessage[]>([QueryKeys.messages, messageCacheId], messages);
       }
     },
     [queryParam, queryClient, conversationId],
@@ -87,7 +87,6 @@ export default function useChatHelpers(index = 0, paramId?: string) {
     conversation,
     latestMessage,
     setSubmission,
-    setLatestMessage,
   });
 
   const askRef = useRef(_ask);
@@ -213,8 +212,6 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       setSiblingIdx,
       latestMessageId,
       latestMessageDepth,
-      setLatestMessage,
-      resetLatestMessage,
       ask,
       index,
       regenerate,
@@ -246,8 +243,6 @@ export default function useChatHelpers(index = 0, paramId?: string) {
       setSiblingIdx,
       latestMessageId,
       latestMessageDepth,
-      setLatestMessage,
-      resetLatestMessage,
       ask,
       index,
       regenerate,

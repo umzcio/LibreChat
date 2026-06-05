@@ -5,6 +5,8 @@ const {
   isEnabled,
   resolveImportMaxFileSize,
   restoreTenantContextFromReq,
+  deleteAllSharedLinksWithCleanup,
+  deleteConvoSharedLinksWithCleanup,
 } = require('@librechat/api');
 const { logger } = require('@librechat/data-schemas');
 const { CacheKeys, EModelEndpoint } = require('librechat-data-provider');
@@ -39,6 +41,9 @@ router.get(
     const search = req.query.search ? decodeURIComponent(req.query.search) : undefined;
     const sortBy = req.query.sortBy || 'updatedAt';
     const sortDirection = req.query.sortDirection || 'desc';
+    const projectId = Array.isArray(req.query.projectId)
+      ? req.query.projectId[0]
+      : req.query.projectId;
 
     let tags;
     if (req.query.tags) {
@@ -53,6 +58,7 @@ router.get(
       search,
       sortBy,
       sortDirection,
+      projectId,
     });
     res.status(200).json(result);
   }),
@@ -137,7 +143,7 @@ router.delete(
     const dbResponse = await db.deleteConvos(req.user.id, filter);
     if (filter.conversationId) {
       await db.deleteToolCalls(req.user.id, filter.conversationId);
-      await db.deleteConvoSharedLink(req.user.id, filter.conversationId);
+      await deleteConvoSharedLinksWithCleanup(req.user.id, filter.conversationId);
     }
     res.status(201).json(dbResponse);
   }),
@@ -148,7 +154,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const dbResponse = await db.deleteConvos(req.user.id, {});
     await db.deleteToolCalls(req.user.id);
-    await db.deleteAllSharedLinks(req.user.id);
+    await deleteAllSharedLinksWithCleanup(req.user.id);
     res.status(201).json(dbResponse);
   }),
 );
@@ -265,6 +271,7 @@ router.post(
         filepath: req.file.path,
         requestUserId: req.user.id,
         userRole: req.user.role,
+        interfaceConfig: req.config?.interfaceConfig,
       });
       res.status(201).json({ message: 'Conversation(s) imported successfully' });
     } catch (error) {

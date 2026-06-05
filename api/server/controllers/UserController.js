@@ -7,6 +7,7 @@ const {
   MCPTokenStorage,
   normalizeHttpError,
   extractWebSearchEnvVars,
+  deleteAllSharedLinksWithCleanup,
 } = require('@librechat/api');
 const {
   Tools,
@@ -26,17 +27,47 @@ const { getAppConfig } = require('~/server/services/Config');
 const { getLogStores } = require('~/cache');
 const db = require('~/models');
 
+const PUBLIC_USER_RESPONSE_FIELDS = [
+  '_id',
+  'id',
+  'name',
+  'username',
+  'email',
+  'emailVerified',
+  'avatar',
+  'provider',
+  'role',
+  'plugins',
+  'twoFactorEnabled',
+  'termsAccepted',
+  'personalization',
+  'favorites',
+  'skillStates',
+  'createdAt',
+  'updatedAt',
+  'tenantId',
+];
+
+const sanitizeUserForResponse = (user) => {
+  const source = user.toObject != null ? user.toObject() : user;
+  return PUBLIC_USER_RESPONSE_FIELDS.reduce((userData, field) => {
+    if (source[field] !== undefined) {
+      userData[field] = source[field];
+    }
+    return userData;
+  }, {});
+};
+
 const getUserController = async (req, res) => {
-  const appConfig = await getAppConfig({ role: req.user?.role, tenantId: req.user?.tenantId });
+  const appConfig =
+    req.config ??
+    (await getAppConfig({
+      role: req.user?.role,
+      userId: req.user?.id,
+      tenantId: req.user?.tenantId,
+    }));
   /** @type {IUser} */
-  const userData = req.user.toObject != null ? req.user.toObject() : { ...req.user };
-  /**
-   * These fields should not exist due to secure field selection, but deletion
-   * is done in case of alternate database incompatibility with Mongo API
-   * */
-  delete userData.password;
-  delete userData.totpSecret;
-  delete userData.backupCodes;
+  const userData = sanitizeUserForResponse(req.user);
   if (appConfig.fileStrategy === FileSources.s3 && userData.avatar) {
     const avatarNeedsRefresh = needsRefresh(userData.avatar, 3600);
     if (!avatarNeedsRefresh) {
@@ -166,7 +197,13 @@ const deleteUserMcpServers = async (userId) => {
 };
 
 const updateUserPluginsController = async (req, res) => {
-  const appConfig = await getAppConfig({ role: req.user?.role, tenantId: req.user?.tenantId });
+  const appConfig =
+    req.config ??
+    (await getAppConfig({
+      role: req.user?.role,
+      userId: req.user?.id,
+      tenantId: req.user?.tenantId,
+    }));
   const { user } = req;
   const { pluginKey, action, auth, isEntityTool } = req.body;
   try {
@@ -322,7 +359,7 @@ const deleteUserController = async (req, res) => {
       () => db.deletePresets(user.id),
       () => db.deleteConvos(user.id),
       () => deleteUserPluginAuth(user.id, null, true),
-      () => db.deleteAllSharedLinks(user.id),
+      () => deleteAllSharedLinksWithCleanup(user.id),
       () => deleteUserFiles(req),
       () => db.deleteFiles(null, user.id),
       () => db.deleteToolCalls(user.id),

@@ -55,7 +55,6 @@ export default function useChatFunctions({
   isSubmitting,
   latestMessage,
   setSubmission,
-  setLatestMessage,
   conversation: immutableConversation,
 }: {
   index?: number;
@@ -130,7 +129,6 @@ export default function useChatFunctions({
     } = {},
   ) => {
     setShowStopButton(false);
-    resetLatestMultiMessage();
 
     text = text.trim();
     if (!!isSubmitting || text === '') {
@@ -168,12 +166,13 @@ export default function useChatFunctions({
      *    a prior turn, not compose a new one).
      *  - Fresh submit → drain the per-convo atom into the message.
      */
-    const manualSkills =
-      overrideManualSkills != null
-        ? overrideManualSkills
-        : isRegenerate || isContinued || isEdited
+    let manualSkills = overrideManualSkills;
+    if (manualSkills == null) {
+      manualSkills =
+        isRegenerate || isContinued || isEdited
           ? []
           : drainPendingManualSkills(conversationId ?? Constants.NEW_CONVO);
+    }
     const isEditOrContinue = isEdited || isContinued;
 
     let currentMessages: TMessage[] | null = overrideMessages ?? getMessages() ?? [];
@@ -184,6 +183,13 @@ export default function useChatFunctions({
         user,
       });
     }
+
+    const chatProjectId =
+      conversationId === Constants.NEW_CONVO
+        ? getRouteChatProjectId()
+        : (conversation?.chatProjectId ?? null);
+    const conversationForPayload =
+      chatProjectId != null ? { ...(conversation ?? {}), chatProjectId } : (conversation ?? {});
 
     // construct the query message
     // this is not a real messageId, it is used as placeholder before real messageId returned
@@ -239,7 +245,7 @@ export default function useChatFunctions({
     const convo = parseCompactConvo({
       endpoint: endpoint as EndpointSchemaKey,
       endpointType: endpointType as EndpointSchemaKey,
-      conversation: conversation ?? {},
+      conversation: conversationForPayload,
       defaultParamsEndpoint,
     });
 
@@ -252,6 +258,7 @@ export default function useChatFunctions({
         overrideUserMessageId,
       },
       convo,
+      chatProjectId ? { chatProjectId } : {},
     ) as TEndpointOption;
     if (endpoint !== EModelEndpoint.agents) {
       endpointOption.key = getExpiry();
@@ -389,6 +396,7 @@ export default function useChatFunctions({
     const submission: TSubmission = {
       conversation: {
         ...conversation,
+        ...(chatProjectId ? { chatProjectId } : {}),
         conversationId,
       },
       endpointOption,
@@ -413,9 +421,6 @@ export default function useChatFunctions({
       setMessages([...submission.messages, initialResponse]);
     } else {
       setMessages([...submission.messages, currentMsg, initialResponse]);
-    }
-    if (index === 0 && setLatestMessage) {
-      setLatestMessage(initialResponse);
     }
 
     setSubmission(submission);

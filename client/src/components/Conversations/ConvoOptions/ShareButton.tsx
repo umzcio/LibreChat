@@ -5,9 +5,9 @@ import { Copy, CopyCheck } from 'lucide-react';
 import { useGetSharedLinkQuery } from 'librechat-data-provider/react-query';
 import { OGDialogTemplate, Button, Spinner, OGDialog } from '@librechat/client';
 import { useLocalize, useCopyToClipboard } from '~/hooks';
+import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import SharedLinkButton from './SharedLinkButton';
 import { buildShareLinkUrl, cn } from '~/utils';
-import store from '~/store';
 
 export default function ShareButton({
   conversationId,
@@ -37,12 +37,13 @@ export default function ShareButton({
   };
   const latestMessageId = useAtomValue(store.latestMessageIdFamily(0));
   const { data: share, isLoading } = useGetSharedLinkQuery(conversationId);
+  const shareId = share?.shareId ?? '';
 
   useEffect(() => {
-    if (share?.shareId !== undefined) {
-      setSharedLink(buildShareLinkUrl(share.shareId));
+    if (shareId) {
+      setSharedLink(buildShareLinkUrl(shareId));
     }
-  }, [share]);
+  }, [shareId]);
 
   const button =
     isLoading === true ? null : (
@@ -55,8 +56,6 @@ export default function ShareButton({
         setSharedLink={setSharedLink}
       />
     );
-
-  const shareId = share?.shareId ?? '';
 
   return (
     <OGDialog open={open} onOpenChange={onOpenChange} triggerRef={triggerRef}>
@@ -95,7 +94,12 @@ export default function ShareButton({
 
               {shareId && (
                 <div className="flex items-center gap-2 rounded-md bg-surface-secondary p-2">
-                  <div className="flex-1 break-all text-sm text-text-secondary">{sharedLink}</div>
+                  <div
+                    className="flex-1 break-all text-sm text-text-secondary"
+                    data-testid="shared-link-url"
+                  >
+                    {sharedLink}
+                  </div>
                   <span className="sr-only" aria-live="polite" aria-atomic="true">
                     {announcement}
                   </span>

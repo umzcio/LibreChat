@@ -14,6 +14,7 @@ import {
 } from '~/hooks';
 import { useConversationsInfiniteQuery, useTitleGeneration } from '~/data-provider';
 import { Conversations } from '~/components/Conversations';
+import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
 import SearchBar from '~/components/Nav/SearchBar';
 import store from '~/store';
 
@@ -104,7 +105,7 @@ const ConversationsSection = memo(() => {
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col overflow-hidden pb-3"
+      className="flex h-full min-h-0 flex-col overflow-hidden pb-3 pt-2"
       role="region"
       aria-label={localize('com_ui_chat_history')}
     >
@@ -116,6 +117,11 @@ const ConversationsSection = memo(() => {
         )}
         {search.enabled && <SearchBar isSmallScreen={isSmallScreen} />}
       </div>
+      {!search.query && (
+        <div className="px-3">
+          <FavoritesList isSmallScreen={isSmallScreen} toggleNav={toggleNav} />
+        </div>
+      )}
       <div className="flex min-h-0 flex-grow flex-col overflow-hidden">
         <Conversations
           conversations={conversations}
@@ -127,6 +133,7 @@ const ConversationsSection = memo(() => {
           isSearchLoading={isSearchLoading}
           isChatsExpanded={isChatsExpanded}
           setIsChatsExpanded={setIsChatsExpanded}
+          showFavorites={false}
         />
       </div>
     </div>

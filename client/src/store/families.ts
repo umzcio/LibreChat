@@ -4,13 +4,7 @@ import { useStore, useAtomValue, useSetAtom } from 'jotai';
 import { createSearchParams } from 'react-router-dom';
 import { atomFamily, selectAtom, RESET } from 'jotai/utils';
 import { LocalStorageKeys, isEphemeralAgentId, Constants } from 'librechat-data-provider';
-import type {
-  EModelEndpoint,
-  TConversation,
-  TSubmission,
-  TMessage,
-  TPreset,
-} from 'librechat-data-provider';
+import type { EModelEndpoint, TConversation, TSubmission, TPreset } from 'librechat-data-provider';
 import type { TOptionSettings, ExtendedFile } from '~/common';
 import {
   clearModelForNonEphemeralAgent,
@@ -573,7 +567,6 @@ export default {
   isSubmittingFamily,
   optionSettingsFamily,
   showPopoverFamily,
-  latestMessageFamily,
   messagesSiblingIdxFamily,
   anySubmittingSelector,
   allConversationsSelector,
@@ -602,7 +595,6 @@ export default {
   showPlusPopoverFamily,
   activePromptByIndex,
   useClearSubmissionState,
-  useClearLatestMessages,
   showPromptsPopoverFamily,
   showSkillsPopoverFamily,
   pendingManualSkillsByConvoId,

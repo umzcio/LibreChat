@@ -260,7 +260,8 @@ export function createUserMethods(mongoose: typeof import('mongoose')) {
       return [];
     }
 
-    const escaped = escapeRegExp(searchPattern.trim());
+    const trimmedPattern = searchPattern.trim();
+    const escaped = escapeRegExp(trimmedPattern);
     const regex = new RegExp(escaped, 'i');
     const User = mongoose.models.User;
 
@@ -276,7 +277,7 @@ export function createUserMethods(mongoose: typeof import('mongoose')) {
 
     // Score results by relevance
     const exactRegex = new RegExp(`^${escaped}$`, 'i');
-    const startsWithPattern = searchPattern.trim().toLowerCase();
+    const startsWithPattern = trimmedPattern.toLowerCase();
 
     const scoredUsers = users.map((user) => {
       const searchableFields = [user.name, user.email, user.username].filter(
@@ -289,7 +290,7 @@ export function createUserMethods(mongoose: typeof import('mongoose')) {
         let score = 0;
 
         // Exact match gets highest score
-        if (exactRegex.test(field)) {
+        if (fieldLower === startsWithPattern) {
           score = 100;
         }
         // Starts with query gets high score
@@ -300,7 +301,7 @@ export function createUserMethods(mongoose: typeof import('mongoose')) {
         else if (fieldLower.includes(startsWithPattern)) {
           score = 50;
         }
-        // Default score for regex match
+        // Default score for database match
         else {
           score = 10;
         }

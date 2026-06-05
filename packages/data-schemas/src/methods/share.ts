@@ -4,6 +4,7 @@ import type { FilterQuery, Model } from 'mongoose';
 import type { SchemaWithMeiliMethods } from '~/models/plugins/mongoMeili';
 import type * as t from '~/types';
 import logger from '~/config/winston';
+import { activeExpirationFilter } from '~/utils/retention';
 
 class ShareServiceError extends Error {
   code: string;
@@ -24,62 +25,135 @@ function createAnonymizer(prefix: string) {
   };
 }
 
-interface Anonymizers {
-  convoId: (id: string) => string;
-  assistantId: (id: string) => string;
-  messageId: (id: string) => string;
+const anonymizeAssistantId = createAnonymizer('a');
+
+/**
+ * Storage- and identity-internal fields that must never be exposed through a
+ * public shared link. Everything else on a file/attachment — including the
+ * `filepath`/`preview` render URLs, dimensions, and tool-call payloads such as
+ * `toolCallId` and search results — is render data the shared view needs, so it
+ * is preserved. (`storageKey` is the raw object key and is dropped; `filepath`
+ * is the URL the share renderer actually loads, so it is kept.)
+ */
+const SENSITIVE_SHARED_FILE_FIELDS = new Set([
+  '_id',
+  '__v',
+  'user',
+  'tenantId',
+  'storageRegion',
+  'storageKey',
+  'temp_file_id',
+  'message',
+  'source',
+  'filterSource',
+  'context',
+  'embedded',
+  'usage',
+  'metadata',
+]);
+
+/**
+ * Strip storage/identity-internal fields from a file or attachment while keeping
+ * render-relevant data (including tool-call payloads keyed by tool name).
+ */
+function sanitizeSharedFile(value: unknown): t.SharedFile | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+
+  const result: t.SharedFile = {};
+  for (const [key, fieldValue] of Object.entries(value as Record<string, unknown>)) {
+    if (!SENSITIVE_SHARED_FILE_FIELDS.has(key)) {
+      result[key] = fieldValue;
+    }
+  }
+
+  return Object.keys(result).length > 0 ? result : null;
 }
 
-function createRequestAnonymizers(): Anonymizers {
-  const convoId = createAnonymizer('convo');
-  const assistantId = createAnonymizer('a');
-  const msgAnonymizer = createAnonymizer('msg');
-  const messageId = (id: string) => (id === Constants.NO_PARENT ? id : msgAnonymizer(id));
-  return { convoId, assistantId, messageId };
+function sanitizeSharedFiles(files: unknown): t.SharedFile[] | undefined {
+  if (!Array.isArray(files)) {
+    return undefined;
+  }
+
+  const sanitized = files
+    .map(sanitizeSharedFile)
+    .filter((file): file is t.SharedFile => file != null);
+
+  return sanitized.length > 0 ? sanitized : undefined;
 }
 
-function anonymizeMessages(
-  messages: t.IMessage[],
-  newConvoId: string,
-  anon: Anonymizers,
-): t.IMessage[] {
+/**
+ * Only surface a model name when it is an (already-anonymized) assistant id;
+ * otherwise omit it so the underlying provider/model is not disclosed.
+ */
+function anonymizeSharedModel(model?: string): string | undefined {
+  if (!model?.startsWith('asst_')) {
+    return undefined;
+  }
+  return anonymizeAssistantId(model);
+}
+
+const anonymizeConvoId = createAnonymizer('convo');
+const anonymizeMessageIdInner = createAnonymizer('msg');
+const anonymizeMessageId = (id: string) =>
+  id === Constants.NO_PARENT ? id : anonymizeMessageIdInner(id);
+
+/**
+ * Build the public, anonymized view of shared messages. An allowlist of
+ * render-relevant fields keeps internal message fields (endpoint,
+ * conversationSignature, clientId, plugin(s), metadata, etc.) out of the
+ * payload, while user files and tool-call attachments are sanitized field by
+ * field so render data (uploaded files, `toolCallId`, search results, generated
+ * outputs) is preserved without leaking storage internals.
+ */
+function anonymizeMessages(messages: t.IMessage[], newConvoId: string): t.SharedMessage[] {
   if (!Array.isArray(messages)) {
     return [];
   }
 
   const idMap = new Map<string, string>();
   return messages.map((message) => {
-    const newMessageId = anon.messageId(message.messageId);
+    const newMessageId = anonymizeMessageId(message.messageId);
     idMap.set(message.messageId, newMessageId);
 
-    type MessageAttachment = {
-      messageId?: string;
-      conversationId?: string;
-      [key: string]: unknown;
-    };
-
-    const anonymizedAttachments = (message.attachments as MessageAttachment[])?.map(
-      (attachment) => {
-        return {
-          ...attachment,
-          messageId: newMessageId,
-          conversationId: newConvoId,
-        };
-      },
-    );
+    const attachments = sanitizeSharedFiles(message.attachments)?.map((attachment) => ({
+      ...attachment,
+      messageId: newMessageId,
+      conversationId: newConvoId,
+    }));
+    // Persisted file records can carry the original conversation/message ids;
+    // rewrite them to the anonymized ids so shared files don't expose them.
+    const files = sanitizeSharedFiles(message.files)?.map((file) => ({
+      ...file,
+      ...(file.conversationId !== undefined && { conversationId: newConvoId }),
+      ...(file.messageId !== undefined && { messageId: newMessageId }),
+    }));
+    const model = anonymizeSharedModel(message.model);
 
     return {
-      ...message,
       messageId: newMessageId,
       parentMessageId:
         idMap.get(message.parentMessageId || '') ||
-        anon.messageId(message.parentMessageId || ''),
+        anonymizeMessageId(message.parentMessageId || ''),
       conversationId: newConvoId,
-      model: message.model?.startsWith('asst_')
-        ? anon.assistantId(message.model)
-        : message.model,
-      attachments: anonymizedAttachments,
-    } as t.IMessage;
+      sender: message.sender,
+      text: message.text,
+      content: message.content,
+      ...(message.iconURL && { iconURL: message.iconURL }),
+      ...(model && { model }),
+      isCreatedByUser: message.isCreatedByUser,
+      createdAt: message.createdAt,
+      updatedAt: message.updatedAt,
+      tokenCount: message.tokenCount,
+      unfinished: message.unfinished,
+      error: message.error,
+      finish_reason: message.finish_reason,
+      ...(message.manualSkills && { manualSkills: message.manualSkills }),
+      ...(message.alwaysAppliedSkills && { alwaysAppliedSkills: message.alwaysAppliedSkills }),
+      ...(files && { files }),
+      ...(attachments && { attachments }),
+    };
   });
 }
 
@@ -157,12 +231,19 @@ function getMessagesUpToTarget(messages: t.IMessage[], targetMessageId: string):
 /** Factory function that takes mongoose instance and returns the methods */
 export function createShareMethods(mongoose: typeof import('mongoose')) {
   /**
-   * Get shared messages for a public share link
+   * Get shared messages for a share link
    */
-  async function getSharedMessages(shareId: string): Promise<t.SharedMessagesResult | null> {
+  async function getSharedMessages(
+    shareId: string,
+    shareObjectId?: string,
+  ): Promise<t.SharedMessagesResult | null> {
     try {
       const SharedLink = mongoose.models.SharedLink as Model<t.ISharedLink>;
-      const share = (await SharedLink.findOne({ shareId, isPublic: true })
+      const query = shareObjectId
+        ? SharedLink.findOne({ _id: shareObjectId, ...activeExpirationFilter<t.ISharedLink>() })
+        : SharedLink.findOne({ shareId, ...activeExpirationFilter<t.ISharedLink>() });
+
+      const share = (await query
         .populate({
           path: 'messages',
           select: '-_id -__v -user',
@@ -170,7 +251,7 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         .select('-_id -__v -user')
         .lean()) as (t.ISharedLink & { messages: t.IMessage[] }) | null;
 
-      if (!share?.conversationId || !share.isPublic) {
+      if (!share?.conversationId) {
         return null;
       }
 
@@ -180,16 +261,14 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         messagesToShare = getMessagesUpToTarget(share.messages, share.targetMessageId);
       }
 
-      const anon = createRequestAnonymizers();
-      const newConvoId = anon.convoId(share.conversationId);
+      const newConvoId = anonymizeConvoId(share.conversationId);
       const result: t.SharedMessagesResult = {
         shareId: share.shareId || shareId,
         title: share.title,
-        isPublic: share.isPublic,
         createdAt: share.createdAt,
         updatedAt: share.updatedAt,
         conversationId: newConvoId,
-        messages: anonymizeMessages(messagesToShare, newConvoId, anon),
+        messages: anonymizeMessages(messagesToShare, newConvoId),
       };
 
       return result;
@@ -209,7 +288,6 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
     user: string,
     pageParam?: Date,
     pageSize: number = 10,
-    isPublic: boolean = true,
     sortBy: string = 'createdAt',
     sortDirection: string = 'desc',
     search?: string,
@@ -217,7 +295,10 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
     try {
       const SharedLink = mongoose.models.SharedLink as Model<t.ISharedLink>;
       const Conversation = mongoose.models.Conversation as SchemaWithMeiliMethods;
-      const query: FilterQuery<t.ISharedLink> = { user, isPublic };
+      const query: FilterQuery<t.ISharedLink> = {
+        user,
+        ...activeExpirationFilter<t.ISharedLink>(),
+      };
 
       if (pageParam) {
         if (sortDirection === 'desc') {
@@ -276,7 +357,6 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         links: links.map((link) => ({
           shareId: link.shareId || '',
           title: link?.title || 'Untitled',
-          isPublic: link.isPublic,
           createdAt: link.createdAt || new Date(),
           conversationId: link.conversationId,
         })),
@@ -295,13 +375,18 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
   /**
    * Delete all shared links for a user
    */
-  async function deleteAllSharedLinks(user: string): Promise<t.DeleteAllSharesResult> {
+  async function deleteAllSharedLinks(
+    user: string,
+  ): Promise<t.DeleteAllSharesResult & { deletedIds: string[] }> {
     try {
       const SharedLink = mongoose.models.SharedLink as Model<t.ISharedLink>;
+      const links = await SharedLink.find({ user }).select('_id').lean();
+      const ids = links.map((l) => l._id.toString());
       const result = await SharedLink.deleteMany({ user });
       return {
         message: 'All shared links deleted successfully',
         deletedCount: result.deletedCount,
+        deletedIds: ids,
       };
     } catch (error) {
       logger.error('[deleteAllSharedLinks] Error deleting shared links', {
@@ -318,17 +403,20 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
   async function deleteConvoSharedLink(
     user: string,
     conversationId: string,
-  ): Promise<t.DeleteAllSharesResult> {
+  ): Promise<t.DeleteAllSharesResult & { deletedIds: string[] }> {
     if (!user || !conversationId) {
       throw new ShareServiceError('Missing required parameters', 'INVALID_PARAMS');
     }
 
     try {
       const SharedLink = mongoose.models.SharedLink as Model<t.ISharedLink>;
+      const links = await SharedLink.find({ user, conversationId }).select('_id').lean();
+      const ids = links.map((l) => l._id.toString());
       const result = await SharedLink.deleteMany({ user, conversationId });
       return {
         message: 'Shared links deleted successfully',
         deletedCount: result.deletedCount,
+        deletedIds: ids,
       };
     } catch (error) {
       logger.error('[deleteConvoSharedLink] Error deleting shared links', {
@@ -347,6 +435,7 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
     user: string,
     conversationId: string,
     targetMessageId?: string,
+    expiredAt?: Date,
   ): Promise<t.CreateShareResult> {
     if (!user || !conversationId) {
       throw new ShareServiceError('Missing required parameters', 'INVALID_PARAMS');
@@ -360,7 +449,7 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         SharedLink.findOne({
           conversationId,
           user,
-          isPublic: true,
+          ...activeExpirationFilter<t.ISharedLink>(),
           ...(targetMessageId && { targetMessageId }),
         })
           .select('-_id -__v -user')
@@ -368,19 +457,13 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         Message.find({ conversationId, user }).sort({ createdAt: 1 }).lean(),
       ]);
 
-      if (existingShare && existingShare.isPublic) {
+      if (existingShare) {
         logger.error('[createSharedLink] Share already exists', {
           user,
           conversationId,
           targetMessageId,
         });
         throw new ShareServiceError('Share already exists', 'SHARE_EXISTS');
-      } else if (existingShare) {
-        await SharedLink.deleteOne({
-          conversationId,
-          user,
-          ...(targetMessageId && { targetMessageId }),
-        });
       }
 
       const conversation = (await Conversation.findOne({ conversationId, user }).lean()) as {
@@ -403,16 +486,17 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
       const title = conversation.title || 'Untitled';
 
       const shareId = nanoid();
-      await SharedLink.create({
+      const created = await SharedLink.create({
         shareId,
         conversationId,
         messages: conversationMessages,
         title,
         user,
         ...(targetMessageId && { targetMessageId }),
+        ...(expiredAt && { expiredAt }),
       });
 
-      return { shareId, conversationId, targetMessageId };
+      return { _id: created._id.toString(), shareId, conversationId, targetMessageId };
     } catch (error) {
       if (error instanceof ShareServiceError) {
         throw error;
@@ -440,16 +524,25 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
 
     try {
       const SharedLink = mongoose.models.SharedLink as Model<t.ISharedLink>;
-      const share = (await SharedLink.findOne({ conversationId, user, isPublic: true })
-        .select('shareId targetMessageId -_id')
+      const share = (await SharedLink.findOne({
+        conversationId,
+        user,
+        ...activeExpirationFilter<t.ISharedLink>(),
+      })
+        .select('shareId targetMessageId _id')
         .sort({ updatedAt: -1 })
-        .lean()) as { shareId?: string; targetMessageId?: string } | null;
+        .lean()) as {
+        shareId?: string;
+        targetMessageId?: string;
+        _id?: import('mongoose').Types.ObjectId;
+      } | null;
 
       if (!share) {
         return { shareId: null, success: false };
       }
 
       return {
+        _id: share._id?.toString(),
         shareId: share.shareId || null,
         targetMessageId: share.targetMessageId,
         success: true,
@@ -471,6 +564,7 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
     user: string,
     shareId: string,
     targetMessageId?: string,
+    expiredAt?: Date | null,
   ): Promise<t.UpdateShareResult> {
     if (!user || !shareId) {
       throw new ShareServiceError('Missing required parameters', 'INVALID_PARAMS');
@@ -492,12 +586,17 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
         .lean();
 
       const newShareId = nanoid();
+      const hasNewExpiration = expiredAt instanceof Date;
       const resolvedTargetMessageId = targetMessageId ?? share.targetMessageId;
       const update = {
-        messages: updatedMessages,
-        user,
-        shareId: newShareId,
-        ...(resolvedTargetMessageId && { targetMessageId: resolvedTargetMessageId }),
+        $set: {
+          messages: updatedMessages,
+          user,
+          shareId: newShareId,
+          ...(resolvedTargetMessageId && { targetMessageId: resolvedTargetMessageId }),
+          ...(hasNewExpiration && { expiredAt }),
+        },
+        ...(expiredAt === null ? { $unset: { expiredAt: 1 } } : {}),
       };
 
       const updatedShare = (await SharedLink.findOneAndUpdate({ shareId, user }, update, {
@@ -513,6 +612,7 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
       anonymizeConvo(updatedShare);
 
       return {
+        _id: updatedShare._id?.toString(),
         shareId: newShareId,
         conversationId: updatedShare.conversationId,
         targetMessageId: updatedShare.targetMessageId,
@@ -550,6 +650,7 @@ export function createShareMethods(mongoose: typeof import('mongoose')) {
       }
 
       return {
+        _id: result._id?.toString(),
         success: true,
         shareId,
         message: 'Share deleted successfully',

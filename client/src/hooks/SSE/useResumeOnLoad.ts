@@ -2,9 +2,46 @@ import { useEffect, useRef } from 'react';
 import { useSetAtom, useAtomValue } from 'jotai';
 import { Constants, tMessageSchema, isAssistantsEndpoint } from 'librechat-data-provider';
 import type { TMessage, TConversation, TSubmission, Agents } from 'librechat-data-provider';
+import type { StreamStatusResponse } from '~/data-provider';
 import { useStreamStatus } from '~/data-provider';
 import { logger } from '~/utils';
 import store from '~/store';
+
+function hasSubmissionUserMessage(
+  submission: TSubmission | null,
+  messages: TMessage[] | undefined,
+  conversationId: string | undefined,
+): boolean {
+  const userMessageId = submission?.userMessage?.messageId;
+  if (!userMessageId || !conversationId || !messages?.length) {
+    return false;
+  }
+
+  return messages.some(
+    (message) =>
+      message.isCreatedByUser === true &&
+      message.messageId === userMessageId &&
+      message.conversationId === conversationId,
+  );
+}
+
+function resumeStateMatchesSubmission(
+  streamStatus: StreamStatusResponse | undefined,
+  submission: TSubmission | null,
+): boolean {
+  const resumeState = streamStatus?.resumeState;
+  if (!resumeState || !submission) {
+    return false;
+  }
+
+  const userMessageId = submission.userMessage?.messageId;
+  if (userMessageId && resumeState.userMessage?.messageId === userMessageId) {
+    return true;
+  }
+
+  const responseMessageId = submission.initialResponse?.messageId;
+  return !!responseMessageId && resumeState.responseMessageId === responseMessageId;
+}
 
 /**
  * Build a submission object from resume state for reconnected streams.
@@ -114,14 +151,21 @@ export default function useResumeOnLoad(
   const processedConvoRef = useRef<string | null>(null);
 
   // Check for active stream when conversation changes
-  // Allow check if no submission OR submission is for a different conversation (stale)
   const submissionConvoId = currentSubmission?.conversation?.conversationId;
-  const hasActiveSubmissionForThisConvo = currentSubmission && submissionConvoId === conversationId;
+  const loadedMessages = messagesLoaded ? getMessages() : undefined;
+  const hasExplicitSubmissionMatch = !!conversationId && submissionConvoId === conversationId;
+  const hasHydratedMessageMatch =
+    submissionConvoId == null &&
+    hasSubmissionUserMessage(currentSubmission, loadedMessages, conversationId);
+  const hasActiveSubmissionForThisConvo =
+    !!currentSubmission && (hasExplicitSubmissionMatch || hasHydratedMessageMatch);
+  const hasStaleSubmissionForDifferentConvo =
+    !!currentSubmission && submissionConvoId != null && submissionConvoId !== conversationId;
 
   const shouldCheck =
     resumableEnabled &&
     messagesLoaded && // Wait for messages to load before checking
-    !hasActiveSubmissionForThisConvo && // Allow if no submission or stale submission
+    !hasActiveSubmissionForThisConvo && // Allow if no submission or a confirmed stale submission
     !!conversationId &&
     conversationId !== Constants.NEW_CONVO &&
     processedConvoRef.current !== conversationId; // Don't re-check processed convos
@@ -185,6 +229,21 @@ export default function useResumeOnLoad(
       return;
     }
 
+    if (
+      streamStatus.active &&
+      streamStatus.streamId &&
+      submissionConvoId == null &&
+      resumeStateMatchesSubmission(streamStatus, currentSubmission)
+    ) {
+      console.log('[ResumeOnLoad] Skipping - active submission matches stream status', {
+        streamId: streamStatus.streamId,
+        currentConvoId: conversationId,
+        userMessageId: currentSubmission?.userMessage?.messageId,
+      });
+      processedConvoRef.current = conversationId;
+      return;
+    }
+
     // Don't process the same conversation twice
     if (processedConvoRef.current === conversationId) {
       logger.log('ResumeOnLoad', 'Skipping - already processed this conversation');
@@ -244,6 +303,7 @@ export default function useResumeOnLoad(
     messagesLoaded,
     hasActiveSubmissionForThisConvo,
     submissionConvoId,
+    hasStaleSubmissionForDifferentConvo,
     currentSubmission,
     isSuccess,
     isFetching,

@@ -3,6 +3,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { replaceSpecialVars } from 'librechat-data-provider';
 import { useChatContext, useChatFormContext, useAddedChatContext } from '~/Providers';
 import { useAuthContext } from '~/hooks/AuthContext';
+import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import { mainTextareaId } from '~/common';
 import { logger } from '~/utils';
 import store from '~/store';

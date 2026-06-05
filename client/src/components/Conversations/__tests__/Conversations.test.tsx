@@ -94,12 +94,19 @@ jest.mock('~/hooks', () => ({
     return [defaultValue, jest.fn()];
   },
   useShowMarketplace: () => mockShowMarketplace,
+  useNewConvo: () => ({ newConversation: jest.fn() }),
   TranslationKeys: {},
+}));
+
+jest.mock('@tanstack/react-query', () => ({
+  useQueryClient: () => ({ invalidateQueries: jest.fn() }),
 }));
 
 jest.mock('@librechat/client', () => ({
   Spinner: () => <div data-testid="spinner" />,
   useMediaQuery: () => false,
+  TooltipAnchor: ({ render }: { render: React.ReactNode }) => render,
+  NewChatIcon: () => <svg data-testid="new-chat-icon" />,
 }));
 
 jest.mock('~/data-provider', () => ({

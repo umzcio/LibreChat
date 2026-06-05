@@ -24,12 +24,8 @@ export function ArtifactsProvider({ children, value }: ArtifactsProviderProps) {
   const conversationId = useAtomValue(store.conversationIdByIndex(0));
 
   const chatLatestMessageText = useMemo(() => {
-    return getLatestText({
-      text: latestMessage?.text ?? null,
-      content: latestMessage?.content ?? null,
-      messageId: latestMessage?.messageId ?? null,
-    } as TMessage);
-  }, [latestMessage?.messageId, latestMessage?.text, latestMessage?.content]);
+    return getLatestText(latestMessage);
+  }, [latestMessage]);
 
   const defaultContextValue = useMemo<ArtifactsContextValue>(
     () => ({

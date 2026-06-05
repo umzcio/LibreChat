@@ -13,6 +13,7 @@ import AgentMarketplace from '~/components/Agents/Marketplace';
 import CodePage from '~/components/Code/CodePage';
 import { OAuthSuccess, OAuthError } from '~/components/OAuth';
 import { AuthContextProvider } from '~/hooks/AuthContext';
+import WithRum from '~/lib/rum/WithRum';
 import RouteErrorBoundary from './RouteErrorBoundary';
 import StartupLayout from './Layouts/Startup';
 import LoginLayout from './Layouts/Login';
@@ -25,7 +26,9 @@ import Root from './Root';
 
 const AuthLayout = () => (
   <AuthContextProvider>
-    <Outlet />
+    <WithRum>
+      <Outlet />
+    </WithRum>
     <ApiErrorWatcher />
   </AuthContextProvider>
 );
@@ -39,6 +42,7 @@ const loadSkillsView = () =>
   import('~/components/Skills/layouts/SkillsView').then((m) => ({
     Component: m.default,
   }));
+
 
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
@@ -166,6 +170,10 @@ export const router = createBrowserRouter(
             },
             {
               path: 'skills',
+              lazy: loadSkillsView,
+            },
+            {
+              path: 'skills/new',
               lazy: loadSkillsView,
             },
             {

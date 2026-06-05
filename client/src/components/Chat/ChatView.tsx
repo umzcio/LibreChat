@@ -4,10 +4,16 @@ import { useForm } from 'react-hook-form';
 import { Spinner } from '@librechat/client';
 import { useParams } from 'react-router-dom';
 import { Constants, buildTree } from 'librechat-data-provider';
-import type { TMessage } from 'librechat-data-provider';
+import type { TChatProject, TMessage } from 'librechat-data-provider';
 import type { ChatFormValues } from '~/common';
 import { ChatContext, AddedChatContext, ChatFormProvider, useFileMapContext } from '~/Providers';
-import { useAddedResponse, useResumeOnLoad, useAdaptiveSSE, useChatHelpers } from '~/hooks';
+import {
+  useAddedResponse,
+  useResumeOnLoad,
+  useAdaptiveSSE,
+  useChatHelpers,
+  useLocalize,
+} from '~/hooks';
 import ConversationStarters from './Input/ConversationStarters';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
@@ -46,16 +52,20 @@ function ChatView({
 
   const fileMap = useFileMapContext();
 
-  const { data: messagesTree = null, isLoading } = useGetMessagesByConvoId(conversationId ?? '', {
-    select: useCallback(
-      (data: TMessage[]) => {
-        const dataTree = buildTree({ messages: data, fileMap });
-        return dataTree?.length === 0 ? null : (dataTree ?? null);
-      },
-      [fileMap],
-    ),
-    enabled: !!fileMap,
-  });
+  const { data: messagesTree = null, isLoading } = useGetMessagesByConvoId(
+    conversationId ?? '',
+    {
+      select: useCallback(
+        (data: TMessage[]) => {
+          const dataTree = buildTree({ messages: data, fileMap });
+          return dataTree?.length === 0 ? null : (dataTree ?? null);
+        },
+        [fileMap],
+      ),
+      enabled: !!fileMap,
+    },
+    { isStreaming: isSubmitting },
+  );
 
   const chatHelpers = useChatHelpers(index, conversationId);
   const addedChatHelpers = useAddedResponse();

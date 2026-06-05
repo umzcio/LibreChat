@@ -14,12 +14,7 @@ import store from '~/store';
 
 type ChatHelpers = Pick<
   EventHandlerParams,
-  | 'setMessages'
-  | 'getMessages'
-  | 'setConversation'
-  | 'setIsSubmitting'
-  | 'newConversation'
-  | 'resetLatestMessage'
+  'setMessages' | 'getMessages' | 'setConversation' | 'setIsSubmitting' | 'newConversation'
 >;
 
 export default function useSSE(
@@ -42,14 +37,8 @@ export default function useSSE(
   const setAbortScroll = useSetAtom(store.abortScrollFamily(runIndex));
   const setShowStopButton = useSetAtom(store.showStopButtonByIndex(runIndex));
 
-  const {
-    setMessages,
-    getMessages,
-    setConversation,
-    setIsSubmitting,
-    newConversation,
-    resetLatestMessage,
-  } = chatHelpers;
+  const { setMessages, getMessages, setConversation, setIsSubmitting, newConversation } =
+    chatHelpers;
 
   const {
     clearStepMaps,
@@ -60,6 +49,7 @@ export default function useSSE(
     messageHandler,
     contentHandler,
     createdHandler,
+    titleHandler,
     attachmentHandler,
     abortConversation,
   } = useEventHandlers({
@@ -71,7 +61,6 @@ export default function useSSE(
     setIsSubmitting,
     newConversation,
     setShowStopButton,
-    resetLatestMessage,
   });
 
   const { data: startupConfig } = useGetStartupConfig();
@@ -138,6 +127,8 @@ export default function useSSE(
         };
 
         createdHandler(data, { ...submission, userMessage } as EventSubmission);
+      } else if (data.event === 'title') {
+        titleHandler(data);
       } else if (data.event != null) {
         stepHandler(data, { ...submission, userMessage } as EventSubmission);
       } else if (data.sync != null) {

@@ -49,6 +49,7 @@ export enum ResourceType {
   REMOTE_AGENT = 'remoteAgent',
   PROJECT = 'project',
   SKILL = 'skill',
+  SHARED_LINK = 'sharedLink',
 }
 
 /**
@@ -87,6 +88,8 @@ export enum AccessRoleIds {
   SKILL_VIEWER = 'skill_viewer',
   SKILL_EDITOR = 'skill_editor',
   SKILL_OWNER = 'skill_owner',
+  SHARED_LINK_VIEWER = 'sharedLink_viewer',
+  SHARED_LINK_OWNER = 'sharedLink_owner',
 }
 
 // ===== ZOD SCHEMAS =====
@@ -149,7 +152,7 @@ export const resourcePermissionsResponseSchema = z.object({
 export const updateResourcePermissionsRequestSchema = z.object({
   updated: principalSchema.array(),
   removed: principalSchema.array(),
-  public: z.boolean(),
+  public: z.boolean().optional(),
   publicAccessRoleId: z.string().optional(),
 });
 
@@ -161,7 +164,7 @@ export const updateResourcePermissionsResponseSchema = z.object({
   message: z.string(),
   results: z.object({
     principals: principalSchema.array(),
-    public: z.boolean(),
+    public: z.boolean().optional(),
     publicAccessRoleId: z.string().optional(),
   }),
 });
@@ -326,6 +329,7 @@ function accessRoleToPermBits(accessRoleId: string): number {
     case AccessRoleIds.MCPSERVER_VIEWER:
     case AccessRoleIds.REMOTE_AGENT_VIEWER:
     case AccessRoleIds.SKILL_VIEWER:
+    case AccessRoleIds.SHARED_LINK_VIEWER:
       return PermissionBits.VIEW;
     case AccessRoleIds.AGENT_EDITOR:
     case AccessRoleIds.PROMPTGROUP_EDITOR:
@@ -339,6 +343,7 @@ function accessRoleToPermBits(accessRoleId: string): number {
     case AccessRoleIds.REMOTE_AGENT_OWNER:
     case AccessRoleIds.PROJECT_OWNER:
     case AccessRoleIds.SKILL_OWNER:
+    case AccessRoleIds.SHARED_LINK_OWNER:
       return (
         PermissionBits.VIEW | PermissionBits.EDIT | PermissionBits.DELETE | PermissionBits.SHARE
       );

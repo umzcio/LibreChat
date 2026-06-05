@@ -8,7 +8,6 @@ export default function useClearStates() {
   const jotaiStore = useStore();
   const clearConversations = store.useClearConvoState();
   const clearSubmissions = store.useClearSubmissionState();
-  const clearLatestMessages = store.useClearLatestMessages();
 
   const clearStates = useCallback(
     (skipFirst?: boolean) => {
