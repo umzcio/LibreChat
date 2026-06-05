@@ -376,10 +376,6 @@ export default function useEventHandlers({
         } else {
           updateConvoInAllQueries(queryClient, update.conversationId!, (_c) => update, true);
         }
-        if (update.chatProjectId) {
-          queryClient.invalidateQueries([QueryKeys.projects]);
-          queryClient.invalidateQueries([QueryKeys.project, update.chatProjectId]);
-        }
       } else if (setConversation) {
         setConversation((prevState) => {
           update = tConvoUpdateSchema.parse({
@@ -454,10 +450,6 @@ export default function useEventHandlers({
             upsertConvoInAllQueries(queryClient, update);
           } else {
             updateConvoInAllQueries(queryClient, update.conversationId!, (_c) => update, true);
-          }
-          if (update.chatProjectId) {
-            queryClient.invalidateQueries([QueryKeys.projects]);
-            queryClient.invalidateQueries([QueryKeys.project, update.chatProjectId]);
           }
         }
       } else if (setConversation) {
@@ -550,7 +542,7 @@ export default function useEventHandlers({
           const newPath = buildConversationPath({
             conversationId: `${Constants.NEW_CONVO}`,
             mode,
-            projectId: submission.conversation?.projectId,
+            zdockId: submission.conversation?.zdockId,
           });
           if (location.pathname !== newPath) {
             navigate(`${newPath}${location.search}`, { replace: true });
@@ -621,7 +613,7 @@ export default function useEventHandlers({
               `${buildConversationPath({
                 conversationId: `${Constants.NEW_CONVO}`,
                 mode: getConversationModeFromPath(location.pathname),
-                projectId: submission.conversation?.projectId,
+                zdockId: submission.conversation?.zdockId,
               })}${location.search}`,
               { replace: true, state: { focusChat: true } },
             );
@@ -746,7 +738,7 @@ export default function useEventHandlers({
               `${buildConversationPath({
                 conversationId: conversation.conversationId,
                 mode: getConversationModeFromPath(location.pathname),
-                projectId: conversation.projectId ?? submissionConvo.projectId ?? undefined,
+                zdockId: conversation.zdockId ?? submissionConvo.zdockId ?? undefined,
               })}${location.search}`,
               { replace: true },
             );

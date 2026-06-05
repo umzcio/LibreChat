@@ -9,7 +9,7 @@ import * as f from './types/files';
 import * as sk from './types/skills';
 import * as mcp from './types/mcpServers';
 import * as code from './types/code';
-import * as p from './types/projects';
+import * as p from './types/zdocks';
 import * as config from './config';
 import request from './request';
 import * as s from './schemas';
@@ -1211,9 +1211,9 @@ export function verifyTwoFactorTemp(
 }
 
 /* Projects */
-export const listProjects = (
+export const listZdocks = (
   params?: p.TProjectListParams,
-): Promise<p.TProjectListResponse> => {
+): Promise<p.TZdockListResponse> => {
   const searchParams = new URLSearchParams();
   if (params?.cursor) {
     searchParams.set('cursor', params.cursor);
@@ -1228,41 +1228,41 @@ export const listProjects = (
     searchParams.set('search', params.search);
   }
   const qs = searchParams.toString();
-  return request.get(`${endpoints.projects()}${qs ? `?${qs}` : ''}`);
+  return request.get(`${endpoints.zdocks()}${qs ? `?${qs}` : ''}`);
 };
 
-export const getProject = (projectId: string): Promise<p.TProject> => {
-  return request.get(endpoints.project(projectId));
+export const getZdock = (zdockId: string): Promise<p.TZdock> => {
+  return request.get(endpoints.zdock(zdockId));
 };
 
-export const createProject = (data: p.TCreateProjectRequest): Promise<p.TProject> => {
-  return request.post(endpoints.projects(), data);
+export const createZdock = (data: p.TCreateZdockRequest): Promise<p.TZdock> => {
+  return request.post(endpoints.zdocks(), data);
 };
 
-export const updateProject = (
-  projectId: string,
-  data: p.TUpdateProjectRequest,
-): Promise<p.TProject> => {
-  return request.patch(endpoints.project(projectId), data);
+export const updateZdock = (
+  zdockId: string,
+  data: p.TUpdateZdockRequest,
+): Promise<p.TZdock> => {
+  return request.patch(endpoints.zdock(zdockId), data);
 };
 
-export const deleteProject = (projectId: string): Promise<{ message: string }> => {
-  return request.delete(endpoints.project(projectId));
+export const deleteZdock = (zdockId: string): Promise<{ message: string }> => {
+  return request.delete(endpoints.zdock(zdockId));
 };
 
-export const getProjectFiles = (projectId: string): Promise<f.TFile[]> => {
-  return request.get(endpoints.projectFiles(projectId));
+export const getZdockFiles = (zdockId: string): Promise<f.TFile[]> => {
+  return request.get(endpoints.zdockFiles(zdockId));
 };
 
 export const assignConversationsToProject = (
-  projectId: string,
+  zdockId: string,
   conversationIds: string[],
 ): Promise<{ message: string }> => {
-  return request.post(endpoints.projectConversations(projectId), { conversationIds });
+  return request.post(endpoints.zdockConversations(zdockId), { conversationIds });
 };
 
-export const getProjectConversations = (
-  projectId: string,
+export const getZdockConversations = (
+  zdockId: string,
   params?: { cursor?: string; limit?: number },
 ): Promise<q.ConversationListResponse> => {
   const query = new URLSearchParams();
@@ -1273,48 +1273,48 @@ export const getProjectConversations = (
     query.set('limit', String(params.limit));
   }
   const qs = query.toString();
-  return request.get(`${endpoints.projectConversations(projectId)}${qs ? `?${qs}` : ''}`);
+  return request.get(`${endpoints.zdockConversations(zdockId)}${qs ? `?${qs}` : ''}`);
 };
 
 export const removeConversationFromProject = (
-  projectId: string,
+  zdockId: string,
   conversationId: string,
 ): Promise<{ message: string }> => {
-  return request.delete(endpoints.projectConversation(projectId, conversationId));
+  return request.delete(endpoints.zdockConversation(zdockId, conversationId));
 };
 
 export const uploadProjectFile = (
-  projectId: string,
+  zdockId: string,
   formData: FormData,
 ): Promise<f.TFile> => {
-  return request.postMultiPart(endpoints.projectFiles(projectId), formData);
+  return request.postMultiPart(endpoints.zdockFiles(zdockId), formData);
 };
 
 export const deleteProjectFile = (
-  projectId: string,
+  zdockId: string,
   fileId: string,
 ): Promise<{ message: string }> => {
-  return request.delete(`${endpoints.projectFiles(projectId)}/${encodeURIComponent(fileId)}`);
+  return request.delete(`${endpoints.zdockFiles(zdockId)}/${encodeURIComponent(fileId)}`);
 };
 
 /* Project Memory */
 export const getProjectMemory = (
-  projectId: string,
+  zdockId: string,
 ): Promise<{ memory: string[]; memoryUpdatedAt?: string }> => {
-  return request.get(`${endpoints.project(projectId)}/memory`);
+  return request.get(`${endpoints.zdock(zdockId)}/memory`);
 };
 
 export const deleteProjectMemoryEntry = (
-  projectId: string,
+  zdockId: string,
   index: number,
 ): Promise<{ message: string }> => {
-  return request.delete(`${endpoints.project(projectId)}/memory/${index}`);
+  return request.delete(`${endpoints.zdock(zdockId)}/memory/${index}`);
 };
 
 export const clearProjectMemory = (
-  projectId: string,
+  zdockId: string,
 ): Promise<{ message: string }> => {
-  return request.delete(`${endpoints.project(projectId)}/memory`);
+  return request.delete(`${endpoints.zdock(zdockId)}/memory`);
 };
 
 /* Code */
@@ -1420,7 +1420,7 @@ export const discardCodeChanges = (payload: {
 
 export const promoteCodeWorkspace = (payload: {
   conversationId: string;
-  projectId?: string;
+  zdockId?: string;
   projectName?: string;
 }): Promise<code.TCodeWorkspaceSession> => {
   return request.post(endpoints.codePromote(), payload);

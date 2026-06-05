@@ -12,7 +12,7 @@ describe('conversationRoutes', () => {
       buildConversationPath({
         conversationId: 'convo_1',
         mode: 'code',
-        projectId: 'project_1',
+        zdockId: 'project_1',
       }),
     ).toBe('/p/project_1/code/convo_1');
   });

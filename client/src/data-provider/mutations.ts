@@ -35,7 +35,7 @@ export const useUpdateConversationMutation = (
         const targetId = payload.conversationId || id;
         queryClient.setQueryData([QueryKeys.conversation, targetId], updatedConvo);
         updateConvoInAllQueries(queryClient, targetId, () => updatedConvo);
-        queryClient.invalidateQueries([QueryKeys.projectConversations]);
+        queryClient.invalidateQueries([QueryKeys.zdockConversations]);
       },
     },
   );
@@ -125,10 +125,6 @@ export const useArchiveConvoMutation = (
           [QueryKeys.conversation, vars.conversationId],
           isArchived ? null : _data,
         );
-        if (_data.chatProjectId) {
-          queryClient.invalidateQueries([QueryKeys.project, _data.chatProjectId]);
-        }
-
         onSuccess?.(_data, vars, context);
       },
       onError,
@@ -141,8 +137,8 @@ export const useArchiveConvoMutation = (
           queryKey: archivedConvoQueryKey,
           refetchPage: (_, index) => index === 0,
         });
-        queryClient.invalidateQueries([QueryKeys.projectConversations]);
-        queryClient.invalidateQueries([QueryKeys.projects]);
+        queryClient.invalidateQueries([QueryKeys.zdockConversations]);
+        queryClient.invalidateQueries([QueryKeys.zdocks]);
       },
       ..._options,
     },
@@ -483,9 +479,9 @@ export const useDeleteConversationMutation = (
         const deletedConversation = vars.conversationId
           ? queryClient.getQueryData<t.TConversation>([QueryKeys.conversation, vars.conversationId])
           : undefined;
-        let deletedProjectId = deletedConversation?.chatProjectId;
+        let deletedProjectId = undefined;
         if (!deletedProjectId && vars.conversationId) {
-          const cacheKeys = [QueryKeys.allConversations, QueryKeys.projectConversations];
+          const cacheKeys = [QueryKeys.allConversations, QueryKeys.zdockConversations];
           for (const cacheKey of cacheKeys) {
             const queries = queryClient.getQueryCache().findAll([cacheKey], { exact: false });
             for (const query of queries) {
@@ -493,10 +489,6 @@ export const useDeleteConversationMutation = (
                 queryClient.getQueryData<InfiniteData<ConversationListResponse>>(query.queryKey),
                 vars.conversationId,
               );
-              if (found?.chatProjectId) {
-                deletedProjectId = found.chatProjectId;
-                break;
-              }
             }
             if (deletedProjectId) {
               break;
@@ -548,10 +540,10 @@ export const useDeleteConversationMutation = (
           queryKey: [QueryKeys.archivedConversations],
           refetchPage: (_, index) => index === 0,
         });
-        queryClient.invalidateQueries([QueryKeys.projectConversations]);
-        queryClient.invalidateQueries([QueryKeys.projects]);
+        queryClient.invalidateQueries([QueryKeys.zdockConversations]);
+        queryClient.invalidateQueries([QueryKeys.zdocks]);
         if (deletedProjectId) {
-          queryClient.invalidateQueries([QueryKeys.project, deletedProjectId]);
+          queryClient.invalidateQueries([QueryKeys.zdock, deletedProjectId]);
         }
 
         options?.onSuccess?.(data, vars, context);
@@ -584,12 +576,8 @@ export const useDuplicateConversationMutation = (
         queryKey: [QueryKeys.allConversations],
         refetchPage: (_, index) => index === 0,
       });
-      queryClient.invalidateQueries([QueryKeys.projectConversations]);
-      queryClient.invalidateQueries([QueryKeys.projects]);
-      if (duplicatedConversation.chatProjectId) {
-        queryClient.invalidateQueries([QueryKeys.project, duplicatedConversation.chatProjectId]);
-      }
-
+      queryClient.invalidateQueries([QueryKeys.zdockConversations]);
+      queryClient.invalidateQueries([QueryKeys.zdocks]);
       if (duplicatedConversation.tags && duplicatedConversation.tags.length > 0) {
         queryClient.setQueryData<t.TConversationTag[]>([QueryKeys.conversationTags], (oldTags) => {
           if (!oldTags) return oldTags;
@@ -632,12 +620,8 @@ export const useForkConvoMutation = (
         queryKey: [QueryKeys.allConversations],
         refetchPage: (_, index) => index === 0,
       });
-      queryClient.invalidateQueries([QueryKeys.projectConversations]);
-      queryClient.invalidateQueries([QueryKeys.projects]);
-      if (forkedConversation.chatProjectId) {
-        queryClient.invalidateQueries([QueryKeys.project, forkedConversation.chatProjectId]);
-      }
-
+      queryClient.invalidateQueries([QueryKeys.zdockConversations]);
+      queryClient.invalidateQueries([QueryKeys.zdocks]);
       if (forkedConversation.tags && forkedConversation.tags.length > 0) {
         queryClient.setQueryData<t.TConversationTag[]>([QueryKeys.conversationTags], (oldTags) => {
           if (!oldTags) return oldTags;

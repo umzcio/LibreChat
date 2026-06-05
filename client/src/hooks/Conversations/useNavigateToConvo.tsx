@@ -58,7 +58,7 @@ const useNavigateToConvo = (index = 0) => {
     const id = convoId ?? convo?.conversationId ?? Constants.NEW_CONVO;
     return buildConversationPath({
       conversationId: id,
-      projectId: convo?.projectId,
+      zdockId: convo?.zdockId,
     });
   };
 

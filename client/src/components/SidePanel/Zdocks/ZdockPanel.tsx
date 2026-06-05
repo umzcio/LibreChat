@@ -8,19 +8,19 @@ import {
   OGDialogTrigger,
   TooltipAnchor,
 } from '@librechat/client';
-import type { TProject } from 'librechat-data-provider';
-import { useListProjectsQuery } from '~/data-provider';
+import type { TZdock } from 'librechat-data-provider';
+import { useListZdocksQuery } from '~/data-provider';
 import { useLocalize } from '~/hooks';
-import ProjectCreateDialog from './ProjectCreateDialog';
-import ProjectCard from './ProjectCard';
+import ZdockCreateDialog from './ZdockCreateDialog';
+import ZdockCard from './ZdockCard';
 
-export default function ProjectPanel() {
+export default function ZdockPanel() {
   const localize = useLocalize();
-  const { data, isLoading } = useListProjectsQuery();
+  const { data, isLoading } = useListZdocksQuery();
   const [searchQuery, setSearchQuery] = useState('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
-  const projects: TProject[] = useMemo(() => data?.projects ?? [], [data]);
+  const projects: TZdock[] = useMemo(() => data?.projects ?? [], [data]);
 
   const filteredProjects = useMemo(() => {
     if (!searchQuery) {
@@ -50,7 +50,7 @@ export default function ProjectPanel() {
             onChange={(e) => setSearchQuery(e.target.value)}
             containerClassName="flex-1"
           />
-          <ProjectCreateDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <ZdockCreateDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <OGDialogTrigger asChild>
               <TooltipAnchor
                 description={localize('com_ui_create_project')}
@@ -68,7 +68,7 @@ export default function ProjectPanel() {
                 }
               />
             </OGDialogTrigger>
-          </ProjectCreateDialog>
+          </ZdockCreateDialog>
         </div>
 
         {filteredProjects.length === 0 ? (
@@ -83,7 +83,7 @@ export default function ProjectPanel() {
         ) : (
           <div className="space-y-1">
             {filteredProjects.map((project) => (
-              <ProjectCard key={project.projectId} project={project} />
+              <ZdockCard key={project.zdockId} project={project} />
             ))}
           </div>
         )}

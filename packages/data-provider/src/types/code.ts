@@ -5,7 +5,7 @@ export type TCodeWorkspaceSession = {
   mode: 'code';
   openFiles: string[];
   pendingConversation?: boolean;
-  projectId?: string | null;
+  zdockId?: string | null;
 };
 
 export type TCodeDirectoryEntry = {

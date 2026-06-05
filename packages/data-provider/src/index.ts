@@ -26,7 +26,7 @@ export * from './types/code';
 export * from './types/files';
 export * from './types/mcpServers';
 export * from './types/mutations';
-export * from './types/projects';
+export * from './types/zdocks';
 export * from './types/queries';
 export * from './types/skills';
 export * from './types/runs';

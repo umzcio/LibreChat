@@ -148,7 +148,7 @@ export default function Conversation({
       const baseUrl = window.location.origin;
       const path = buildConversationPath({
         conversationId: conversationId ?? Constants.NEW_CONVO,
-        projectId: conversation.projectId,
+        zdockId: conversation.zdockId,
       });
       window.open(baseUrl + path, '_blank');
       return;
@@ -175,7 +175,6 @@ export default function Conversation({
     renameHandler: handleRename,
     isActiveConvo,
     conversationId,
-    chatProjectId: conversation.chatProjectId,
     isPopoverActive,
     setIsPopoverActive: handlePopoverOpenChange,
     isShiftHeld: isActiveConvo ? isShiftHeld : false,

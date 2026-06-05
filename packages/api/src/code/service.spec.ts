@@ -26,16 +26,16 @@ describe('createCodeWorkspaceService', () => {
     await fs.mkdir(sessionRoot, { recursive: true });
 
     const deps = {
-      createProject: jest.fn(),
+      createZdock: jest.fn(),
       createFile: jest.fn(),
       deleteFileByFilter: jest.fn(),
       findFileById: jest.fn(),
       getConvo: jest.fn().mockResolvedValue({
         conversationId: 'convo_1',
-        projectId: 'project_1',
+        zdockId: 'project_1',
       }),
-      getProject: jest.fn(),
-      getProjectFiles: jest.fn().mockResolvedValue([]),
+      getZdock: jest.fn(),
+      getZdockFiles: jest.fn().mockResolvedValue([]),
       getWorkspaceSession: jest.fn().mockResolvedValue({
         conversationId: 'convo_1',
         mode: 'code',
@@ -58,9 +58,9 @@ describe('createCodeWorkspaceService', () => {
       hasProject: true,
       mode: 'code',
       openFiles: ['/README.md'],
-      projectId: 'project_1',
+      zdockId: 'project_1',
     });
-    expect(deps.getProjectFiles).not.toHaveBeenCalled();
+    expect(deps.getZdockFiles).not.toHaveBeenCalled();
   });
 
   it('clears active and open file state when a workspace file is deleted', async () => {
@@ -79,13 +79,13 @@ describe('createCodeWorkspaceService', () => {
     };
 
     const deps = {
-      createProject: jest.fn(),
+      createZdock: jest.fn(),
       createFile: jest.fn(),
       deleteFileByFilter: jest.fn(),
       findFileById: jest.fn(),
       getConvo: jest.fn().mockResolvedValue({ conversationId: 'convo_2' }),
-      getProject: jest.fn(),
-      getProjectFiles: jest.fn().mockResolvedValue([]),
+      getZdock: jest.fn(),
+      getZdockFiles: jest.fn().mockResolvedValue([]),
       getWorkspaceSession: jest.fn().mockResolvedValue(session),
       saveConvo: jest.fn(),
       upsertWorkspaceSession: jest.fn().mockResolvedValue({
@@ -126,9 +126,9 @@ describe('createCodeWorkspaceService', () => {
     };
 
     const deps = {
-      createProject: jest.fn().mockResolvedValue({
+      createZdock: jest.fn().mockResolvedValue({
         name: 'API Playground',
-        projectId: 'project_promoted',
+        zdockId: 'project_promoted',
       }),
       createFile: jest.fn().mockResolvedValue({
         file_id: 'file_1',
@@ -143,15 +143,15 @@ describe('createCodeWorkspaceService', () => {
         })
         .mockResolvedValue({
           conversationId: 'convo_3',
-          projectId: 'project_promoted',
+          zdockId: 'project_promoted',
           title: 'API Playground',
         }),
-      getProject: jest.fn().mockResolvedValue(null),
-      getProjectFiles: jest.fn().mockResolvedValue([]),
+      getZdock: jest.fn().mockResolvedValue(null),
+      getZdockFiles: jest.fn().mockResolvedValue([]),
       getWorkspaceSession: jest.fn().mockResolvedValue(session),
       saveConvo: jest.fn().mockResolvedValue({
         conversationId: 'convo_3',
-        projectId: 'project_promoted',
+        zdockId: 'project_promoted',
       }),
       upsertWorkspaceSession: jest.fn().mockImplementation(async (_userId, _conversationId, update) => ({
         ...session,
@@ -169,11 +169,11 @@ describe('createCodeWorkspaceService', () => {
       activeFile: '/index.ts',
       conversationId: 'convo_3',
       hasProject: true,
-      projectId: 'project_promoted',
+      zdockId: 'project_promoted',
     });
     expect(deps.saveConvo).toHaveBeenCalledWith(
       { userId: USER_ID },
-      { conversationId: 'convo_3', projectId: 'project_promoted' },
+      { conversationId: 'convo_3', zdockId: 'project_promoted' },
       expect.objectContaining({
         context: '[code] promote workspace to project',
         noUpsert: true,
@@ -182,7 +182,7 @@ describe('createCodeWorkspaceService', () => {
     expect(deps.createFile).toHaveBeenCalledWith(
       expect.objectContaining({
         filename: 'index.ts',
-        projectId: 'project_promoted',
+        zdockId: 'project_promoted',
         source: 'local',
         text: 'console.log("hi");',
       }),

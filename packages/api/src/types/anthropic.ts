@@ -21,7 +21,7 @@ export interface VertexAIClientOptions {
   /** Google Cloud region for Vertex AI (e.g., 'us-east5', 'europe-west1') */
   region?: string;
   /** Google Cloud Project ID */
-  projectId?: string;
+  zdockId?: string;
 }
 
 export interface ThinkingConfigDisabled {

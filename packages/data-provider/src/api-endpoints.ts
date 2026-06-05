@@ -457,15 +457,15 @@ export const disableTwoFactor = () => `${BASE_URL}/api/auth/2fa/disable`;
 export const regenerateBackupCodes = () => `${BASE_URL}/api/auth/2fa/backup/regenerate`;
 export const verifyTwoFactorTemp = () => `${BASE_URL}/api/auth/2fa/verify-temp`;
 
-/* Projects */
-export const projects = () => `${BASE_URL}/api/projects`;
-export const project = (projectId: string) =>
-  `${projects()}/${encodeURIComponent(projectId)}`;
-export const projectFiles = (projectId: string) => `${project(projectId)}/files`;
-export const projectConversations = (projectId: string) =>
-  `${project(projectId)}/conversations`;
-export const projectConversation = (projectId: string, conversationId: string) =>
-  `${projectConversations(projectId)}/${encodeURIComponent(conversationId)}`;
+/* Zdocks */
+export const zdocks = () => `${BASE_URL}/api/zdocks`;
+export const zdock = (zdockId: string) =>
+  `${zdocks()}/${encodeURIComponent(zdockId)}`;
+export const zdockFiles = (zdockId: string) => `${zdock(zdockId)}/files`;
+export const zdockConversations = (zdockId: string) =>
+  `${zdock(zdockId)}/conversations`;
+export const zdockConversation = (zdockId: string, conversationId: string) =>
+  `${zdockConversations(zdockId)}/${encodeURIComponent(conversationId)}`;
 
 const codeRoot = `${BASE_URL}/api/code`;
 export const codeSession = () => `${codeRoot}/session`;

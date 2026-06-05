@@ -1,23 +1,23 @@
 import axios from 'axios';
 import { logger } from '@librechat/data-schemas';
-import type { IMongoFile, IProject } from '@librechat/data-schemas';
+import type { IMongoFile, IZdock } from '@librechat/data-schemas';
 import { generateShortLivedToken } from '~/crypto/jwt';
 
 const MAX_EMBEDDED_FILES = 10;
 const MAX_TEXT_CHARS = 8000;
 
 export interface ProjectContextDeps {
-  getProject(projectId: string, userId?: string): Promise<IProject | null>;
-  getProjectFiles(projectId: string, userId?: string): Promise<IMongoFile[]>;
+  getZdock(zdockId: string, userId?: string): Promise<IZdock | null>;
+  getZdockFiles(zdockId: string, userId?: string): Promise<IMongoFile[]>;
 }
 
 export interface ProjectContextOptions {
-  projectId: string;
+  zdockId: string;
   userId: string;
   userQuery?: string;
 }
 
-export function createProjectContextBuilder(deps: ProjectContextDeps) {
+export function createZdockContextBuilder(deps: ProjectContextDeps) {
   async function queryRag(
     embeddedFiles: IMongoFile[],
     userId: string,
@@ -80,19 +80,19 @@ export function createProjectContextBuilder(deps: ProjectContextDeps) {
     return parts;
   }
 
-  function buildMemorySection(project: IProject): string {
+  function buildMemorySection(project: IZdock): string {
     const bullets = project.memory?.length
       ? project.memory.map((m) => `\u2022 ${m}`).join('\n')
       : '';
     return `## Project Memory\nYou have project-scoped memory that automatically learns from conversations in this project. Facts, preferences, and decisions are saved and carried across conversations.\n${bullets ? `Current memory:\n${bullets}` : 'No memories saved yet.'}\nWhen the user asks you to remember or forget something, acknowledge it naturally \u2014 the memory system processes it automatically after the conversation.`;
   }
 
-  async function buildProjectContext(
+  async function buildZdockContext(
     options: ProjectContextOptions,
   ): Promise<string | undefined> {
-    const { projectId, userId, userQuery } = options;
+    const { zdockId, userId, userQuery } = options;
     try {
-      const project = await deps.getProject(projectId, userId);
+      const project = await deps.getZdock(zdockId, userId);
       if (!project) {
         return undefined;
       }
@@ -103,7 +103,7 @@ export function createProjectContextBuilder(deps: ProjectContextDeps) {
         parts.push(`## Project Instructions\n${project.instructions}`);
       }
 
-      const projectFiles = await deps.getProjectFiles(projectId, userId);
+      const projectFiles = await deps.getZdockFiles(zdockId, userId);
       const embeddedFiles = projectFiles.filter((f) => f.embedded);
 
       const ragParts = await queryRag(embeddedFiles, userId, userQuery ?? '');
@@ -120,10 +120,10 @@ export function createProjectContextBuilder(deps: ProjectContextDeps) {
 
       return parts.length > 0 ? parts.join('\n\n') : undefined;
     } catch (error) {
-      logger.error('[buildProjectContext]', error);
+      logger.error('[buildZdockContext]', error);
       return undefined;
     }
   }
 
-  return { buildProjectContext };
+  return { buildZdockContext };
 }

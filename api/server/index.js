@@ -241,7 +241,7 @@ const startServer = async () => {
   app.use('/api/messages', routes.messages);
   app.use('/api/convos', routes.convos);
   app.use('/api/presets', routes.presets);
-  app.use('/api/projects', routes.projects);
+  app.use('/api/zdocks', routes.zdocks);
   app.use('/api/prompts', routes.prompts);
   app.use('/api/skills', routes.skills);
   app.use('/api/categories', routes.categories);
@@ -262,7 +262,6 @@ const startServer = async () => {
 
   app.use('/api/tags', routes.tags);
   app.use('/api/mcp', routes.mcp);
-  app.use('/api/projects', routes.projects);
   app.use('/api/code', routes.code);
   app.use('/api/rum', routes.rum);
 

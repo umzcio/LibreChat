@@ -3,7 +3,6 @@ import { createTokenModel } from './token';
 import { createSessionModel } from './session';
 import { createBalanceModel } from './balance';
 import { createConversationModel } from './convo';
-import { createChatProjectModel } from './chatProject';
 import { createMessageModel } from './message';
 import { createAgentModel } from './agent';
 import { createAgentApiKeyModel } from './agentApiKey';
@@ -31,7 +30,7 @@ import { createAccessRoleModel } from './accessRole';
 import { createAclEntryModel } from './aclEntry';
 import { createSystemGrantModel } from './systemGrant';
 import { createGroupModel } from './group';
-import { createProjectModel } from './project';
+import { createZdockModel } from './zdock';
 import { createWorkspaceSessionModel } from './workspace';
 import { createConfigModel } from './config';
 
@@ -45,7 +44,6 @@ export function createModels(mongoose: typeof import('mongoose')) {
     Session: createSessionModel(mongoose),
     Balance: createBalanceModel(mongoose),
     Conversation: createConversationModel(mongoose),
-    ChatProject: createChatProjectModel(mongoose),
     Message: createMessageModel(mongoose),
     Agent: createAgentModel(mongoose),
     AgentApiKey: createAgentApiKeyModel(mongoose),
@@ -73,7 +71,7 @@ export function createModels(mongoose: typeof import('mongoose')) {
     AclEntry: createAclEntryModel(mongoose),
     SystemGrant: createSystemGrantModel(mongoose),
     Group: createGroupModel(mongoose),
-    Project: createProjectModel(mongoose),
+    Project: createZdockModel(mongoose),
     WorkspaceSession: createWorkspaceSessionModel(mongoose),
     Config: createConfigModel(mongoose),
   };

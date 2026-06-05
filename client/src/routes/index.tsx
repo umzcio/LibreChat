@@ -19,7 +19,7 @@ import StartupLayout from './Layouts/Startup';
 import LoginLayout from './Layouts/Login';
 import dashboardRoutes from './Dashboard';
 import ShareRoute from './ShareRoute';
-import ProjectView from '~/components/Projects/ProjectView';
+import ZdockView from '~/components/Zdocks/ZdockView';
 import ChatRoute from './ChatRoute';
 import Search from './Search';
 import Root from './Root';
@@ -48,8 +48,8 @@ const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
 
 const CodeRedirect = () => {
-  const { projectId } = useParams();
-  return <Navigate to={projectId ? `/p/${projectId}/code/new` : '/code/new'} replace={true} />;
+  const { zdockId } = useParams();
+  return <Navigate to={zdockId ? `/p/${zdockId}/code/new` : '/code/new'} replace={true} />;
 };
 
 export const router = createBrowserRouter(
@@ -137,19 +137,19 @@ export const router = createBrowserRouter(
               element: <CodePage />,
             },
             {
-              path: 'p/:projectId',
-              element: <ProjectView />,
+              path: 'p/:zdockId',
+              element: <ZdockView />,
             },
             {
-              path: 'p/:projectId/c/:conversationId?',
+              path: 'p/:zdockId/c/:conversationId?',
               element: <ChatRoute />,
             },
             {
-              path: 'p/:projectId/code',
+              path: 'p/:zdockId/code',
               element: <CodeRedirect />,
             },
             {
-              path: 'p/:projectId/code/:conversationId?',
+              path: 'p/:zdockId/code/:conversationId?',
               element: <CodePage />,
             },
             {

@@ -1,5 +1,5 @@
-export type TProject = {
-  projectId: string;
+export type TZdock = {
+  zdockId: string;
   name: string;
   description?: string;
   instructions?: string;
@@ -22,19 +22,19 @@ export type TProjectListParams = {
   search?: string;
 };
 
-export type TProjectListResponse = {
-  projects: TProject[];
+export type TZdockListResponse = {
+  projects: TZdock[];
   nextCursor: string | null;
 };
 
-export type TCreateProjectRequest = Pick<TProject, 'name'> &
+export type TCreateZdockRequest = Pick<TZdock, 'name'> &
   Partial<
     Pick<
-      TProject,
+      TZdock,
       'description' | 'instructions' | 'color' | 'icon' | 'conversationDefaults' | 'pinnedAgents'
     >
   >;
 
-export type TUpdateProjectRequest = Partial<
-  Omit<TProject, 'projectId' | 'author' | 'createdAt' | 'updatedAt'>
+export type TUpdateZdockRequest = Partial<
+  Omit<TZdock, 'zdockId' | 'author' | 'createdAt' | 'updatedAt'>
 >;

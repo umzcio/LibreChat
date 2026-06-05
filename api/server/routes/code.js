@@ -8,13 +8,13 @@ const db = require('~/models');
 const router = express.Router();
 
 const service = createCodeWorkspaceService({
-  createProject: db.createProject,
+  createZdock: db.createZdock,
   createFile: db.createFile,
   deleteFileByFilter: db.deleteFileByFilter,
   findFileById: db.findFileById,
   getConvo: db.getConvo,
-  getProject: db.getProject,
-  getProjectFiles: db.getProjectFiles,
+  getZdock: db.getZdock,
+  getZdockFiles: db.getZdockFiles,
   getWorkspaceSession: db.getWorkspaceSession,
   saveConvo: db.saveConvo,
   updateFile: db.updateFile,
@@ -75,7 +75,7 @@ router.get('/session', async (req, res) => {
         mode: 'code',
         openFiles: [],
         pendingConversation: true,
-        projectId: null,
+        zdockId: null,
       });
     }
 
@@ -303,14 +303,14 @@ router.post('/promote', express.json(), async (req, res) => {
     }
 
     if (
-      typeof req.body.projectId !== 'string' &&
+      typeof req.body.zdockId !== 'string' &&
       typeof req.body.projectName !== 'string'
     ) {
-      return res.status(400).json({ error: 'projectId or projectName is required' });
+      return res.status(400).json({ error: 'zdockId or projectName is required' });
     }
 
     const session = await service.promoteWorkspace(req.user.id, conversationId, {
-      projectId: typeof req.body.projectId === 'string' ? req.body.projectId : undefined,
+      zdockId: typeof req.body.zdockId === 'string' ? req.body.zdockId : undefined,
       projectName: typeof req.body.projectName === 'string' ? req.body.projectName : undefined,
     });
 

@@ -27,7 +27,7 @@ export const useUpdateCodeWorkspaceSessionMutation = (
   const queryClient = useQueryClient();
 
   return useMutation(
-    [MutationKeys.updateProject, 'code-session'],
+    [MutationKeys.updateZdock, 'code-session'],
     (payload: { activeFile?: string; conversationId: string; openFiles?: string[] }) =>
       dataService.updateCodeWorkspaceSession(payload),
     {
@@ -50,7 +50,7 @@ export const useSaveCodeFileContentMutation = (
   const queryClient = useQueryClient();
 
   return useMutation(
-    [MutationKeys.updateProject, 'code-file'],
+    [MutationKeys.updateZdock, 'code-file'],
     (payload: { content: string; conversationId: string; path: string }) =>
       dataService.saveCodeFileContent(payload),
     {
@@ -73,7 +73,7 @@ export const useCreateCodeItemMutation = (
   const queryClient = useQueryClient();
 
   return useMutation(
-    [MutationKeys.updateProject, 'code-create'],
+    [MutationKeys.updateZdock, 'code-create'],
     (payload: { conversationId: string; path: string; type: 'directory' | 'file' }) =>
       dataService.createCodeFile(payload),
     {
@@ -96,7 +96,7 @@ export const useDeleteCodeItemMutation = (
   const queryClient = useQueryClient();
 
   return useMutation(
-    [MutationKeys.updateProject, 'code-delete'],
+    [MutationKeys.updateZdock, 'code-delete'],
     (payload: { conversationId: string; path: string }) =>
       dataService.deleteCodeFile(payload.conversationId, payload.path),
     {
@@ -119,7 +119,7 @@ export const useRenameCodeItemMutation = (
   const queryClient = useQueryClient();
 
   return useMutation(
-    [MutationKeys.updateProject, 'code-rename'],
+    [MutationKeys.updateZdock, 'code-rename'],
     (payload: { conversationId: string; path: string; newPath: string }) =>
       dataService.renameCodeFile(payload),
     {
@@ -145,14 +145,14 @@ export const useApplyCodeChangesMutation = (
   const queryClient = useQueryClient();
 
   return useMutation(
-    [MutationKeys.updateProject, 'code-apply'],
+    [MutationKeys.updateZdock, 'code-apply'],
     (payload: { conversationId: string; paths?: string[] }) => dataService.applyCodeChanges(payload),
     {
       ...options,
       onSuccess: (data, variables, context) => {
         invalidateWorkspaceQueries(queryClient, variables.conversationId);
-        if (data.projectId) {
-          queryClient.invalidateQueries([QueryKeys.projectFiles, data.projectId]);
+        if (data.zdockId) {
+          queryClient.invalidateQueries([QueryKeys.zdockFiles, data.zdockId]);
         }
         options?.onSuccess?.(data, variables, context);
       },
@@ -173,7 +173,7 @@ export const useDiscardCodeChangesMutation = (
   const queryClient = useQueryClient();
 
   return useMutation(
-    [MutationKeys.updateProject, 'code-discard'],
+    [MutationKeys.updateZdock, 'code-discard'],
     (payload: { conversationId: string; paths?: string[] }) =>
       dataService.discardCodeChanges(payload),
     {
@@ -192,7 +192,7 @@ export const usePromoteCodeWorkspaceMutation = (
     Error,
     {
       conversationId: string;
-      projectId?: string;
+      zdockId?: string;
       projectName?: string;
     }
   >,
@@ -200,17 +200,17 @@ export const usePromoteCodeWorkspaceMutation = (
   const queryClient = useQueryClient();
 
   return useMutation(
-    [MutationKeys.updateProject, 'code-promote'],
-    (payload: { conversationId: string; projectId?: string; projectName?: string }) =>
+    [MutationKeys.updateZdock, 'code-promote'],
+    (payload: { conversationId: string; zdockId?: string; projectName?: string }) =>
       dataService.promoteCodeWorkspace(payload),
     {
       ...options,
       onSuccess: (data, variables, context) => {
         invalidateWorkspaceQueries(queryClient, variables.conversationId);
-        if (data.projectId) {
-          queryClient.invalidateQueries([QueryKeys.project, data.projectId]);
-          queryClient.invalidateQueries([QueryKeys.projectFiles, data.projectId]);
-          queryClient.invalidateQueries([QueryKeys.projectConversations, data.projectId]);
+        if (data.zdockId) {
+          queryClient.invalidateQueries([QueryKeys.zdock, data.zdockId]);
+          queryClient.invalidateQueries([QueryKeys.zdockFiles, data.zdockId]);
+          queryClient.invalidateQueries([QueryKeys.zdockConversations, data.zdockId]);
         }
         queryClient.invalidateQueries([QueryKeys.conversation, variables.conversationId]);
         queryClient.invalidateQueries([QueryKeys.allConversations]);

@@ -13,15 +13,15 @@ import { QueryKeys, dataService } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalize } from '~/hooks';
 
-export default function ProjectMemoryModal({
+export default function ZdockMemoryModal({
   open,
   onOpenChange,
-  projectId,
+  zdockId,
   memory,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
+  zdockId: string;
   memory: string[];
 }) {
   const localize = useLocalize();
@@ -30,9 +30,9 @@ export default function ProjectMemoryModal({
 
   const handleDeleteEntry = async (index: number) => {
     try {
-      await dataService.deleteProjectMemoryEntry(projectId, index);
+      await dataService.deleteProjectMemoryEntry(zdockId, index);
       queryClient.setQueryData(
-        [QueryKeys.project, projectId],
+        [QueryKeys.zdock, zdockId],
         (old: { memory?: string[]; memoryUpdatedAt?: string } | undefined) => {
           if (!old) {
             return old;
@@ -49,9 +49,9 @@ export default function ProjectMemoryModal({
 
   const handleClearAll = async () => {
     try {
-      await dataService.clearProjectMemory(projectId);
+      await dataService.clearProjectMemory(zdockId);
       queryClient.setQueryData(
-        [QueryKeys.project, projectId],
+        [QueryKeys.zdock, zdockId],
         (old: { memory?: string[]; memoryUpdatedAt?: string } | undefined) => {
           if (!old) {
             return old;

@@ -255,7 +255,7 @@ describe('duplicateConversation', () => {
   test('should duplicate conversation and increment tag counts', async () => {
     const mockConvoWithTags = {
       ...mockConversation,
-      tags: ['important', 'work', 'project'],
+      tags: ['important', 'work', 'zdock'],
     };
     getConvo.mockResolvedValue(mockConvoWithTags);
 
@@ -265,7 +265,7 @@ describe('duplicateConversation', () => {
     });
 
     // Verify that bulkIncrementTagCounts was called with correct tags
-    expect(bulkIncrementTagCounts).toHaveBeenCalledWith('user1', ['important', 'work', 'project']);
+    expect(bulkIncrementTagCounts).toHaveBeenCalledWith('user1', ['important', 'work', 'zdock']);
   });
 
   test('should duplicate conversation without tags', async () => {

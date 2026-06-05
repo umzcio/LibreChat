@@ -9,7 +9,7 @@ const mockLocation = {
 };
 const mockParams: {
   conversationId?: string;
-  projectId?: string;
+  zdockId?: string;
 } = {};
 const mockSetQueryData = jest.fn();
 const mockGetQueryData = jest.fn();
@@ -141,7 +141,7 @@ describe('useEventHandlers', () => {
     mockLocation.pathname = '/code/new';
     mockLocation.search = '';
     mockParams.conversationId = Constants.NEW_CONVO;
-    delete mockParams.projectId;
+    delete mockParams.zdockId;
     getMessages.mockReturnValue([createMessage({ messageId: 'existing-message' })]);
     mockGetQueryData.mockReturnValue(undefined);
     mockFindAllQueries.mockReturnValue([]);
@@ -163,12 +163,12 @@ describe('useEventHandlers', () => {
   it('keeps code-mode navigation on early aborts', () => {
     mockLocation.pathname = '/p/project-1/code/temp-stream';
     mockLocation.search = '?openArtifact=artifact-1';
-    mockParams.projectId = 'project-1';
+    mockParams.zdockId = 'project-1';
 
     const submission = createSubmission({
       conversation: {
         conversationId: Constants.NEW_CONVO,
-        projectId: 'project-1',
+        zdockId: 'project-1',
       } as Partial<TConversation>,
     });
 
@@ -235,12 +235,12 @@ describe('useEventHandlers', () => {
   it('replaces new project code routes with persisted code conversation routes', () => {
     mockLocation.pathname = '/p/project-1/code/new';
     mockLocation.search = '?openFile=README.md';
-    mockParams.projectId = 'project-1';
+    mockParams.zdockId = 'project-1';
 
     const submission = createSubmission({
       conversation: {
         conversationId: `${Constants.NEW_CONVO}`,
-        projectId: 'project-1',
+        zdockId: 'project-1',
       } as Partial<TConversation>,
       initialResponse: createMessage({
         content: [{ type: 'text', text: { value: 'draft' } }] as TMessage['content'],
@@ -253,7 +253,7 @@ describe('useEventHandlers', () => {
 
     const persistedConversation = {
       conversationId: 'convo-persisted',
-      projectId: 'project-1',
+      zdockId: 'project-1',
       title: 'Generated Conversation',
     };
 

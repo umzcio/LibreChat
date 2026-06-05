@@ -65,7 +65,7 @@ jest.mock('~/store', () => {
 });
 
 type FavoriteEntry = { agentId?: string; model?: string; endpoint?: string };
-type ProjectEntry = { projectId: string; name: string };
+type ProjectEntry = { zdockId: string; name: string };
 
 const mockFavoritesState: { favorites: FavoriteEntry[]; isLoading: boolean } = {
   favorites: [],
@@ -111,7 +111,7 @@ jest.mock('@librechat/client', () => ({
 
 jest.mock('~/data-provider', () => ({
   useActiveJobs: () => ({ data: undefined }),
-  useListProjectsQuery: () => ({ data: { projects: mockProjects } }),
+  useListZdocksQuery: () => ({ data: { projects: mockProjects } }),
 }));
 
 jest.mock('~/utils', () => ({
@@ -124,13 +124,13 @@ jest.mock('~/components/Nav/Favorites/FavoritesList', () => ({
   default: () => <div data-testid="favorites-list" />,
 }));
 
-jest.mock('~/components/SidePanel/Projects/ProjectCreateDialog', () => ({
+jest.mock('~/components/SidePanel/Zdocks/ZdockCreateDialog', () => ({
   __esModule: true,
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-jest.mock('~/components/SidePanel/Projects', () => ({
-  ProjectCard: ({ project }: { project: ProjectEntry }) => <div>{project.name}</div>,
+jest.mock('~/components/SidePanel/Zdocks', () => ({
+  ZdockCard: ({ project }: { project: ProjectEntry }) => <div>{project.name}</div>,
 }));
 
 jest.mock('../Convo', () => ({
@@ -239,14 +239,14 @@ describe('Conversations – favorites CellMeasurerCache key invalidation', () =>
     cache.set(1, 0, 300, 72);
     expect(cache.has(1, 0)).toBe(true);
 
-    mockProjects = [{ projectId: 'project-1', name: 'Test New' }];
+    mockProjects = [{ zdockId: 'project-1', name: 'Test New' }];
     rerender(<Wrapper />);
 
     expect(cache.has(1, 0)).toBe(false);
   });
 
   it('should invalidate the cached projects height when projects expanded state changes', () => {
-    mockProjects = [{ projectId: 'project-1', name: 'Test New' }];
+    mockProjects = [{ zdockId: 'project-1', name: 'Test New' }];
     const { rerender } = render(<Wrapper />);
     const cache = mockCapturedCache!;
 
@@ -260,7 +260,7 @@ describe('Conversations – favorites CellMeasurerCache key invalidation', () =>
   });
 
   it('should keep the first date header flush after favorites, projects, and chats header rows', () => {
-    mockProjects = [{ projectId: 'project-1', name: 'Test New' }];
+    mockProjects = [{ zdockId: 'project-1', name: 'Test New' }];
     mockGroupedConversations = [['Today', [createConversation('conversation-1')]]];
 
     render(<Wrapper />);

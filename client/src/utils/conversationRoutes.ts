@@ -7,10 +7,10 @@ export function getConversationModeFromPath(pathname = ''): ConversationMode {
 export function buildConversationPath(params: {
   conversationId: string;
   mode?: ConversationMode;
-  projectId?: string;
+  zdockId?: string;
 }) {
-  const { conversationId, projectId, mode = 'chat' } = params;
-  const prefix = projectId ? `/p/${projectId}` : '';
+  const { conversationId, zdockId, mode = 'chat' } = params;
+  const prefix = zdockId ? `/p/${zdockId}` : '';
   const routeSegment = mode === 'code' ? 'code' : 'c';
 
   return `${prefix}/${routeSegment}/${conversationId}`;

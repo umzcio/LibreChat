@@ -30,20 +30,20 @@ import { Constants, QueryKeys, dataService } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import {
-  useGetProjectQuery,
-  useUpdateProjectMutation,
-  useDeleteProjectMutation,
-  useGetProjectConversationsQuery,
+  useGetZdockQuery,
+  useUpdateZdockMutation,
+  useDeleteZdockMutation,
+  useGetZdockConversationsQuery,
 } from '~/data-provider';
 import { useLocalize, useNewConvo } from '~/hooks';
 import {
   getProjectIcon,
   IconColorPicker,
   PROJECT_COLORS,
-} from '~/components/SidePanel/Projects/ProjectCreateDialog';
-import ProjectMemoryModal from './ProjectMemoryModal';
-import AddConversationsDialog from './AddConversationsDialog';
-import ProjectConvoItem from './ProjectConvoItem';
+} from '~/components/SidePanel/Zdocks/ZdockCreateDialog';
+import ZdockMemoryModal from './ZdockMemoryModal';
+import AddConversationsToZdockDialog from './AddConversationsToZdockDialog';
+import ZdockConvoItem from './ZdockConvoItem';
 import { buildConversationPath, clearMessagesCache, cn } from '~/utils';
 import store from '~/store';
 
@@ -184,8 +184,8 @@ function renderInstructions(text: string) {
   return elements;
 }
 
-export default function ProjectView() {
-  const { projectId } = useParams<{ projectId: string }>();
+export default function ZdockView() {
+  const { zdockId } = useParams<{ zdockId: string }>();
   const navigate = useNavigate();
   const localize = useLocalize();
   const { showToast } = useToastContext();
@@ -194,11 +194,11 @@ export default function ProjectView() {
   const conversation = useAtomValue(store.conversationByIndex(0));
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: project, isLoading } = useGetProjectQuery(projectId || '', {
-    enabled: !!projectId,
+  const { data: project, isLoading } = useGetZdockQuery(zdockId || '', {
+    enabled: !!zdockId,
   });
-  const { data: convosData, refetch: refetchConvos } = useGetProjectConversationsQuery(projectId || '', {
-    enabled: !!projectId,
+  const { data: convosData, refetch: refetchConvos } = useGetZdockConversationsQuery(zdockId || '', {
+    enabled: !!zdockId,
   });
 
   const [showAddConvos, setShowAddConvos] = useState(false);
@@ -229,15 +229,15 @@ export default function ProjectView() {
   }, [project]);
 
   useEffect(() => {
-    if (projectId) {
+    if (zdockId) {
       dataService
-        .getProjectFiles(projectId)
+        .getZdockFiles(zdockId)
         .then((f) => setFiles(f))
         .catch(() => setFiles([]));
     }
-  }, [projectId]);
+  }, [zdockId]);
 
-  const updateMutation = useUpdateProjectMutation({
+  const updateMutation = useUpdateZdockMutation({
     onSuccess: () => {
       showToast({ message: localize('com_ui_project_saved'), status: 'success' });
     },
@@ -246,7 +246,7 @@ export default function ProjectView() {
     },
   });
 
-  const deleteMutation = useDeleteProjectMutation({
+  const deleteMutation = useDeleteZdockMutation({
     onSuccess: () => {
       showToast({ message: localize('com_ui_project_deleted'), status: 'success' });
       navigate('/c/new');
@@ -257,11 +257,11 @@ export default function ProjectView() {
   });
 
   const handleSaveSettings = useCallback(() => {
-    if (!projectId || !editName.trim()) {
+    if (!zdockId || !editName.trim()) {
       return;
     }
     updateMutation.mutate({
-      projectId,
+      zdockId,
       data: {
         name: editName.trim(),
         description: editDesc.trim() || undefined,
@@ -270,32 +270,32 @@ export default function ProjectView() {
       },
     });
     setShowSettings(false);
-  }, [projectId, editName, editDesc, editColor, editIcon, updateMutation]);
+  }, [zdockId, editName, editDesc, editColor, editIcon, updateMutation]);
 
   const handleSaveInstructions = useCallback(() => {
-    if (!projectId) {
+    if (!zdockId) {
       return;
     }
     updateMutation.mutate({
-      projectId,
+      zdockId,
       data: { instructions: editInstructions.trim() || undefined },
     });
     setShowEditInstructions(false);
-  }, [projectId, editInstructions, updateMutation]);
+  }, [zdockId, editInstructions, updateMutation]);
 
   const handleConvoRemoved = useCallback(() => {
     refetchConvos();
   }, [refetchConvos]);
 
   const handleDelete = () => {
-    if (projectId) {
-      deleteMutation.mutate(projectId);
+    if (zdockId) {
+      deleteMutation.mutate(zdockId);
     }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = e.target.files;
-    if (!selectedFiles || !projectId) {
+    if (!selectedFiles || !zdockId) {
       return;
     }
     setUploading(true);
@@ -303,7 +303,7 @@ export default function ProjectView() {
       const formData = new FormData();
       formData.append('file', selectedFiles[i]);
       try {
-        const uploaded = await dataService.uploadProjectFile(projectId, formData);
+        const uploaded = await dataService.uploadProjectFile(zdockId, formData);
         setFiles((prev) => [...prev, uploaded]);
       } catch {
         showToast({ message: `Error uploading ${selectedFiles[i].name}`, status: 'error' });
@@ -316,11 +316,11 @@ export default function ProjectView() {
   };
 
   const handleDeleteFile = async (fileId: string) => {
-    if (!projectId) {
+    if (!zdockId) {
       return;
     }
     try {
-      await dataService.deleteProjectFile(projectId, fileId);
+      await dataService.deleteProjectFile(zdockId, fileId);
       setFiles((prev) => prev.filter((f) => f.file_id !== fileId));
     } catch {
       showToast({ message: localize('com_ui_error_delete_file'), status: 'error' });
@@ -329,12 +329,12 @@ export default function ProjectView() {
 
   const handleOpenFileInCode = useCallback(
     (file: TFile) => {
-      if (!projectId) {
+      if (!zdockId) {
         return;
       }
 
       const nextConversationId =
-        conversation?.projectId === projectId &&
+        conversation?.zdockId === zdockId &&
         conversation?.conversationId &&
         conversation.conversationId !== Constants.SEARCH
           ? conversation.conversationId
@@ -344,11 +344,11 @@ export default function ProjectView() {
         `${buildConversationPath({
           conversationId: nextConversationId,
           mode: 'code',
-          projectId,
+          zdockId,
         })}?openFile=${encodeURIComponent(file.filename)}`,
       );
     },
-    [conversation?.conversationId, conversation?.projectId, navigate, projectId],
+    [conversation?.conversationId, conversation?.zdockId, navigate, zdockId],
   );
 
   const grouped = useMemo(
@@ -420,7 +420,7 @@ export default function ProjectView() {
           onClick={() => {
             clearMessagesCache(queryClient, conversation?.conversationId);
             queryClient.invalidateQueries([QueryKeys.messages]);
-            newConversation({ template: { projectId } });
+            newConversation({ template: { zdockId } });
           }}
         >
           <PenLine className="size-3.5" aria-hidden="true" />
@@ -436,10 +436,10 @@ export default function ProjectView() {
                   {group.label}
                 </div>
                 {group.convos.map((convo) => (
-                  <ProjectConvoItem
+                  <ZdockConvoItem
                     key={convo.conversationId}
                     conversation={convo}
-                    projectId={projectId || ''}
+                    zdockId={zdockId || ''}
                     onConvoRemoved={handleConvoRemoved}
                     relativeTime={relativeTime(convo.updatedAt)}
                   />
@@ -712,20 +712,20 @@ export default function ProjectView() {
 
       {/* Project Memory modal */}
       {showMemoryModal && (
-        <ProjectMemoryModal
+        <ZdockMemoryModal
           open={showMemoryModal}
           onOpenChange={setShowMemoryModal}
-          projectId={projectId || ''}
+          zdockId={zdockId || ''}
           memory={project.memory || []}
         />
       )}
 
       {/* Add Conversations dialog */}
       {showAddConvos && (
-        <AddConversationsDialog
+        <AddConversationsToZdockDialog
           open={showAddConvos}
           onOpenChange={setShowAddConvos}
-          projectId={projectId || ''}
+          zdockId={zdockId || ''}
         />
       )}
 

@@ -184,12 +184,7 @@ export default function useChatFunctions({
       });
     }
 
-    const chatProjectId =
-      conversationId === Constants.NEW_CONVO
-        ? getRouteChatProjectId()
-        : (conversation?.chatProjectId ?? null);
-    const conversationForPayload =
-      chatProjectId != null ? { ...(conversation ?? {}), chatProjectId } : (conversation ?? {});
+    const conversationForPayload = conversation ?? {};
 
     // construct the query message
     // this is not a real messageId, it is used as placeholder before real messageId returned
@@ -214,7 +209,7 @@ export default function useChatFunctions({
         buildConversationPath({
           conversationId: Constants.NEW_CONVO,
           mode: getConversationModeFromPath(location.pathname),
-          projectId: conversation?.projectId,
+          zdockId: conversation?.zdockId,
         }),
         { state: { focusChat: true } },
       );
@@ -257,8 +252,6 @@ export default function useChatFunctions({
         overrideConvoId,
         overrideUserMessageId,
       },
-      convo,
-      chatProjectId ? { chatProjectId } : {},
     ) as TEndpointOption;
     if (endpoint !== EModelEndpoint.agents) {
       endpointOption.key = getExpiry();
@@ -396,7 +389,6 @@ export default function useChatFunctions({
     const submission: TSubmission = {
       conversation: {
         ...conversation,
-        ...(chatProjectId ? { chatProjectId } : {}),
         conversationId,
       },
       endpointOption,

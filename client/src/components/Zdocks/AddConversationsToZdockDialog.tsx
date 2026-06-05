@@ -13,18 +13,18 @@ import {
 import { QueryKeys, dataService } from 'librechat-data-provider';
 import type { TConversation } from 'librechat-data-provider';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAssignConversationsMutation } from '~/data-provider';
+import { useAssignConversationsToZdockMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
-export default function AddConversationsDialog({
+export default function AddConversationsToZdockDialog({
   open,
   onOpenChange,
-  projectId,
+  zdockId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
+  zdockId: string;
 }) {
   const localize = useLocalize();
   const queryClient = useQueryClient();
@@ -38,10 +38,10 @@ export default function AddConversationsDialog({
     { enabled: open, refetchOnWindowFocus: false },
   );
 
-  const assignMutation = useAssignConversationsMutation({
+  const assignMutation = useAssignConversationsToZdockMutation({
     onSuccess: () => {
       showToast({ message: localize('com_ui_moved_to_project'), status: 'success' });
-      queryClient.invalidateQueries([QueryKeys.projectConversations, projectId]);
+      queryClient.invalidateQueries([QueryKeys.zdockConversations, zdockId]);
       onOpenChange(false);
       setSelected(new Set());
     },
@@ -51,7 +51,7 @@ export default function AddConversationsDialog({
   });
 
   const conversations = (data?.conversations ?? []).filter(
-    (c: TConversation) => c.projectId !== projectId,
+    (c: TConversation) => c.zdockId !== zdockId,
   );
 
   const toggleSelect = (convoId: string) => {
@@ -71,7 +71,7 @@ export default function AddConversationsDialog({
       return;
     }
     assignMutation.mutate({
-      projectId,
+      zdockId,
       conversationIds: Array.from(selected),
     });
   };

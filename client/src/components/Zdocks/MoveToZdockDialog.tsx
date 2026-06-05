@@ -8,12 +8,12 @@ import {
   Spinner,
   useToastContext,
 } from '@librechat/client';
-import type { TProject } from 'librechat-data-provider';
-import { useListProjectsQuery, useAssignConversationsMutation } from '~/data-provider';
-import { getProjectIcon } from '~/components/SidePanel/Projects/ProjectCreateDialog';
+import type { TZdock } from 'librechat-data-provider';
+import { useListZdocksQuery, useAssignConversationsToZdockMutation } from '~/data-provider';
+import { getProjectIcon } from '~/components/SidePanel/Zdocks/ZdockCreateDialog';
 import { useLocalize } from '~/hooks';
 
-export default function MoveToProjectDialog({
+export default function MoveToZdockDialog({
   open,
   onOpenChange,
   conversationIds,
@@ -27,11 +27,11 @@ export default function MoveToProjectDialog({
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const [search, setSearch] = useState('');
-  const { data: projectsData, isLoading } = useListProjectsQuery(undefined, {
+  const { data: projectsData, isLoading } = useListZdocksQuery(undefined, {
     enabled: open,
   });
 
-  const assignMutation = useAssignConversationsMutation({
+  const assignMutation = useAssignConversationsToZdockMutation({
     onSuccess: () => {
       showToast({ message: localize('com_ui_moved_to_project'), status: 'success' });
       onOpenChange(false);
@@ -46,12 +46,12 @@ export default function MoveToProjectDialog({
     ? projects.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
     : projects;
 
-  const handleSelect = (project: TProject) => {
+  const handleSelect = (project: TZdock) => {
     if (conversationIds.length === 0) {
       return;
     }
     assignMutation.mutate({
-      projectId: project.projectId,
+      zdockId: project.zdockId,
       conversationIds,
     });
   };
@@ -92,7 +92,7 @@ export default function MoveToProjectDialog({
                 const Icon = getProjectIcon(project.icon);
                 return (
                   <button
-                    key={project.projectId}
+                    key={project.zdockId}
                     type="button"
                     className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-text-primary hover:bg-surface-hover"
                     onClick={() => handleSelect(project)}

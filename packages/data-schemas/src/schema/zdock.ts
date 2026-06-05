@@ -1,9 +1,9 @@
 import { Schema } from 'mongoose';
-import type { IProject } from '~/types';
+import type { IZdock } from '~/types';
 
-const projectSchema = new Schema<IProject>(
+const zdockSchema = new Schema<IZdock>(
   {
-    projectId: {
+    zdockId: {
       type: String,
       unique: true,
       required: true,
@@ -63,7 +63,7 @@ const projectSchema = new Schema<IProject>(
   { timestamps: true },
 );
 
-projectSchema.index({ author: 1, updatedAt: -1 });
-projectSchema.index({ projectId: 1, author: 1, tenantId: 1 }, { unique: true });
+zdockSchema.index({ author: 1, updatedAt: -1 });
+zdockSchema.index({ zdockId: 1, author: 1, tenantId: 1 }, { unique: true });
 
-export default projectSchema;
+export default zdockSchema;

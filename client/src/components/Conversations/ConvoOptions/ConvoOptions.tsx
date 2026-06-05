@@ -15,14 +15,13 @@ import {
 } from '~/data-provider';
 import { useHasAccess, useLocalize, useNavigateToConvo, useNewConvo } from '~/hooks';
 import { NotificationSeverity } from '~/common';
-import MoveToProjectDialog from '~/components/Projects/MoveToProjectDialog';
+import MoveToZdockDialog from '~/components/Zdocks/MoveToZdockDialog';
 import DeleteButton from './DeleteButton';
 import ShareButton from './ShareButton';
 import { buildConversationPath, cn, getConversationModeFromPath } from '~/utils';
 
 function ConvoOptions({
   conversationId,
-  chatProjectId,
   title,
   retainView,
   renameHandler,
@@ -31,10 +30,9 @@ function ConvoOptions({
   isActiveConvo,
   isShiftHeld = false,
   index = 0,
-  projectId,
+  zdockId,
 }: {
   conversationId: string | null;
-  chatProjectId?: string | null;
   title: string | null;
   retainView: () => void;
   renameHandler: (e: MouseEvent) => void;
@@ -43,7 +41,7 @@ function ConvoOptions({
   isActiveConvo: boolean;
   isShiftHeld?: boolean;
   index?: number;
-  projectId?: string;
+  zdockId?: string;
 }) {
   const localize = useLocalize();
   const queryClient = useQueryClient();
@@ -53,7 +51,7 @@ function ConvoOptions({
 
   const navigate = useNavigate();
   const location = useLocation();
-  const { conversationId: currentConvoId, projectId: routeProjectId } = useParams();
+  const { conversationId: currentConvoId, zdockId: routeProjectId } = useParams();
   const { newConversation } = useNewConvo();
 
   const menuId = useId();
@@ -80,7 +78,7 @@ function ConvoOptions({
           buildConversationPath({
             conversationId: 'new',
             mode: getConversationModeFromPath(location.pathname),
-            projectId: projectId ?? routeProjectId,
+            zdockId: zdockId ?? routeProjectId,
           }),
           { replace: true },
         );
@@ -173,7 +171,7 @@ function ConvoOptions({
                 buildConversationPath({
                   conversationId: 'new',
                   mode: getConversationModeFromPath(location.pathname),
-                  projectId: projectId ?? routeProjectId,
+                  zdockId: zdockId ?? routeProjectId,
                 }),
                 { replace: true },
               );
@@ -197,7 +195,7 @@ function ConvoOptions({
       archiveConvoMutation,
       navigate,
       newConversation,
-      projectId,
+      zdockId,
       routeProjectId,
       retainView,
       setIsPopoverActive,
@@ -252,7 +250,7 @@ function ConvoOptions({
             buildConversationPath({
               conversationId,
               mode: 'code',
-              projectId,
+              zdockId,
             }),
           );
           setIsPopoverActive(false);
@@ -275,12 +273,12 @@ function ConvoOptions({
         label: localize('com_ui_remove_from_project'),
         onClick: (e: MouseEvent) => {
           e.stopPropagation();
-          if (!projectId || !conversationId) {
+          if (!zdockId || !conversationId) {
             return;
           }
           // Optimistic: remove from cache immediately
           queryClient.setQueryData(
-            [QueryKeys.projectConversations, projectId],
+            [QueryKeys.zdockConversations, zdockId],
             (old: { conversations: Array<{ conversationId?: string }> } | undefined) => {
               if (!old) {
                 return old;
@@ -294,9 +292,9 @@ function ConvoOptions({
             },
           );
           // Fire API call in background
-          dataService.removeConversationFromProject(projectId, conversationId).catch(() => {
+          dataService.removeConversationFromProject(zdockId, conversationId).catch(() => {
             // Revert on failure
-            queryClient.invalidateQueries([QueryKeys.projectConversations, projectId]);
+            queryClient.invalidateQueries([QueryKeys.zdockConversations, zdockId]);
             showToast({
               message: localize('com_ui_error_remove_from_project'),
               severity: NotificationSeverity.ERROR,
@@ -310,7 +308,7 @@ function ConvoOptions({
           });
         },
         icon: <FolderOutput className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
-        show: !!projectId,
+        show: !!zdockId,
       },
       {
         label: localize('com_ui_archive'),
@@ -345,7 +343,7 @@ function ConvoOptions({
       handleArchiveClick,
       canCreateSharedLinks,
       handleDuplicateClick,
-      projectId,
+      zdockId,
       conversationId,
       queryClient,
       showToast,
@@ -452,7 +450,7 @@ function ConvoOptions({
         />
       )}
       {showMoveDialog && (
-        <MoveToProjectDialog
+        <MoveToZdockDialog
           open={showMoveDialog}
           onOpenChange={setShowMoveDialog}
           conversationIds={conversationId ? [conversationId] : []}
@@ -467,11 +465,10 @@ export default memo(ConvoOptions, (prevProps, nextProps) => {
   return (
     prevProps.conversationId === nextProps.conversationId &&
     prevProps.title === nextProps.title &&
-    prevProps.chatProjectId === nextProps.chatProjectId &&
     prevProps.isPopoverActive === nextProps.isPopoverActive &&
     prevProps.isActiveConvo === nextProps.isActiveConvo &&
     prevProps.isShiftHeld === nextProps.isShiftHeld &&
-    prevProps.projectId === nextProps.projectId &&
+    prevProps.zdockId === nextProps.zdockId &&
     prevProps.retainView === nextProps.retainView
   );
 });

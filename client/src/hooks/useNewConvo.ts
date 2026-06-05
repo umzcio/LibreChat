@@ -90,11 +90,6 @@ const useNewConvo = (index = 0) => {
         const modelsConfig = modelsData ?? modelsQuery.data;
         const { endpoint = null } = conversation;
         const buildDefaultConversation = (endpoint === null || buildDefault) ?? false;
-        const hasExplicitChatProjectId = Object.prototype.hasOwnProperty.call(
-          conversation,
-          'chatProjectId',
-        );
-        const explicitChatProjectId = conversation.chatProjectId;
         const activePreset =
           // use default preset only when it's defined,
           // preset is not provided,
@@ -205,12 +200,6 @@ const useNewConvo = (index = 0) => {
             models,
             defaultParamsEndpoint,
           });
-
-          if (hasExplicitChatProjectId) {
-            conversation.chatProjectId = explicitChatProjectId ?? null;
-          } else {
-            delete conversation.chatProjectId;
-          }
         }
 
         if (disableParams === true) {
@@ -242,20 +231,13 @@ const useNewConvo = (index = 0) => {
 
         const getParams = (nextConversation: TConversation) => {
           const nextParams = new URLSearchParams(searchParams);
-          nextParams.delete('projectId');
-          if (
-            nextConversation.conversationId === Constants.NEW_CONVO &&
-            nextConversation.chatProjectId
-          ) {
-            nextParams.set('projectId', nextConversation.chatProjectId);
-          }
-
+          nextParams.delete('zdockId');
           const searchParamsString = nextParams.toString();
           return searchParamsString ? `?${searchParamsString}` : '';
         };
 
-        const projectPrefix = conversation.projectId
-          ? conversation.projectId
+        const projectPrefix = conversation.zdockId
+          ? conversation.zdockId
           : undefined;
         if (conversation.conversationId === Constants.NEW_CONVO && !modelsData) {
           const appTitle = localStorage.getItem(LocalStorageKeys.APP_TITLE) ?? '';
@@ -264,7 +246,7 @@ const useNewConvo = (index = 0) => {
           }
           const path = `${buildConversationPath({
             conversationId: Constants.NEW_CONVO,
-            projectId: projectPrefix,
+            zdockId: projectPrefix,
           })}${getParams()}`;
           navigate(path, { state: { focusChat: true } });
           return;
@@ -272,7 +254,7 @@ const useNewConvo = (index = 0) => {
 
         const path = `${buildConversationPath({
           conversationId: conversation.conversationId,
-          projectId: projectPrefix,
+          zdockId: projectPrefix,
         })}${getParams()}`;
         navigate(path, {
           replace: true,
@@ -311,7 +293,7 @@ const useNewConvo = (index = 0) => {
         isParamEndpoint(_preset?.endpoint ?? '', _preset?.endpointType ?? '');
       const template =
         paramEndpoint === true && templateConvoId && templateConvoId === Constants.NEW_CONVO
-          ? { endpoint: _template.endpoint, chatProjectId: _template.chatProjectId }
+          ? { endpoint: _template.endpoint }
           : _template;
 
       const conversation = {
@@ -331,8 +313,7 @@ const useNewConvo = (index = 0) => {
         startupConfig &&
         (startupConfig.modelSpecs?.prioritize === true ||
           (startupConfig.interface?.modelSelect ?? true) !== true ||
-          (result?.last != null &&
-            Object.keys(_template).filter((key) => key !== 'chatProjectId').length === 0)) &&
+          (result?.last != null && Object.keys(_template).length === 0)) &&
         defaultModelSpec
       ) {
         preset = getModelSpecPreset(defaultModelSpec);

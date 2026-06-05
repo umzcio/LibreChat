@@ -13,9 +13,9 @@ import {
   useLocalStorage,
 } from '~/hooks';
 import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
-import ProjectCreateDialog from '~/components/SidePanel/Projects/ProjectCreateDialog';
-import { ProjectCard } from '~/components/SidePanel/Projects';
-import { useActiveJobs, useListProjectsQuery } from '~/data-provider';
+import ZdockCreateDialog from '~/components/SidePanel/Zdocks/ZdockCreateDialog';
+import { ZdockCard } from '~/components/SidePanel/Zdocks';
+import { useActiveJobs, useListZdocksQuery } from '~/data-provider';
 import { groupConversationsByDate, cn } from '~/utils';
 import Convo from './Convo';
 import store from '~/store';
@@ -190,7 +190,6 @@ const MemoizedConvo = memo(
       prevProps.conversation.conversationId === nextProps.conversation.conversationId &&
       prevProps.conversation.title === nextProps.conversation.title &&
       prevProps.conversation.endpoint === nextProps.conversation.endpoint &&
-      prevProps.conversation.chatProjectId === nextProps.conversation.chatProjectId &&
       prevProps.isGenerating === nextProps.isGenerating
     );
   },
@@ -216,13 +215,13 @@ const Conversations: FC<ConversationsProps> = ({
   const showAgentMarketplace = useShowMarketplace();
 
   const favoritesContentKeyRef = useRef('');
-  const projectsContentKeyRef = useRef('');
-  const [isProjectsExpanded, setIsProjectsExpanded] = useLocalStorage('projectsExpanded', true);
-  const [createProjectOpen, setCreateProjectOpen] = useState(false);
-  const { data: projectsData } = useListProjectsQuery();
+  const zdocksContentKeyRef = useRef('');
+  const [isZdocksExpanded, setIsProjectsExpanded] = useLocalStorage('projectsExpanded', true);
+  const [createZdockOpen, setCreateZdockOpen] = useState(false);
+  const { data: projectsData } = useListZdocksQuery();
   const projects = useMemo(() => projectsData?.projects ?? [], [projectsData]);
   const projectsContentKey = useMemo(
-    () => projects.map(({ projectId }) => projectId).join(':'),
+    () => projects.map(({ zdockId }) => zdockId).join(':'),
     [projects],
   );
 
@@ -242,7 +241,7 @@ const Conversations: FC<ConversationsProps> = ({
   const favoritesContentKey = `${favorites.length}-${showAgentMarketplace ? 1 : 0}-${isFavoritesLoading ? 1 : 0}`;
 
   favoritesContentKeyRef.current = favoritesContentKey;
-  projectsContentKeyRef.current = `${projectsContentKey}-${isProjectsExpanded ? 1 : 0}`;
+  zdocksContentKeyRef.current = `${projectsContentKey}-${isZdocksExpanded ? 1 : 0}`;
 
   const filteredConversations = useMemo(
     () => rawConversations.filter(Boolean) as TConversation[],
@@ -295,7 +294,7 @@ const Conversations: FC<ConversationsProps> = ({
             return `favorites-${favoritesContentKeyRef.current}`;
           }
           if (item.type === 'projects') {
-            return `projects-${projectsContentKeyRef.current}`;
+            return `projects-${zdocksContentKeyRef.current}`;
           }
           if (item.type === 'chats-header') {
             return 'chats-header';
@@ -363,7 +362,7 @@ const Conversations: FC<ConversationsProps> = ({
       clearMeasuredRows(['projects']);
     });
     return () => cancelAnimationFrame(frameId);
-  }, [projectsContentKey, isProjectsExpanded, clearMeasuredRows]);
+  }, [projectsContentKey, isZdocksExpanded, clearMeasuredRows]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
@@ -401,7 +400,7 @@ const Conversations: FC<ConversationsProps> = ({
           <MeasuredRow key={key} {...rowProps}>
             <div className="px-1">
               <button
-                onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
+                onClick={() => setIsProjectsExpanded(!isZdocksExpanded)}
                 className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-xs font-bold text-text-secondary outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
                 type="button"
               >
@@ -409,24 +408,24 @@ const Conversations: FC<ConversationsProps> = ({
                 <ChevronDown
                   className={cn(
                     'h-3 w-3 transition-transform duration-200',
-                    isProjectsExpanded ? 'rotate-180' : '',
+                    isZdocksExpanded ? 'rotate-180' : '',
                   )}
                 />
               </button>
-              {isProjectsExpanded && (
+              {isZdocksExpanded && (
                 <div className="space-y-0.5 pb-1">
-                  <ProjectCreateDialog open={createProjectOpen} onOpenChange={setCreateProjectOpen}>
+                  <ZdockCreateDialog open={createZdockOpen} onOpenChange={setCreateZdockOpen}>
                     <button
                       type="button"
                       className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                      onClick={() => setCreateProjectOpen(true)}
+                      onClick={() => setCreateZdockOpen(true)}
                     >
                       <FolderKanban className="size-4" aria-hidden="true" />
                       {localize('com_ui_new_project')}
                     </button>
-                  </ProjectCreateDialog>
+                  </ZdockCreateDialog>
                   {projects.map((proj) => (
-                    <ProjectCard key={proj.projectId} project={proj} />
+                    <ZdockCard key={proj.zdockId} project={proj} />
                   ))}
                 </div>
               )}
@@ -485,9 +484,9 @@ const Conversations: FC<ConversationsProps> = ({
       shouldShowFavorites,
       activeJobIds,
       localize,
-      isProjectsExpanded,
+      isZdocksExpanded,
       setIsProjectsExpanded,
-      createProjectOpen,
+      createZdockOpen,
       projects,
     ],
   );

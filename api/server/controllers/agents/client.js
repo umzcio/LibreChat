@@ -31,7 +31,7 @@ const {
   countFormattedMessageTokens,
   prependFileContext,
   hydrateMissingIndexTokenCounts,
-  createProjectContextBuilder,
+  createZdockContextBuilder,
   injectSkillPrimes,
   isSkillPrimeMessage,
   collectFileIds,
@@ -212,10 +212,9 @@ class AgentClient extends BaseClient {
         {
           spec: this.options.spec,
           iconURL: this.options.iconURL,
-          chatProjectId: this.options.chatProjectId,
           endpoint: this.options.endpoint,
           agent_id: this.options.agent.id,
-          projectId: this.options.req?.body?.projectId,
+          zdockId: this.options.req?.body?.zdockId,
           modelLabel: this.options.modelLabel,
           resendFiles: this.options.resendFiles,
           imageDetail: this.options.imageDetail,
@@ -422,16 +421,16 @@ class AgentClient extends BaseClient {
     const sharedRunContextParts = [];
 
     /** Project context (instructions + knowledge base) - stacks on top of everything */
-    const projectId = this.options.req?.body?.projectId;
+    const zdockId = this.options.req?.body?.zdockId;
     const latestMessage = orderedMessages[orderedMessages.length - 1];
-    if (projectId) {
-      const { buildProjectContext } = createProjectContextBuilder({
-        getProject: db.getProject,
-        getProjectFiles: db.getProjectFiles,
+    if (zdockId) {
+      const { buildZdockContext } = createZdockContextBuilder({
+        getZdock: db.getZdock,
+        getZdockFiles: db.getZdockFiles,
       });
       const userQuery = latestMessage?.text || latestMessage?.content?.[0]?.text?.value || '';
-      const projectContext = await buildProjectContext({
-        projectId,
+      const projectContext = await buildZdockContext({
+        zdockId,
         userId: this.options.req.user.id,
         userQuery,
       });
@@ -697,8 +696,8 @@ class AgentClient extends BaseClient {
       }));
 
       const metadata = {};
-      if (this.options.req?.body?.projectId) {
-        metadata.project_id = this.options.req.body.projectId;
+      if (this.options.req?.body?.zdockId) {
+        metadata.project_id = this.options.req.body.zdockId;
       }
       if (this.conversationId) {
         metadata.conversation_id = this.conversationId;

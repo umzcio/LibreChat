@@ -6,7 +6,7 @@ export type AccessRole = {
   /** e.g., "Viewer", "Editor" */
   name: string;
   description?: string;
-  /** e.g., 'agent', 'project', 'file' */
+  /** e.g., 'agent', 'zdock', 'file' */
   resourceType: string;
   /** e.g., 1 for read, 3 for read+write */
   permBits: number;

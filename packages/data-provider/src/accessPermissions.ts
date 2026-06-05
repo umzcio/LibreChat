@@ -47,7 +47,7 @@ export enum ResourceType {
   PROMPTGROUP = 'promptGroup',
   MCPSERVER = 'mcpServer',
   REMOTE_AGENT = 'remoteAgent',
-  PROJECT = 'project',
+  PROJECT = 'zdock',
   SKILL = 'skill',
   SHARED_LINK = 'sharedLink',
 }
@@ -82,9 +82,9 @@ export enum AccessRoleIds {
   REMOTE_AGENT_VIEWER = 'remoteAgent_viewer',
   REMOTE_AGENT_EDITOR = 'remoteAgent_editor',
   REMOTE_AGENT_OWNER = 'remoteAgent_owner',
-  PROJECT_VIEWER = 'project_viewer',
-  PROJECT_EDITOR = 'project_editor',
-  PROJECT_OWNER = 'project_owner',
+  ZDOCK_VIEWER = 'zdock_viewer',
+  ZDOCK_EDITOR = 'zdock_editor',
+  ZDOCK_OWNER = 'zdock_owner',
   SKILL_VIEWER = 'skill_viewer',
   SKILL_EDITOR = 'skill_editor',
   SKILL_OWNER = 'skill_owner',
@@ -341,15 +341,15 @@ function accessRoleToPermBits(accessRoleId: string): number {
     case AccessRoleIds.PROMPTGROUP_OWNER:
     case AccessRoleIds.MCPSERVER_OWNER:
     case AccessRoleIds.REMOTE_AGENT_OWNER:
-    case AccessRoleIds.PROJECT_OWNER:
+    case AccessRoleIds.ZDOCK_OWNER:
     case AccessRoleIds.SKILL_OWNER:
     case AccessRoleIds.SHARED_LINK_OWNER:
       return (
         PermissionBits.VIEW | PermissionBits.EDIT | PermissionBits.DELETE | PermissionBits.SHARE
       );
-    case AccessRoleIds.PROJECT_VIEWER:
+    case AccessRoleIds.ZDOCK_VIEWER:
       return PermissionBits.VIEW;
-    case AccessRoleIds.PROJECT_EDITOR:
+    case AccessRoleIds.ZDOCK_EDITOR:
       return PermissionBits.VIEW | PermissionBits.EDIT;
     default:
       return PermissionBits.VIEW;

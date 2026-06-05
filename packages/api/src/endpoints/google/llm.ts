@@ -383,7 +383,7 @@ export function getGoogleConfig(
   if (provider === Providers.VERTEXAI) {
     (llmConfig as VertexAIClientOptions).authOptions = {
       credentials: { ...serviceKey },
-      projectId: project_id,
+      zdockId: project_id,
     };
     const location = process.env.GOOGLE_LOC || 'us-central1';
     (llmConfig as VertexAIClientOptions).location = location;

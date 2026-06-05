@@ -36,7 +36,7 @@ export default function useConversationRoute(index = 0) {
   useAppStartup({ startupConfig, user });
 
   const [searchParams] = useSearchParams();
-  const { conversationId = '', projectId } = useParams();
+  const { conversationId = '', zdockId } = useParams();
   useIdChangeEffect(conversationId);
   const { hasSetConversation, conversation } = store.useCreateConversationAtom(index);
   const { newConversation } = useNewConvo();
@@ -99,9 +99,9 @@ export default function useConversationRoute(index = 0) {
     if (isNewConvo && endpointsQuery.data && modelsQuery.data) {
       const preset = getNewConvoPreset();
       const convoTemplate = conversation
-        ? { ...conversation, ...(projectId ? { projectId } : {}) }
-        : projectId
-          ? ({ projectId } as Partial<TConversation>)
+        ? { ...conversation, ...(zdockId ? { zdockId } : {}) }
+        : zdockId
+          ? ({ zdockId } as Partial<TConversation>)
           : undefined;
 
       newConversation({
@@ -119,7 +119,7 @@ export default function useConversationRoute(index = 0) {
         keepLatestMessage: true,
         modelsData: modelsQuery.data,
         preset: initialConvoQuery.data as TPreset,
-        template: { ...initialConvoQuery.data, ...(projectId ? { projectId } : {}) },
+        template: { ...initialConvoQuery.data, ...(zdockId ? { zdockId } : {}) },
       });
       hasSetConversation.current = true;
       return;
@@ -164,9 +164,9 @@ export default function useConversationRoute(index = 0) {
       newConversation({
         modelsData: modelsQuery.data,
         template: conversation
-          ? { ...conversation, ...(projectId ? { projectId } : {}) }
-          : projectId
-            ? ({ projectId } as Partial<TConversation>)
+          ? { ...conversation, ...(zdockId ? { zdockId } : {}) }
+          : zdockId
+            ? ({ zdockId } as Partial<TConversation>)
             : undefined,
         ...(preset ? { preset } : {}),
       });
@@ -210,6 +210,6 @@ export default function useConversationRoute(index = 0) {
     isAuthenticated,
     isConversationReady,
     isLoading,
-    projectId,
+    zdockId,
   };
 }

@@ -7,10 +7,10 @@ export * from './Code';
 /* Memories */
 export * from './Memories';
 /* Projects */
-export * from './Projects';
+export * from './Zdocks';
 export * from './Messages';
 export * from './Misc';
-export * from './Projects';
+export * from './Zdocks';
 export * from './Tools';
 export * from './connection';
 export * from './Favorites';

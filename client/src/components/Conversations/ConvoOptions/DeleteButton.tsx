@@ -48,7 +48,7 @@ export function DeleteConversationDialog({
   const queryClient = useQueryClient();
   const { showToast } = useToastContext();
   const { newConversation } = useNewConvo();
-  const { conversationId: currentConvoId, projectId } = useParams();
+  const { conversationId: currentConvoId, zdockId } = useParams();
 
   const deleteMutation = useDeleteConversationMutation({
     onSuccess: () => {
@@ -59,7 +59,7 @@ export function DeleteConversationDialog({
           buildConversationPath({
             conversationId: 'new',
             mode: getConversationModeFromPath(location.pathname),
-            projectId,
+            zdockId,
           }),
           { replace: true },
         );

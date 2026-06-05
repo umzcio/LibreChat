@@ -6,7 +6,7 @@ import { FileSources } from 'librechat-data-provider';
 import type {
   IConversation,
   IMongoFile,
-  IProject,
+  IZdock,
   IWorkspaceFileBinding,
   IWorkspaceSession,
 } from '@librechat/data-schemas';
@@ -29,7 +29,7 @@ export interface CodeWorkspaceSessionView {
   hasProject: boolean;
   mode: 'code';
   openFiles: string[];
-  projectId?: string | null;
+  zdockId?: string | null;
 }
 
 export interface CodeChange {
@@ -51,10 +51,10 @@ export interface CodeRenameResult {
 }
 
 export interface CodeServiceDeps {
-  createProject: (
+  createZdock: (
     userId: string,
-    data: Partial<IProject> & { projectId: string; name: string },
-  ) => Promise<IProject>;
+    data: Partial<IZdock> & { zdockId: string; name: string },
+  ) => Promise<IZdock>;
   createFile: (
     data: Partial<IMongoFile>,
     disableTTL?: boolean,
@@ -67,8 +67,8 @@ export interface CodeServiceDeps {
     options?: Record<string, unknown>,
   ) => Promise<IMongoFile | null>;
   getConvo: (userId: string, conversationId: string) => Promise<IConversation | null>;
-  getProject: (projectId: string, userId?: string) => Promise<IProject | null>;
-  getProjectFiles: (projectId: string, userId?: string) => Promise<IMongoFile[]>;
+  getZdock: (zdockId: string, userId?: string) => Promise<IZdock | null>;
+  getZdockFiles: (zdockId: string, userId?: string) => Promise<IMongoFile[]>;
   getWorkspaceSession: (
     userId: string,
     conversationId: string,
@@ -168,16 +168,16 @@ function getConversationWorkspaceRoot(userId: string, conversationId: string): s
   return path.join(getUserWorkspaceRoot(userId), 'sessions', sanitizeFilename(conversationId));
 }
 
-function getProjectStorageRoot(userId: string, projectId: string): string {
+function getProjectStorageRoot(userId: string, zdockId: string): string {
   return path.join(
     getUserWorkspaceRoot(userId),
     'projects',
-    sanitizeFilename(projectId),
+    sanitizeFilename(zdockId),
   );
 }
 
-function getProjectStoragePath(userId: string, projectId: string, relativePath: string): string {
-  return ensurePathWithinRoot(getProjectStorageRoot(userId, projectId), relativePath);
+function getProjectStoragePath(userId: string, zdockId: string, relativePath: string): string {
+  return ensurePathWithinRoot(getProjectStorageRoot(userId, zdockId), relativePath);
 }
 
 function getUniqueRelativePath(inputName: string, usedPaths: Set<string>): string {
@@ -252,15 +252,15 @@ async function removeEmptyParents(rootPath: string, relativePath: string): Promi
 
 function buildSessionView(
   session: IWorkspaceSession,
-  projectId?: string | null,
+  zdockId?: string | null,
 ): CodeWorkspaceSessionView {
   return {
     activeFile: session.activeFile ? toClientPath(session.activeFile) : undefined,
     conversationId: session.conversationId,
-    hasProject: Boolean(projectId),
+    hasProject: Boolean(zdockId),
     mode: 'code',
     openFiles: (session.openFiles ?? []).map((filePath) => toClientPath(filePath)),
-    projectId: projectId ?? null,
+    zdockId: zdockId ?? null,
   };
 }
 
@@ -278,12 +278,12 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
   async function materializeProjectFiles(
     userId: string,
     conversationId: string,
-    projectId: string,
+    zdockId: string,
   ) {
     const workspaceRoot = getConversationWorkspaceRoot(userId, conversationId);
     await fs.mkdir(workspaceRoot, { recursive: true });
 
-    const projectFiles = await deps.getProjectFiles(projectId, userId);
+    const projectFiles = await deps.getZdockFiles(zdockId, userId);
     const usedPaths = new Set<string>();
     const fileBindings: IWorkspaceFileBinding[] = [];
 
@@ -333,10 +333,10 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
       workingCopyRoot,
     };
 
-    if (conversation.projectId) {
+    if (conversation.zdockId) {
       Object.assign(
         sessionUpdate,
-        await materializeProjectFiles(userId, conversationId, conversation.projectId),
+        await materializeProjectFiles(userId, conversationId, conversation.zdockId),
       );
     }
 
@@ -355,7 +355,7 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
   async function bootstrapWorkspace(userId: string, conversationId: string) {
     const { conversation, session } = await ensureWorkspaceSession(userId, conversationId);
 
-    return buildSessionView(session, conversation.projectId);
+    return buildSessionView(session, conversation.zdockId);
   }
 
   async function listFiles(
@@ -543,11 +543,11 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
   async function listChanges(userId: string, conversationId: string): Promise<CodeChange[]> {
     const { conversation, session } = await ensureWorkspaceSession(userId, conversationId);
 
-    if (!conversation.projectId) {
+    if (!conversation.zdockId) {
       return [];
     }
 
-    const projectFiles = await deps.getProjectFiles(conversation.projectId, userId);
+    const projectFiles = await deps.getZdockFiles(conversation.zdockId, userId);
     const fileMap = new Map(projectFiles.map((file) => [file.file_id, file]));
     const bindings = session.fileBindings ?? [];
     const workspaceFiles = new Set(await collectWorkspaceFiles(session.workingCopyRoot));
@@ -606,9 +606,9 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
     const workspaceExists = await exists(absolutePath);
     const workingContent = workspaceExists ? await readTextFile(absolutePath) : '';
     const originalFile =
-      conversation.projectId && binding?.fileId
+      conversation.zdockId && binding?.fileId
         ? await deps.findFileById(binding.fileId, {
-            projectId: conversation.projectId,
+            zdockId: conversation.zdockId,
             user: userId,
           })
         : null;
@@ -640,7 +640,7 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
   ) {
     const { conversation, session } = await ensureWorkspaceSession(userId, conversationId);
 
-    if (!conversation.projectId) {
+    if (!conversation.zdockId) {
       throw new Error('Conversation is not linked to a project');
     }
 
@@ -662,7 +662,7 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
       if (!workspaceExists && binding?.fileId) {
         const deletedFile = await deps.deleteFileByFilter({
           file_id: binding.fileId,
-          projectId: conversation.projectId,
+          zdockId: conversation.zdockId,
           user: userId,
         });
 
@@ -680,7 +680,7 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
 
       const content = await readTextFile(workingPath);
       const bytes = Buffer.byteLength(content, 'utf8');
-      const managedPath = getProjectStoragePath(userId, conversation.projectId, relativePath);
+      const managedPath = getProjectStoragePath(userId, conversation.zdockId, relativePath);
 
       await fs.mkdir(path.dirname(managedPath), { recursive: true });
       await fs.writeFile(managedPath, content, 'utf8');
@@ -692,7 +692,7 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
           file_id: binding.fileId,
           filename: relativePath,
           filepath: managedPath,
-          projectId: conversation.projectId,
+          zdockId: conversation.zdockId,
           source: FileSources.local,
           text: content,
           type: inferTextMime(relativePath),
@@ -714,7 +714,7 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
           filename: relativePath,
           filepath: managedPath,
           object: 'file',
-          projectId: conversation.projectId,
+          zdockId: conversation.zdockId,
           source: FileSources.local,
           text: content,
           type: inferTextMime(relativePath),
@@ -741,7 +741,7 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
       openFiles: session.openFiles ?? [],
     });
 
-    return buildSessionView(updatedSession ?? session, conversation.projectId);
+    return buildSessionView(updatedSession ?? session, conversation.zdockId);
   }
 
   async function discardChanges(
@@ -771,9 +771,9 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
       }
 
       const originalFile =
-        conversation.projectId && binding.fileId
+        conversation.zdockId && binding.fileId
           ? await deps.findFileById(binding.fileId, {
-              projectId: conversation.projectId,
+              zdockId: conversation.zdockId,
               user: userId,
             })
           : null;
@@ -796,19 +796,19 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
   async function promoteWorkspace(
     userId: string,
     conversationId: string,
-    options?: { projectId?: string; projectName?: string },
+    options?: { zdockId?: string; projectName?: string },
   ) {
     const { conversation, session } = await ensureWorkspaceSession(userId, conversationId);
 
-    if (conversation.projectId) {
-      return buildSessionView(session, conversation.projectId);
+    if (conversation.zdockId) {
+      return buildSessionView(session, conversation.zdockId);
     }
 
-    let targetProject = options?.projectId
-      ? await deps.getProject(options.projectId, userId)
+    let targetProject = options?.zdockId
+      ? await deps.getZdock(options.zdockId, userId)
       : null;
 
-    if (options?.projectId && !targetProject) {
+    if (options?.zdockId && !targetProject) {
       throw new Error('Project not found');
     }
 
@@ -819,15 +819,15 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
           ? conversation.title.trim()
           : 'Code Workspace');
 
-      targetProject = await deps.createProject(userId, {
+      targetProject = await deps.createZdock(userId, {
         name: nextProjectName,
-        projectId: `project_${crypto.randomUUID()}`,
+        zdockId: `zdock_${crypto.randomUUID()}`,
       });
     }
 
     const updatedConversation = await deps.saveConvo(
       { userId },
-      { conversationId, projectId: targetProject.projectId },
+      { conversationId, zdockId: targetProject.zdockId },
       {
         context: '[code] promote workspace to project',
         noUpsert: true,
@@ -841,7 +841,7 @@ export function createCodeWorkspaceService(deps: CodeServiceDeps) {
     const importedSession = await applyChanges(userId, conversationId);
     return {
       ...importedSession,
-      projectId: targetProject.projectId,
+      zdockId: targetProject.zdockId,
     };
   }
 

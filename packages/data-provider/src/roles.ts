@@ -107,7 +107,7 @@ const defaultRolesSchema = z.object({
         [Permissions.SHARE]: z.boolean().default(true),
         [Permissions.SHARE_PUBLIC]: z.boolean().default(true),
       }),
-      [PermissionTypes.PROJECTS]: projectPermissionsSchema.extend({
+      [PermissionTypes.ZDOCKS]: projectPermissionsSchema.extend({
         [Permissions.USE]: z.boolean().default(true),
         [Permissions.CREATE]: z.boolean().default(true),
         [Permissions.SHARE]: z.boolean().default(true),
@@ -207,7 +207,7 @@ export const roleDefaults = defaultRolesSchema.parse({
         [Permissions.SHARE]: true,
         [Permissions.SHARE_PUBLIC]: true,
       },
-      [PermissionTypes.PROJECTS]: {
+      [PermissionTypes.ZDOCKS]: {
         [Permissions.USE]: true,
         [Permissions.CREATE]: true,
         [Permissions.SHARE]: true,
@@ -270,7 +270,7 @@ export const roleDefaults = defaultRolesSchema.parse({
         [Permissions.SHARE]: false,
         [Permissions.SHARE_PUBLIC]: false,
       },
-      [PermissionTypes.PROJECTS]: {
+      [PermissionTypes.ZDOCKS]: {
         [Permissions.USE]: true,
         [Permissions.CREATE]: true,
         [Permissions.SHARE]: false,

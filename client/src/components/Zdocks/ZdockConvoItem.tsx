@@ -10,14 +10,14 @@ import { useNavigateToConvo, useLocalize } from '~/hooks';
 import { NotificationSeverity } from '~/common';
 import { cn, logger } from '~/utils';
 
-export default function ProjectConvoItem({
+export default function ZdockConvoItem({
   conversation,
-  projectId,
+  zdockId,
   onConvoRemoved,
   relativeTime,
 }: {
   conversation: TConversation;
-  projectId: string;
+  zdockId: string;
   onConvoRemoved?: () => void;
   relativeTime?: string;
 }) {
@@ -104,7 +104,7 @@ export default function ProjectConvoItem({
     if (renaming || isPopoverActive) {
       return;
     }
-    navigateToConvo({ ...conversation, projectId } as TConversation, {
+    navigateToConvo({ ...conversation, zdockId } as TConversation, {
       currentConvoId,
       resetLatestMessage: true,
     });
@@ -178,7 +178,7 @@ export default function ProjectConvoItem({
             isPopoverActive={isPopoverActive}
             setIsPopoverActive={handlePopoverOpenChange}
             index={0}
-            projectId={projectId}
+            zdockId={zdockId}
           />
         )}
       </div>

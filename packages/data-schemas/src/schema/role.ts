@@ -68,7 +68,7 @@ const rolePermissionsSchema = new Schema(
       [Permissions.SHARE]: { type: Boolean },
       [Permissions.SHARE_PUBLIC]: { type: Boolean },
     },
-    [PermissionTypes.PROJECTS]: {
+    [PermissionTypes.ZDOCKS]: {
       [Permissions.USE]: { type: Boolean },
       [Permissions.CREATE]: { type: Boolean },
       [Permissions.SHARE]: { type: Boolean },

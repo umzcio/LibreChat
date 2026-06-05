@@ -37,17 +37,6 @@ import { createPresetMethods, type PresetMethods } from './preset';
 import { createConversationTagMethods, type ConversationTagMethods } from './conversationTag';
 import { createMessageMethods, type MessageMethods } from './message';
 import { createConversationMethods, type ConversationMethods } from './conversation';
-import { createChatProjectMethods, type ChatProjectMethods } from './chatProject';
-export type {
-  AssignConversationToProjectResult,
-  ChatProjectSortBy,
-  ChatProjectSortDirection,
-  CreateChatProjectInput,
-  DeleteChatProjectResult,
-  ListChatProjectsOptions,
-  ListChatProjectsResult,
-  UpdateChatProjectInput,
-} from './chatProject';
 /* Tier 3 — Complex (heavier injection) */
 import {
   createTxMethods,
@@ -62,7 +51,7 @@ import { createTransactionMethods, type TransactionMethods } from './transaction
 import { createSpendTokensMethods, type SpendTokensMethods } from './spendTokens';
 import { createPromptMethods, type PromptMethods, type PromptDeps } from './prompt';
 /* Projects */
-import { createProjectMethods, type ProjectMethods } from './project';
+import { createZdockMethods, type ZdockMethods } from './zdock';
 import { createWorkspaceMethods, type WorkspaceMethods } from './workspace';
 /* Skills */
 import {
@@ -113,14 +102,13 @@ export type AllMethods = UserMethods &
   ConversationTagMethods &
   MessageMethods &
   ConversationMethods &
-  ChatProjectMethods &
   TxMethods &
   TransactionMethods &
   SpendTokensMethods &
   PromptMethods &
   SkillMethods &
   AgentMethods &
-  ProjectMethods &
+  ZdockMethods &
   WorkspaceMethods &
   ConfigMethods;
 
@@ -243,14 +231,13 @@ export function createMethods(
     ...createConversationTagMethods(mongoose),
     ...messageMethods,
     ...conversationMethods,
-    ...createChatProjectMethods(mongoose),
     /* Tier 3 */
     ...txMethods,
     ...transactionMethods,
     ...spendTokensMethods,
     ...promptMethods,
     /* Projects */
-    ...createProjectMethods(mongoose),
+    ...createZdockMethods(mongoose),
     ...createWorkspaceMethods(mongoose),
     /* Skills */
     ...skillMethods,
@@ -288,7 +275,6 @@ export type {
   ConversationTagMethods,
   MessageMethods,
   ConversationMethods,
-  ChatProjectMethods,
   TxMethods,
   TransactionMethods,
   SpendTokensMethods,
@@ -304,7 +290,7 @@ export type {
   UpdateSkillResult,
   ValidationIssue,
   AgentMethods,
-  ProjectMethods,
+  ZdockMethods,
   WorkspaceMethods,
   ConfigMethods,
 };

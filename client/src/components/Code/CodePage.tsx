@@ -30,7 +30,7 @@ import {
 import {
   useCreateCodeItemMutation,
   useDeleteCodeItemMutation,
-  useListProjectsQuery,
+  useListZdocksQuery,
   usePromoteCodeWorkspaceMutation,
   useCodeChangesQuery,
   useCodeDiffQuery,
@@ -591,7 +591,7 @@ function EditorPanel({
       conversationId,
       paths: [activeFile],
     });
-    queryClient.invalidateQueries([QueryKeys.projectFiles]);
+    queryClient.invalidateQueries([QueryKeys.zdockFiles]);
   };
 
   const handleDiscard = async () => {
@@ -786,7 +786,7 @@ export default function CodePage() {
   const { data: workspaceSession } = useCodeWorkspaceSessionQuery(conversationId, {
     enabled: !!conversationId,
   });
-  const { data: projectsData } = useListProjectsQuery();
+  const { data: projectsData } = useListZdocksQuery();
   const promoteMutation = usePromoteCodeWorkspaceMutation();
   const createItemMutation = useCreateCodeItemMutation();
   const saveFileMutation = useSaveCodeFileContentMutation();
@@ -817,7 +817,7 @@ export default function CodePage() {
 
   const pendingConversation =
     conversationId === Constants.NEW_CONVO || workspaceSession?.pendingConversation === true;
-  const hasProject = workspaceSession?.hasProject ?? Boolean(conversation?.projectId);
+  const hasProject = workspaceSession?.hasProject ?? Boolean(conversation?.zdockId);
 
   useEffect(() => {
     const requestedFile = searchParams.get('openFile');
@@ -971,7 +971,7 @@ export default function CodePage() {
       const session = await promoteMutation.mutateAsync({
         conversationId,
         ...(promotionMode === 'existing'
-          ? { projectId: selectedProjectId }
+          ? { zdockId: selectedProjectId }
           : { projectName: trimmedName }),
       });
 
@@ -990,7 +990,7 @@ export default function CodePage() {
         buildConversationPath({
           conversationId,
           mode: 'code',
-          projectId: session.projectId ?? undefined,
+          zdockId: session.zdockId ?? undefined,
         }),
         { replace: true },
       );
@@ -1055,7 +1055,7 @@ export default function CodePage() {
                 >
                   <option value="">{localize('com_ui_select')}</option>
                   {(projectsData?.projects ?? []).map((project) => (
-                    <option key={project.projectId} value={project.projectId}>
+                    <option key={project.zdockId} value={project.zdockId}>
                       {project.name}
                     </option>
                   ))}
@@ -1105,7 +1105,7 @@ export default function CodePage() {
             const existingProjects = projectsData?.projects ?? [];
             setPromotionMode(existingProjects.length > 0 ? 'existing' : 'create');
             setProjectName(conversation?.title?.trim() || '');
-            setSelectedProjectId(existingProjects[0]?.projectId ?? '');
+            setSelectedProjectId(existingProjects[0]?.zdockId ?? '');
             setShowPromoteDialog(true);
           }}
           pendingConversation={pendingConversation}

@@ -75,9 +75,9 @@ export default function useQueryParams({
 
   const getPreservedSearchParams = useCallback(() => {
     const preservedParams = new URLSearchParams();
-    const projectId = searchParams.get(PROJECT_ID_SEARCH_PARAM);
-    if (projectId) {
-      preservedParams.set(PROJECT_ID_SEARCH_PARAM, projectId);
+    const zdockId = searchParams.get(PROJECT_ID_SEARCH_PARAM);
+    if (zdockId) {
+      preservedParams.set(PROJECT_ID_SEARCH_PARAM, zdockId);
     }
     return preservedParams;
   }, [searchParams]);
@@ -178,7 +178,6 @@ export default function useQueryParams({
       }
 
       newConversation({
-        template: { chatProjectId: conversation?.chatProjectId ?? null },
         preset: newPreset,
         keepAddedConvos: true,
       });

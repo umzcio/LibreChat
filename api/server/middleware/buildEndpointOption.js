@@ -1,6 +1,6 @@
 const {
   handleError,
-  createProjectContextBuilder,
+  createZdockContextBuilder,
   applyModelSpecPreset,
   findModelSpecByName,
   isModelSpecEndpointMatch,
@@ -18,7 +18,7 @@ const azureAssistants = require('~/server/services/Endpoints/azureAssistants');
 const assistants = require('~/server/services/Endpoints/assistants');
 const { getEndpointsConfig } = require('~/server/services/Config');
 const agents = require('~/server/services/Endpoints/agents');
-const { updateFilesUsage, getProject, getProjectFiles } = require('~/models');
+const { updateFilesUsage, getZdock, getZdockFiles } = require('~/models');
 
 const buildFunction = {
   [EModelEndpoint.agents]: agents.buildOptions,
@@ -136,16 +136,16 @@ async function buildEndpointOption(req, res, next) {
       req.body.endpointOption.attachments = updateFilesUsage(req.body.files);
     }
 
-    /** Persist projectId in endpointOption so it's saved to the conversation */
-    if (req.body.projectId) {
-      req.body.endpointOption.projectId = req.body.projectId;
+    /** Persist zdockId in endpointOption so it's saved to the conversation */
+    if (req.body.zdockId) {
+      req.body.endpointOption.zdockId = req.body.zdockId;
     }
 
     /** Inject project context for non-agent endpoints */
-    if (req.body.projectId && !isAgents) {
-      const { buildProjectContext } = createProjectContextBuilder({ getProject, getProjectFiles });
-      const projectContext = await buildProjectContext({
-        projectId: req.body.projectId,
+    if (req.body.zdockId && !isAgents) {
+      const { buildZdockContext } = createZdockContextBuilder({ getZdock, getZdockFiles });
+      const projectContext = await buildZdockContext({
+        zdockId: req.body.zdockId,
         userId: req.user.id,
         userQuery: req.body.text || '',
       });

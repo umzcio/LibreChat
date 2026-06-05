@@ -29,7 +29,7 @@ const conversationSchema = new Schema({
   tags: { type: [String], default: [] },
 });
 
-const projectSchema = new Schema({
+const zdockSchema = new Schema({
   name: { type: String, required: true },
   promptGroupIds: { type: [Schema.Types.ObjectId], default: [] },
   agentIds: { type: [String], default: [] },
@@ -52,7 +52,7 @@ describeIfFerretDB('$pullAll FerretDB compatibility', () => {
     Group = mongoose.models.FDBGroup || mongoose.model('FDBGroup', groupSchema);
     Conversation =
       mongoose.models.FDBConversation || mongoose.model('FDBConversation', conversationSchema);
-    Project = mongoose.models.FDBProject || mongoose.model('FDBProject', projectSchema);
+    Project = mongoose.models.FDBProject || mongoose.model('FDBProject', zdockSchema);
     Agent = mongoose.models.FDBAgent || mongoose.model('FDBAgent', agentSchema);
 
     await Group.createCollection();

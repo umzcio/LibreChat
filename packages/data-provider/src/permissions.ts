@@ -61,9 +61,9 @@ export enum PermissionTypes {
    */
   REMOTE_AGENTS = 'REMOTE_AGENTS',
   /**
-   * Type for Project Permissions
+   * Type for Zdock Permissions
    */
-  PROJECTS = 'PROJECTS',
+  ZDOCKS = 'ZDOCKS',
   /**
    * Type for Skill Permissions
    */
@@ -94,7 +94,7 @@ export const PERMISSION_TYPE_INTERFACE_FIELDS: Record<PermissionTypes, string> =
   [PermissionTypes.MARKETPLACE]: 'marketplace',
   [PermissionTypes.MCP_SERVERS]: 'mcpServers',
   [PermissionTypes.REMOTE_AGENTS]: 'remoteAgents',
-  [PermissionTypes.PROJECTS]: 'projects',
+  [PermissionTypes.ZDOCKS]: 'zdocks',
   [PermissionTypes.SKILLS]: 'skills',
   [PermissionTypes.SHARED_LINKS]: 'sharedLinks',
 };
@@ -281,7 +281,7 @@ export const permissionsSchema = z.object({
   [PermissionTypes.FILE_CITATIONS]: fileCitationsPermissionsSchema,
   [PermissionTypes.MCP_SERVERS]: mcpServersPermissionsSchema,
   [PermissionTypes.REMOTE_AGENTS]: remoteAgentsPermissionsSchema,
-  [PermissionTypes.PROJECTS]: projectPermissionsSchema,
+  [PermissionTypes.ZDOCKS]: projectPermissionsSchema,
   [PermissionTypes.SKILLS]: skillPermissionsSchema,
   [PermissionTypes.SHARED_LINKS]: sharedLinksPermissionsSchema,
 });

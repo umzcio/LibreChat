@@ -20,7 +20,7 @@ describe('createAnthropicVertexClient', () => {
     testCases.forEach(({ region, baseURL }) => {
       const client = createAnthropicVertexClient(credentials, undefined, {
         region,
-        projectId: 'test-project',
+        zdockId: 'test-project',
       });
 
       expect(client.region).toBe(region);

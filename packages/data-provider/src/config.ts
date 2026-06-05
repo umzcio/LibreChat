@@ -63,7 +63,6 @@ export const excludedKeys = new Set([
   'files',
   'spec',
   'disableParams',
-  'chatProjectId',
 ]);
 
 export enum SettingsViews {
@@ -700,7 +699,7 @@ export const vertexAISchema = z.object({
   /** Enable Vertex AI mode for Anthropic (defaults to true when vertex config is present) */
   enabled: z.boolean().optional(),
   /** Google Cloud Project ID (optional - auto-detected from service key file if not provided) */
-  projectId: z.string().optional(),
+  zdockId: z.string().optional(),
   /** Vertex AI region (e.g., 'us-east5', 'europe-west1') */
   region: z.string().default('us-east5'),
   /** Optional: Path to service account key file */

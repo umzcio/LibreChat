@@ -310,7 +310,7 @@ describe('getGoogleConfig', () => {
       expect(result.provider).toBe(Providers.VERTEXAI);
       expect(result.llmConfig).toHaveProperty('authOptions');
       expect((result.llmConfig as Record<string, unknown>).authOptions).toMatchObject({
-        projectId: 'test-project',
+        zdockId: 'test-project',
         credentials: expect.objectContaining({
           project_id: 'test-project',
         }),
@@ -496,7 +496,7 @@ describe('getGoogleConfig', () => {
         modelOptions: {
           model: 'gemini-3.1-flash-lite-preview',
           apiKey: 'attacker-api-key',
-          authOptions: { projectId: 'attacker-project' },
+          authOptions: { zdockId: 'attacker-project' },
           baseUrl: 'https://attacker.example.test',
           customHeaders: { Authorization: 'Bearer attacker' },
         } as t.GoogleParameters,
@@ -506,7 +506,7 @@ describe('getGoogleConfig', () => {
       expect(result.llmConfig).not.toHaveProperty('baseUrl');
       expect(result.llmConfig).not.toHaveProperty('customHeaders');
       expect((result.llmConfig as Record<string, unknown>).authOptions).toMatchObject({
-        projectId: 'test-project',
+        zdockId: 'test-project',
       });
     });
 

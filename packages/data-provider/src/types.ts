@@ -17,7 +17,7 @@ import type { ContentTypes } from './types/runs';
 import type { Agent } from './types/assistants';
 
 export * from './schemas';
-export * from './types/projects';
+export * from './types/zdocks';
 
 export type TMessages = TMessage[];
 
@@ -72,7 +72,6 @@ export type TEndpointOption = Pick<
   | 'file_ids'
   // System field
   | 'system'
-  | 'chatProjectId'
   // Google examples
   | 'examples'
   // Context
@@ -115,7 +114,7 @@ export type TPayload = Partial<TMessage> &
     isContinued: boolean;
     isRegenerate?: boolean;
     conversationId: string | null;
-    projectId?: string;
+    zdockId?: string;
     messages?: TMessages;
     isTemporary: boolean;
     ephemeralAgent?: TEphemeralAgent | null;
@@ -290,41 +289,19 @@ export type TUpdateConversationRequest = {
 
 export type TUpdateConversationResponse = TConversation;
 
-export type TChatProject = {
-  _id: string;
-  name: string;
-  description?: string;
-  user?: string;
-  conversationCount: number;
-  lastConversationAt?: string | null;
-  lastConversationId?: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
 
-export type TCreateChatProjectRequest = {
-  name: string;
-  description?: string;
-};
 
-export type TUpdateChatProjectRequest = Partial<TCreateChatProjectRequest> & {
-  projectId: string;
-};
 
-export type TDeleteChatProjectResponse = {
-  deletedCount: number;
-  modifiedCount: number;
-};
 
 export type TAssignConversationToProjectRequest = {
   conversationId: string;
-  projectId: string | null;
+  zdockId: string | null;
 };
 
 export type TAssignConversationToProjectResponse = {
   conversation: TConversation;
   previousProjectId: string | null;
-  projectId: string | null;
+  zdockId: string | null;
 };
 
 export type TDeleteConversationRequest = {
@@ -620,7 +597,7 @@ export type TCreatePromptRecord = TCreatePrompt & Pick<TPromptGroup, 'author' | 
 export type TPromptsWithFilterRequest = {
   groupId: string;
   tags?: string[];
-  projectId?: string;
+  zdockId?: string;
   version?: number;
 };
 

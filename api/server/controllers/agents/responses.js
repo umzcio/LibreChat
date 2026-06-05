@@ -235,7 +235,7 @@ async function saveConversation(req, conversationId, agentId, agent) {
       conversationId,
       endpoint: EModelEndpoint.agents,
       agentId,
-      projectId: req?.body?.projectId,
+      zdockId: req?.body?.zdockId,
       title: agent?.name || 'Open Responses Conversation',
       model: agent?.model,
     },

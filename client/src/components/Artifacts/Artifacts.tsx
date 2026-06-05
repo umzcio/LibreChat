@@ -30,7 +30,7 @@ export default function Artifacts() {
   const navigate = useNavigate();
   const { isMutating } = useMutationState();
   const { isSharedConvo } = useShareContext();
-  const { conversationId: routeConversationId = '', projectId: routeProjectId } = useParams();
+  const { conversationId: routeConversationId = '', zdockId: routeProjectId } = useParams();
   const conversation = useAtomValue(store.conversationByIndex(0));
   const isMobile = useMediaQuery('(max-width: 868px)');
   const previewRef = useRef<SandpackPreviewRef>();
@@ -207,7 +207,7 @@ export default function Artifacts() {
       : routeConversationId && routeConversationId !== Constants.SEARCH
         ? routeConversationId
         : '';
-  const targetProjectId = conversation?.projectId ?? routeProjectId;
+  const targetProjectId = conversation?.zdockId ?? routeProjectId;
   const canOpenInCode = !isSharedConvo && !!targetConversationId && !!currentArtifact.id;
 
   const handleRefresh = () => {
@@ -249,7 +249,7 @@ export default function Artifacts() {
       `${buildConversationPath({
         conversationId: targetConversationId,
         mode: 'code',
-        projectId: targetProjectId,
+        zdockId: targetProjectId,
       })}?openArtifact=${encodeURIComponent(currentArtifact.id)}`,
     );
   };

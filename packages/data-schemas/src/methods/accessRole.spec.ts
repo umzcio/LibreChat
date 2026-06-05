@@ -135,17 +135,17 @@ describe('AccessRole Model Tests', () => {
           permBits: RoleBits.EDITOR,
         }),
         methods.createRole({
-          accessRoleId: 'project_viewer',
+          accessRoleId: 'zdock_viewer',
           name: 'Project Viewer',
           description: 'Can view projects',
-          resourceType: 'project',
+          resourceType: 'zdock',
           permBits: RoleBits.VIEWER,
         }),
         methods.createRole({
-          accessRoleId: 'project_editor',
+          accessRoleId: 'zdock_editor',
           name: 'Project Editor',
           description: 'Can edit projects',
-          resourceType: 'project',
+          resourceType: 'zdock',
           permBits: RoleBits.EDITOR,
         }),
       ]);
@@ -161,7 +161,7 @@ describe('AccessRole Model Tests', () => {
       const projectRoles = await methods.findRolesByResourceType('project');
       expect(projectRoles).toHaveLength(2);
       expect(projectRoles.map((r) => r.accessRoleId).sort()).toEqual(
-        ['project_editor', 'project_viewer'].sort(),
+        ['zdock_editor', 'zdock_viewer'].sort(),
       );
     });
 
@@ -311,9 +311,9 @@ describe('AccessRole Model Tests', () => {
     test('should find role for resource-specific permissions', async () => {
       // Create a role for a different resource type
       await methods.createRole({
-        accessRoleId: 'project_viewer',
+        accessRoleId: 'zdock_viewer',
         name: 'Project Viewer',
-        resourceType: 'project',
+        resourceType: 'zdock',
         permBits: RoleBits.VIEWER,
       });
 
@@ -323,9 +323,9 @@ describe('AccessRole Model Tests', () => {
       expect(agentRole?.accessRoleId).toBe(AccessRoleIds.AGENT_VIEWER);
 
       // Query for project roles
-      const projectRole = await methods.getRoleForPermissions('project', RoleBits.VIEWER);
+      const projectRole = await methods.getRoleForPermissions('zdock', RoleBits.VIEWER);
       expect(projectRole).toBeDefined();
-      expect(projectRole?.accessRoleId).toBe('project_viewer');
+      expect(projectRole?.accessRoleId).toBe('zdock_viewer');
     });
   });
 });

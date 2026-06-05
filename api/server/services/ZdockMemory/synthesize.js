@@ -34,24 +34,24 @@ Existing project memory (do not duplicate these):
 Return format: {"memories": ["memory 1", "memory 2", ...]}
 If there is nothing new worth remembering, return {"memories": []}`;
 
-async function synthesizeProjectMemory(projectId, userId) {
+async function synthesizeProjectMemory(zdockId, userId) {
   const endpoint =
     process.env.MEMORY_MODEL_ENDPOINT || 'http://host.docker.internal:11434/v1';
   const model = process.env.MEMORY_MODEL || 'qwen3:8b';
 
-  const project = await db.getProject(projectId, userId);
+  const project = await db.getZdock(zdockId, userId);
   if (!project) {
-    logger.warn('[ProjectMemory] Project not found for synthesis', { projectId });
+    logger.warn('[ProjectMemory] Project not found for synthesis', { zdockId });
     return;
   }
 
   const convosResult = await db.getConvosByCursor(userId, {
-    projectId,
+    zdockId,
     limit: 5,
   });
   const conversations = convosResult?.conversations || [];
   if (conversations.length === 0) {
-    logger.debug('[ProjectMemory] No conversations to synthesize', { projectId });
+    logger.debug('[ProjectMemory] No conversations to synthesize', { zdockId });
     return;
   }
 
@@ -76,7 +76,7 @@ async function synthesizeProjectMemory(projectId, userId) {
 
   const transcript = transcriptParts.join('\n\n');
   if (!transcript.trim()) {
-    logger.debug('[ProjectMemory] Empty transcript, skipping synthesis', { projectId });
+    logger.debug('[ProjectMemory] Empty transcript, skipping synthesis', { zdockId });
     return;
   }
 
@@ -126,7 +126,7 @@ async function synthesizeProjectMemory(projectId, userId) {
   }
 
   if (newMemories.length === 0) {
-    logger.debug('[ProjectMemory] No new memories extracted', { projectId });
+    logger.debug('[ProjectMemory] No new memories extracted', { zdockId });
     return;
   }
 
@@ -134,13 +134,13 @@ async function synthesizeProjectMemory(projectId, userId) {
   const dedupedNew = newMemories.filter((m) => !existingSet.has(m.toLowerCase().trim()));
   const mergedMemory = [...existingMemory, ...dedupedNew].slice(0, MAX_MEMORY_ENTRIES);
 
-  await db.updateProject(projectId, userId, {
+  await db.updateZdock(zdockId, userId, {
     memory: mergedMemory,
     memoryUpdatedAt: new Date(),
   });
 
   logger.info('[ProjectMemory] Synthesized memory', {
-    projectId,
+    zdockId,
     newEntries: dedupedNew.length,
     totalEntries: mergedMemory.length,
   });

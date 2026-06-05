@@ -1,7 +1,7 @@
 import type { Document, Types } from 'mongoose';
 
-export interface IProject extends Document {
-  projectId: string;
+export interface IZdock extends Document {
+  zdockId: string;
   name: string;
   description?: string;
   instructions?: string;

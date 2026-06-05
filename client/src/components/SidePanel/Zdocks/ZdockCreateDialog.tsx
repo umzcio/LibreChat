@@ -50,7 +50,7 @@ import {
   OGDialogContent,
   useToastContext,
 } from '@librechat/client';
-import { useCreateProjectMutation } from '~/data-provider';
+import { useCreateZdockMutation } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
@@ -177,7 +177,7 @@ export function IconColorPicker({
   );
 }
 
-export default function ProjectCreateDialog({
+export default function ZdockCreateDialog({
   open,
   onOpenChange,
   children,
@@ -193,7 +193,7 @@ export default function ProjectCreateDialog({
   const [icon, setIcon] = useState('FolderClosed');
   const [showIconPicker, setShowIconPicker] = useState(false);
 
-  const createMutation = useCreateProjectMutation({
+  const createMutation = useCreateZdockMutation({
     onSuccess: () => {
       showToast({ message: localize('com_ui_project_created'), status: 'success' });
       onOpenChange(false);

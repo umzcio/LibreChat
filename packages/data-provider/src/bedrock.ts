@@ -212,7 +212,6 @@ function mergeBedrockAnthropicBetaHeaders(existing: unknown, generated: string[]
 export const bedrockInputSchema = s.tConversationSchema
   .pick({
     /* LibreChat params; optionType: 'conversation' */
-    chatProjectId: true,
     modelLabel: true,
     promptPrefix: true,
     resendFiles: true,
@@ -269,7 +268,6 @@ export type BedrockConverseInput = z.infer<typeof bedrockInputSchema>;
 export const bedrockInputParser = s.tConversationSchema
   .pick({
     /* LibreChat params; optionType: 'conversation' */
-    chatProjectId: true,
     modelLabel: true,
     promptPrefix: true,
     resendFiles: true,
@@ -299,7 +297,6 @@ export const bedrockInputParser = s.tConversationSchema
   .catchall(z.any())
   .transform((data) => {
     const knownKeys = [
-      'chatProjectId',
       'modelLabel',
       'promptPrefix',
       'resendFiles',

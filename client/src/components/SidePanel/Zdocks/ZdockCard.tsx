@@ -4,14 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import { DropdownPopup, useToastContext } from '@librechat/client';
 import { Ellipsis, Pen, Trash } from 'lucide-react';
 import type { MouseEvent } from 'react';
-import type { TProject } from 'librechat-data-provider';
-import { useUpdateProjectMutation, useDeleteProjectMutation } from '~/data-provider';
-import { getProjectIcon } from '~/components/SidePanel/Projects/ProjectCreateDialog';
+import type { TZdock } from 'librechat-data-provider';
+import { useUpdateZdockMutation, useDeleteZdockMutation } from '~/data-provider';
+import { getProjectIcon } from '~/components/SidePanel/Zdocks/ZdockCreateDialog';
 import RenameForm from '~/components/Conversations/RenameForm';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
-export default function ProjectCard({ project }: { project: TProject }) {
+export default function ZdockCard({ project }: { project: TZdock }) {
   const navigate = useNavigate();
   const localize = useLocalize();
   const { showToast } = useToastContext();
@@ -21,7 +21,7 @@ export default function ProjectCard({ project }: { project: TProject }) {
   const [renaming, setRenaming] = useState(false);
   const [titleInput, setTitleInput] = useState(project.name);
 
-  const updateMutation = useUpdateProjectMutation({
+  const updateMutation = useUpdateZdockMutation({
     onSuccess: () => {
       setRenaming(false);
     },
@@ -30,7 +30,7 @@ export default function ProjectCard({ project }: { project: TProject }) {
     },
   });
 
-  const deleteMutation = useDeleteProjectMutation({
+  const deleteMutation = useDeleteZdockMutation({
     onSuccess: () => {
       showToast({ message: localize('com_ui_project_deleted'), status: 'success' });
     },
@@ -53,20 +53,20 @@ export default function ProjectCard({ project }: { project: TProject }) {
     (title: string) => {
       const trimmed = title.trim() || project.name;
       updateMutation.mutate({
-        projectId: project.projectId,
+        zdockId: project.zdockId,
         data: { name: trimmed },
       });
     },
-    [project.projectId, project.name, updateMutation],
+    [project.zdockId, project.name, updateMutation],
   );
 
   const handleDelete = useCallback(
     (e: MouseEvent) => {
       e.stopPropagation();
       setIsMenuOpen(false);
-      deleteMutation.mutate(project.projectId);
+      deleteMutation.mutate(project.zdockId);
     },
-    [project.projectId, deleteMutation],
+    [project.zdockId, deleteMutation],
   );
 
   const dropdownItems = useMemo(
@@ -102,7 +102,7 @@ export default function ProjectCard({ project }: { project: TProject }) {
       <button
         type="button"
         className="flex flex-1 items-center gap-2 overflow-hidden px-2 py-1.5"
-        onClick={() => navigate(`/p/${project.projectId}`)}
+        onClick={() => navigate(`/p/${project.zdockId}`)}
       >
         {(() => {
           const Icon = getProjectIcon(project.icon);
@@ -127,7 +127,7 @@ export default function ProjectCard({ project }: { project: TProject }) {
           setIsOpen={setIsMenuOpen}
           trigger={
             <Ariakit.MenuButton
-              id={`project-menu-${project.projectId}`}
+              id={`project-menu-${project.zdockId}`}
               aria-label={localize('com_ui_project_options')}
               aria-expanded={isMenuOpen}
               className={cn(

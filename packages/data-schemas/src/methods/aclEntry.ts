@@ -99,7 +99,7 @@ export function createAclEntryMethods(mongoose: typeof import('mongoose')) {
 
   /**
    * Find ACL entries for a specific resource
-   * @param resourceType - The type of resource ('agent', 'project', 'file')
+   * @param resourceType - The type of resource ('agent', 'zdock', 'file')
    * @param resourceId - The ID of the resource
    * @returns Array of ACL entries
    */

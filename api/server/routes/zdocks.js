@@ -22,7 +22,7 @@ router.get(
   '/',
   asyncHandler(async (req, res) => {
     const { cursor, limit, isArchived, search } = req.query;
-    const result = await db.getProjectsByCursor(req.user.id, {
+    const result = await db.getZdocksByCursor(req.user.id, {
       cursor: cursor || undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
       isArchived: isArchived === 'true',
@@ -46,8 +46,8 @@ router.post(
       return res.status(400).json({ message: 'Project name is required' });
     }
 
-    const project = await db.createProject(req.user.id, {
-      projectId: `project_${uuidv4()}`,
+    const project = await db.createZdock(req.user.id, {
+      zdockId: `zdock_${uuidv4()}`,
       name: name.trim(),
       description,
       instructions,
@@ -63,12 +63,12 @@ router.post(
 
 /**
  * Get a project by ID.
- * @route GET /api/projects/:projectId
+ * @route GET /api/projects/:zdockId
  */
 router.get(
-  '/:projectId',
+  '/:zdockId',
   asyncHandler(async (req, res) => {
-    const project = await db.getProject(req.params.projectId, req.user.id);
+    const project = await db.getZdock(req.params.zdockId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
@@ -78,7 +78,7 @@ router.get(
 
 /**
  * Update a project.
- * @route PATCH /api/projects/:projectId
+ * @route PATCH /api/projects/:zdockId
  */
 const MUTABLE_PROJECT_FIELDS = [
   'name',
@@ -94,12 +94,12 @@ const MUTABLE_PROJECT_FIELDS = [
 ];
 
 router.patch(
-  '/:projectId',
+  '/:zdockId',
   asyncHandler(async (req, res) => {
     const allowedUpdate = Object.fromEntries(
       MUTABLE_PROJECT_FIELDS.filter((k) => req.body[k] !== undefined).map((k) => [k, req.body[k]]),
     );
-    const project = await db.updateProject(req.params.projectId, req.user.id, allowedUpdate);
+    const project = await db.updateZdock(req.params.zdockId, req.user.id, allowedUpdate);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
@@ -109,12 +109,12 @@ router.patch(
 
 /**
  * Delete a project.
- * @route DELETE /api/projects/:projectId
+ * @route DELETE /api/projects/:zdockId
  */
 router.delete(
-  '/:projectId',
+  '/:zdockId',
   asyncHandler(async (req, res) => {
-    const result = await db.deleteProject(req.params.projectId, req.user.id);
+    const result = await db.deleteZdock(req.params.zdockId, req.user.id);
     if (result.deletedCount === 0) {
       return res.status(404).json({ message: 'Project not found' });
     }
@@ -124,28 +124,28 @@ router.delete(
 
 /**
  * Get knowledge base files for a project.
- * @route GET /api/projects/:projectId/files
+ * @route GET /api/projects/:zdockId/files
  */
 router.get(
-  '/:projectId/files',
+  '/:zdockId/files',
   asyncHandler(async (req, res) => {
-    const project = await db.getProject(req.params.projectId, req.user.id);
+    const project = await db.getZdock(req.params.zdockId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
-    const files = await db.getProjectFiles(req.params.projectId);
+    const files = await db.getZdockFiles(req.params.zdockId);
     return res.status(200).json(files);
   }),
 );
 
 /**
  * List conversations belonging to a project.
- * @route GET /api/projects/:projectId/conversations
+ * @route GET /api/projects/:zdockId/conversations
  */
 router.get(
-  '/:projectId/conversations',
+  '/:zdockId/conversations',
   asyncHandler(async (req, res) => {
-    const project = await db.getProject(req.params.projectId, req.user.id);
+    const project = await db.getZdock(req.params.zdockId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
@@ -154,7 +154,7 @@ router.get(
     const result = await db.getConvosByCursor(req.user.id, {
       cursor: cursor || undefined,
       limit: limit ? parseInt(limit, 10) : 25,
-      projectId: req.params.projectId,
+      zdockId: req.params.zdockId,
     });
     return res.status(200).json(result);
   }),
@@ -162,17 +162,17 @@ router.get(
 
 /**
  * Assign conversations to a project.
- * @route POST /api/projects/:projectId/conversations
+ * @route POST /api/projects/:zdockId/conversations
  */
 router.post(
-  '/:projectId/conversations',
+  '/:zdockId/conversations',
   asyncHandler(async (req, res) => {
     const { conversationIds } = req.body;
     if (!Array.isArray(conversationIds) || conversationIds.length === 0) {
       return res.status(400).json({ message: 'conversationIds array is required' });
     }
 
-    const project = await db.getProject(req.params.projectId, req.user.id);
+    const project = await db.getZdock(req.params.zdockId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
@@ -181,7 +181,7 @@ router.post(
       db.default?.models?.Conversation || require('mongoose').models.Conversation;
     await Conversation.updateMany(
       { conversationId: { $in: conversationIds }, user: req.user.id },
-      { $set: { projectId: req.params.projectId } },
+      { $set: { zdockId: req.params.zdockId } },
     );
 
     return res.status(200).json({ message: 'Conversations assigned to project' });
@@ -190,10 +190,10 @@ router.post(
 
 /**
  * Remove a conversation from a project.
- * @route DELETE /api/projects/:projectId/conversations/:conversationId
+ * @route DELETE /api/projects/:zdockId/conversations/:conversationId
  */
 router.delete(
-  '/:projectId/conversations/:conversationId',
+  '/:zdockId/conversations/:conversationId',
   asyncHandler(async (req, res) => {
     const Conversation =
       db.default?.models?.Conversation || require('mongoose').models.Conversation;
@@ -201,9 +201,9 @@ router.delete(
       {
         conversationId: req.params.conversationId,
         user: req.user.id,
-        projectId: req.params.projectId,
+        zdockId: req.params.zdockId,
       },
-      { $unset: { projectId: '' } },
+      { $unset: { zdockId: '' } },
     );
 
     return res.status(200).json({ message: 'Conversation removed from project' });
@@ -212,32 +212,32 @@ router.delete(
 
 /**
  * Upload a file to a project's knowledge base.
- * @route POST /api/projects/:projectId/files
+ * @route POST /api/projects/:zdockId/files
  */
 const { createMulterInstance } = require('~/server/routes/files/multer');
 
 router.post(
-  '/:projectId/files',
+  '/:zdockId/files',
   async (req, res, next) => {
     try {
       const upload = await createMulterInstance();
       upload.single('file')(req, res, (err) => {
         if (err) {
-          logger.error('[POST /projects/:projectId/files] Multer error', err);
+          logger.error('[POST /projects/:zdockId/files] Multer error', err);
           return res.status(400).json({ message: `Upload error: ${err.message}` });
         }
         next();
       });
     } catch (err) {
-      logger.error('[POST /projects/:projectId/files] Upload init error', err);
+      logger.error('[POST /projects/:zdockId/files] Upload init error', err);
       return res.status(500).json({ message: 'Error initializing upload' });
     }
   },
   asyncHandler(async (req, res) => {
     logger.info(
-      `[POST /projects/:projectId/files] Upload request for project ${req.params.projectId}`,
+      `[POST /projects/:zdockId/files] Upload request for project ${req.params.zdockId}`,
     );
-    const project = await db.getProject(req.params.projectId, req.user.id);
+    const project = await db.getZdock(req.params.zdockId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
@@ -278,7 +278,7 @@ router.post(
           text = fs.readFileSync(filepath, 'utf-8');
         }
       } catch (readErr) {
-        logger.warn('[POST /projects/:projectId/files] Could not extract text', readErr);
+        logger.warn('[POST /projects/:zdockId/files] Could not extract text', readErr);
       }
     }
 
@@ -292,11 +292,11 @@ router.post(
         });
         embedded = true;
         logger.info(
-          `[POST /projects/:projectId/files] Embedded ${req.file.originalname} in vector DB`,
+          `[POST /projects/:zdockId/files] Embedded ${req.file.originalname} in vector DB`,
         );
       } catch (embedErr) {
         logger.warn(
-          `[POST /projects/:projectId/files] Vector embedding failed for ${req.file.originalname}, falling back to text-only`,
+          `[POST /projects/:zdockId/files] Vector embedding failed for ${req.file.originalname}, falling back to text-only`,
           embedErr.message,
         );
       }
@@ -311,7 +311,7 @@ router.post(
         bytes: req.file.size,
         type: req.file.mimetype,
         source: embedded ? FileSources.vectordb : FileSources.local,
-        projectId: req.params.projectId,
+        zdockId: req.params.zdockId,
         text: text || undefined,
         embedded,
         object: 'file',
@@ -330,18 +330,18 @@ router.post(
 
 /**
  * Delete a file from a project's knowledge base.
- * @route DELETE /api/projects/:projectId/files/:fileId
+ * @route DELETE /api/projects/:zdockId/files/:fileId
  */
 router.delete(
-  '/:projectId/files/:fileId',
+  '/:zdockId/files/:fileId',
   asyncHandler(async (req, res) => {
-    const project = await db.getProject(req.params.projectId, req.user.id);
+    const project = await db.getZdock(req.params.zdockId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
 
     const file = await db.findFileById(req.params.fileId, {
-      projectId: req.params.projectId,
+      zdockId: req.params.zdockId,
       user: req.user.id,
     });
     if (!file) {
@@ -352,7 +352,7 @@ router.delete(
         await deleteVectors(req, file);
       } catch (vecErr) {
         logger.warn(
-          '[DELETE /projects/:projectId/files/:fileId] Error deleting vectors',
+          '[DELETE /projects/:zdockId/files/:fileId] Error deleting vectors',
           vecErr.message,
         );
       }
@@ -362,7 +362,7 @@ router.delete(
     }
     await db.deleteFileByFilter({
       file_id: req.params.fileId,
-      projectId: req.params.projectId,
+      zdockId: req.params.zdockId,
       user: req.user.id,
     });
     return res.status(200).json({ message: 'File deleted' });
@@ -371,12 +371,12 @@ router.delete(
 
 /**
  * Get project memory entries.
- * @route GET /api/projects/:projectId/memory
+ * @route GET /api/projects/:zdockId/memory
  */
 router.get(
-  '/:projectId/memory',
+  '/:zdockId/memory',
   asyncHandler(async (req, res) => {
-    const project = await db.getProject(req.params.projectId, req.user.id);
+    const project = await db.getZdock(req.params.zdockId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
@@ -389,12 +389,12 @@ router.get(
 
 /**
  * Delete a single memory entry by index.
- * @route DELETE /api/projects/:projectId/memory/:index
+ * @route DELETE /api/projects/:zdockId/memory/:index
  */
 router.delete(
-  '/:projectId/memory/:index',
+  '/:zdockId/memory/:index',
   asyncHandler(async (req, res) => {
-    const project = await db.getProject(req.params.projectId, req.user.id);
+    const project = await db.getZdock(req.params.zdockId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
@@ -404,7 +404,7 @@ router.delete(
       return res.status(400).json({ message: 'Invalid memory index' });
     }
     memory.splice(index, 1);
-    await db.updateProject(req.params.projectId, req.user.id, {
+    await db.updateZdock(req.params.zdockId, req.user.id, {
       memory,
       memoryUpdatedAt: new Date(),
     });
@@ -414,16 +414,16 @@ router.delete(
 
 /**
  * Clear all memory entries for a project.
- * @route DELETE /api/projects/:projectId/memory
+ * @route DELETE /api/projects/:zdockId/memory
  */
 router.delete(
-  '/:projectId/memory',
+  '/:zdockId/memory',
   asyncHandler(async (req, res) => {
-    const project = await db.getProject(req.params.projectId, req.user.id);
+    const project = await db.getZdock(req.params.zdockId, req.user.id);
     if (!project) {
       return res.status(404).json({ message: 'Project not found' });
     }
-    await db.updateProject(req.params.projectId, req.user.id, {
+    await db.updateZdock(req.params.zdockId, req.user.id, {
       memory: [],
       memoryUpdatedAt: new Date(),
     });

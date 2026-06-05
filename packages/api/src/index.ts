@@ -40,13 +40,13 @@ export * from './modelSpecs';
 /* Agents */
 export * from './agents';
 /* Projects */
-export * from './projects';
+export * from './zdocks';
 /* Code */
 export * from './code';
 /* Prompts */
 export * from './prompts';
 /* Projects */
-export * from './projects';
+export * from './zdocks';
 /* Skills */
 export * from './skills';
 /* Endpoints */

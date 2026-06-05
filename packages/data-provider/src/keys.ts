@@ -63,10 +63,10 @@ export enum QueryKeys {
   mcpServers = 'mcpServers',
   mcpServer = 'mcpServer',
   /* Projects */
-  projects = 'projects',
-  project = 'project',
-  projectConversations = 'projectConversations',
-  projectFiles = 'projectFiles',
+  zdocks = 'zdocks',
+  project = 'zdock',
+  zdockConversations = 'zdockConversations',
+  zdockFiles = 'zdockFiles',
   codeSession = 'codeSession',
   codeFiles = 'codeFiles',
   codeChanges = 'codeChanges',
@@ -121,9 +121,9 @@ export enum MutationKeys {
   enableTwoFactor = 'enableTwoFactor',
   verifyTwoFactor = 'verifyTwoFactor',
   updateMemoryPreferences = 'updateMemoryPreferences',
-  createProject = 'createProject',
-  updateProject = 'updateProject',
-  deleteProject = 'deleteProject',
+  createZdock = 'createZdock',
+  updateZdock = 'updateZdock',
+  deleteZdock = 'deleteZdock',
   /* Skill mutations from the original UI PR — tree/node operations are
    * phase 2 and currently stubbed in the data-service layer. */
   createSkillNode = 'createSkillNode',

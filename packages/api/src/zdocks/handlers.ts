@@ -1,8 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import { logger } from '@librechat/data-schemas';
 import type { Response } from 'express';
-import type { ProjectMethods } from '@librechat/data-schemas';
-import type { IProject } from '@librechat/data-schemas';
+import type { ZdockMethods } from '@librechat/data-schemas';
+import type { IZdock } from '@librechat/data-schemas';
 
 interface AuthenticatedRequest {
   user?: { id: string };
@@ -11,17 +11,17 @@ interface AuthenticatedRequest {
   query: Record<string, string>;
 }
 
-export interface ProjectHandlerDeps {
-  createProject: ProjectMethods['createProject'];
-  getProject: ProjectMethods['getProject'];
-  getProjectsByCursor: ProjectMethods['getProjectsByCursor'];
-  updateProject: ProjectMethods['updateProject'];
-  deleteProject: ProjectMethods['deleteProject'];
-  getProjectFiles: ProjectMethods['getProjectFiles'];
-  getProjectConversationCount: ProjectMethods['getProjectConversationCount'];
+export interface ZdockHandlerDeps {
+  createZdock: ZdockMethods['createZdock'];
+  getZdock: ZdockMethods['getZdock'];
+  getZdocksByCursor: ZdockMethods['getZdocksByCursor'];
+  updateZdock: ZdockMethods['updateZdock'];
+  deleteZdock: ZdockMethods['deleteZdock'];
+  getZdockFiles: ZdockMethods['getZdockFiles'];
+  getZdockConversationCount: ZdockMethods['getZdockConversationCount'];
 }
 
-export function createProjectHandlers(deps: ProjectHandlerDeps) {
+export function createZdockHandlers(deps: ZdockHandlerDeps) {
   async function create(req: AuthenticatedRequest, res: Response) {
     try {
       const userId = req.user?.id;
@@ -30,14 +30,14 @@ export function createProjectHandlers(deps: ProjectHandlerDeps) {
       }
 
       const { name, description, instructions, color, icon, conversationDefaults, pinnedAgents } =
-        req.body as Partial<IProject> & { name?: string };
+        req.body as Partial<IZdock> & { name?: string };
 
       if (!name || typeof name !== 'string' || !name.trim()) {
         return res.status(400).json({ message: 'Project name is required' });
       }
 
-      const project = await deps.createProject(userId, {
-        projectId: `project_${uuidv4()}`,
+      const project = await deps.createZdock(userId, {
+        zdockId: `zdock_${uuidv4()}`,
         name: name.trim(),
         description: description as string | undefined,
         instructions: instructions as string | undefined,
@@ -62,7 +62,7 @@ export function createProjectHandlers(deps: ProjectHandlerDeps) {
       }
 
       const { cursor, limit, isArchived, search } = req.query;
-      const result = await deps.getProjectsByCursor(userId, {
+      const result = await deps.getZdocksByCursor(userId, {
         cursor: cursor || undefined,
         limit: limit ? parseInt(limit, 10) : undefined,
         isArchived: isArchived === 'true',
@@ -83,8 +83,8 @@ export function createProjectHandlers(deps: ProjectHandlerDeps) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      const { projectId } = req.params;
-      const project = await deps.getProject(projectId, userId);
+      const { zdockId } = req.params;
+      const project = await deps.getZdock(zdockId, userId);
       if (!project) {
         return res.status(404).json({ message: 'Project not found' });
       }
@@ -103,10 +103,10 @@ export function createProjectHandlers(deps: ProjectHandlerDeps) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      const { projectId } = req.params;
-      const updateData = req.body as Partial<IProject>;
+      const { zdockId } = req.params;
+      const updateData = req.body as Partial<IZdock>;
 
-      const project = await deps.updateProject(projectId, userId, updateData);
+      const project = await deps.updateZdock(zdockId, userId, updateData);
       if (!project) {
         return res.status(404).json({ message: 'Project not found' });
       }
@@ -125,8 +125,8 @@ export function createProjectHandlers(deps: ProjectHandlerDeps) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      const { projectId } = req.params;
-      const result = await deps.deleteProject(projectId, userId);
+      const { zdockId } = req.params;
+      const result = await deps.deleteZdock(zdockId, userId);
       if (result.deletedCount === 0) {
         return res.status(404).json({ message: 'Project not found' });
       }
@@ -145,13 +145,13 @@ export function createProjectHandlers(deps: ProjectHandlerDeps) {
         return res.status(401).json({ message: 'Unauthorized' });
       }
 
-      const { projectId } = req.params;
-      const project = await deps.getProject(projectId, userId);
+      const { zdockId } = req.params;
+      const project = await deps.getZdock(zdockId, userId);
       if (!project) {
         return res.status(404).json({ message: 'Project not found' });
       }
 
-      const files = await deps.getProjectFiles(projectId);
+      const files = await deps.getZdockFiles(zdockId);
       return res.status(200).json(files);
     } catch (error) {
       logger.error('[projects/getFiles]', error);
