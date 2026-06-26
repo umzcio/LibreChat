@@ -41,11 +41,11 @@ export default function ZdockPanel() {
 
   return (
     <div className="flex h-auto w-full flex-col px-3 pb-3">
-      <div role="region" aria-label={localize('com_ui_projects')} className="space-y-2">
+      <div role="region" aria-label={localize('com_ui_zdocks')} className="space-y-2">
         <div className="flex items-center gap-2">
           <FilterInput
             inputId="project-search"
-            label={localize('com_ui_projects_filter')}
+            label={localize('com_ui_zdocks_filter')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             containerClassName="flex-1"
@@ -53,14 +53,14 @@ export default function ZdockPanel() {
           <ZdockCreateDialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <OGDialogTrigger asChild>
               <TooltipAnchor
-                description={localize('com_ui_create_project')}
+                description={localize('com_ui_create_zdock')}
                 side="bottom"
                 render={
                   <Button
                     variant="outline"
                     size="icon"
                     className="size-9 shrink-0 bg-transparent"
-                    aria-label={localize('com_ui_create_project')}
+                    aria-label={localize('com_ui_create_zdock')}
                     onClick={() => setCreateDialogOpen(true)}
                   >
                     <Plus className="size-4" aria-hidden="true" />
@@ -76,8 +76,8 @@ export default function ZdockPanel() {
             <FolderKanban className="size-8 text-text-tertiary" aria-hidden="true" />
             <p className="text-sm text-text-secondary">
               {searchQuery
-                ? localize('com_ui_no_projects_found')
-                : localize('com_ui_no_projects')}
+                ? localize('com_ui_no_zdocks_found')
+                : localize('com_ui_no_zdocks')}
             </p>
           </div>
         ) : (

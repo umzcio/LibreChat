@@ -31,7 +31,7 @@ import {
 import type { ActiveJobsResponse } from '~/data-provider';
 import { useAuthContext } from '~/hooks/AuthContext';
 import useEventHandlers from './useEventHandlers';
-import { clearAllDrafts, logger } from '~/utils';
+import { clearAllDrafts, logger, removeConvoFromAllQueries, upsertConvoInAllQueries } from '~/utils';
 import store from '~/store';
 
 type ChatHelpers = Pick<
@@ -804,13 +804,15 @@ export default function useResumableSSE(
             return null;
           }
 
-          if (isNetworkError && attempt < maxRetries) {
-            const delay = Math.min(1000 * Math.pow(2, attempt - 1), 8000);
+          const isNetworkError = isRetryableNetworkError(error);
+          if (isNetworkError && networkAttempts < START_GENERATION_NETWORK_RETRIES - 1) {
+            networkAttempts += 1;
+            const delay = Math.min(1000 * Math.pow(2, requestAttempts - 1), 8000);
             logger.log(
               'ResumableSSE',
-              `Network error starting generation, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`,
+              `Network error starting generation, retrying in ${delay}ms (attempt ${networkAttempts}/${START_GENERATION_NETWORK_RETRIES})`,
             );
-            const shouldContinue = await waitForRetryDelay(retryDelay, signal);
+            const shouldContinue = await waitForRetryDelay(delay, signal);
             if (!shouldContinue) {
               return null;
             }
@@ -818,7 +820,7 @@ export default function useResumableSSE(
           }
 
           // Don't retry: either not a network error or max retries reached
-          break;
+          throw error;
         }
       }
 

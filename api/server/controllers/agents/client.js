@@ -456,8 +456,10 @@ class AgentClient extends BaseClient {
     /** Memory context (user preferences/memories) via Mem0 semantic search */
     const userQuery = latestMessage?.text || latestMessage?.content?.[0]?.text?.value || '';
     const memoryResults = await this.useMemory(userQuery);
-    if (memoryResults) {
-      const memoryContext = `${memoryInstructions}\n\n# Relevant memories about the user:\n${memoryResults}`;
+    const memoryContext = memoryResults
+      ? `${memoryInstructions}\n\n# Relevant memories about the user:\n${memoryResults}`
+      : undefined;
+    if (memoryContext) {
       sharedRunContextParts.push(memoryContext);
     }
 

@@ -206,12 +206,33 @@ export function useResetRecoilState<T>(
  * Recoil signature: useRecoilCallback(({get, set, reset, snapshot}) => (...args) => result, deps)
  * We map to Jotai's store.get / store.set.
  */
+type RecoilLoadable<T> = {
+  state: 'hasValue' | 'loading' | 'hasError';
+  contents: T;
+  valueMaybe: () => T | undefined;
+  valueOrThrow: () => T;
+  getValue: () => T;
+};
+
+function makeLoadable<T>(value: T): RecoilLoadable<T> {
+  return {
+    state: 'hasValue',
+    contents: value,
+    valueMaybe: () => value,
+    valueOrThrow: () => value,
+    getValue: () => value,
+  };
+}
+
 export function useRecoilCallback<Args extends unknown[], Result>(
   fn: (iface: {
     get: RecoilGetRecoilValue;
     set: <T>(a: WritableAtom<T, [SetStateAction<T>], void>, v: T | SetStateAction<T>) => void;
     reset: <T>(a: WritableAtom<T, [typeof RESET], void>) => void;
-    snapshot: { getPromise: <T>(a: WritableAtom<T, never[], unknown>) => Promise<T> };
+    snapshot: {
+      getPromise: <T>(a: WritableAtom<T, never[], unknown>) => Promise<T>;
+      getLoadable: <T>(a: WritableAtom<T, never[], unknown>) => RecoilLoadable<T>;
+    };
   }) => (...args: Args) => Result,
   deps?: unknown[],
 ): (...args: Args) => Result {
@@ -226,6 +247,7 @@ export function useRecoilCallback<Args extends unknown[], Result>(
       store.set(a, RESET);
     const snapshot = {
       getPromise: async <T>(a: WritableAtom<T, never[], unknown>) => store.get(a),
+      getLoadable: <T>(a: WritableAtom<T, never[], unknown>) => makeLoadable(store.get(a)),
     };
     return fn({ get, set, reset, snapshot })(...args);
   }) as (...args: Args) => Result;

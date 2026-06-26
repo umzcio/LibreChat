@@ -73,12 +73,12 @@ export default function useArtifacts() {
     if (currentId != null && orderedArtifactIds.includes(currentId)) return;
     if (latestAutoOpenArtifactId == null) {
       if (currentId != null) {
-        resetCurrentArtifactId();
+        setCurrentArtifactIdReset(RESET);
       }
       return;
     }
     setCurrentArtifactId(latestAutoOpenArtifactId);
-  }, [latestAutoOpenArtifactId, orderedArtifactIds, resetCurrentArtifactId, setCurrentArtifactId]);
+  }, [latestAutoOpenArtifactId, orderedArtifactIds, setCurrentArtifactIdReset, setCurrentArtifactId]);
 
   /**
    * Manage artifact selection and code tab switching for non-enclosed artifacts

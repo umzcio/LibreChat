@@ -6,8 +6,10 @@ import { RESET } from 'jotai/utils';
 import type { TMessage } from 'librechat-data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import useChatFunctions from '~/hooks/Chat/useChatFunctions';
+import { useLatestMessageId } from '~/hooks/Messages/useLatestMessage';
 import { useAbortStreamMutation } from '~/data-provider';
 import useNewConvo from '~/hooks/useNewConvo';
+import { getMessageCacheIds } from './cache';
 import { logger } from '~/utils';
 import store from '~/store';
 

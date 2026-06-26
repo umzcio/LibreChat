@@ -1,7 +1,12 @@
 import { useState, useId, useRef, memo, useCallback, useMemo } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { QueryKeys, dataService } from 'librechat-data-provider';
+import {
+  QueryKeys,
+  PermissionTypes,
+  Permissions,
+  dataService,
+} from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import { DropdownPopup, Spinner, useToastContext } from '@librechat/client';
 import { Ellipsis, Share2, CopyPlus, Archive, Pen, Trash, FolderInput, FolderOutput, Code2 } from 'lucide-react';
@@ -258,7 +263,7 @@ function ConvoOptions({
         icon: <Code2 className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
       },
       {
-        label: localize('com_ui_move_to_project'),
+        label: localize('com_ui_move_to_zdock'),
         onClick: () => {
           setShowMoveDialog(true);
         },
@@ -270,7 +275,7 @@ function ConvoOptions({
         render: (props) => <button {...props} />,
       },
       {
-        label: localize('com_ui_remove_from_project'),
+        label: localize('com_ui_remove_from_zdock'),
         onClick: (e: MouseEvent) => {
           e.stopPropagation();
           if (!zdockId || !conversationId) {
@@ -296,13 +301,13 @@ function ConvoOptions({
             // Revert on failure
             queryClient.invalidateQueries([QueryKeys.zdockConversations, zdockId]);
             showToast({
-              message: localize('com_ui_error_remove_from_project'),
+              message: localize('com_ui_error_remove_from_zdock'),
               severity: NotificationSeverity.ERROR,
               showIcon: true,
             });
           });
           showToast({
-            message: localize('com_ui_removed_from_project'),
+            message: localize('com_ui_removed_from_zdock'),
             severity: NotificationSeverity.SUCCESS,
             showIcon: true,
           });

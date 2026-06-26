@@ -24,6 +24,8 @@ import { startupConfigKey, useGetAgentByIdQuery } from '~/data-provider';
 import { useChatContext, useChatFormContext } from '~/Providers';
 import store from '~/store';
 
+const PROJECT_ID_SEARCH_PARAM = 'zdockId';
+
 const injectAgentIntoAgentsMap = (queryClient: QueryClient, agent: Agent) => {
   const editCacheKey = [QueryKeys.agents, { requiredPermission: PermissionBits.EDIT }];
   const editCache = queryClient.getQueryData<AgentListResponse>(editCacheKey);

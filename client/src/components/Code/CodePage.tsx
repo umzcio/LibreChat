@@ -470,7 +470,7 @@ function ChangesPanel({
           {localize('com_ui_code_changes_local_only')}
         </div>
         <Button size="sm" onClick={onPromote}>
-          {localize('com_ui_code_promote_project')}
+          {localize('com_ui_code_promote_zdock')}
         </Button>
       </div>
     );
@@ -628,11 +628,11 @@ function EditorPanel({
               onClick={handleApply}
               disabled={applyMutation.isLoading || discardMutation.isLoading}
             >
-              {localize('com_ui_code_apply_project')}
+              {localize('com_ui_code_apply_zdock')}
             </Button>
           ) : (
             <Button size="sm" onClick={onPromote}>
-              {localize('com_ui_code_promote_project')}
+              {localize('com_ui_code_promote_zdock')}
             </Button>
           )}
           <Button size="sm" variant="outline" onClick={handleSave} disabled={!isDirty || saveMutation.isLoading}>
@@ -655,7 +655,7 @@ function EditorPanel({
         </div>
         <div className="flex min-h-0 flex-col rounded-2xl border border-border-light bg-surface-primary">
           <div className="border-b border-border-light px-3 py-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-            {hasProject ? localize('com_ui_code_project_version') : localize('com_ui_code_local_workspace')}
+            {hasProject ? localize('com_ui_code_zdock_version') : localize('com_ui_code_local_workspace')}
           </div>
           <pre className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap px-4 py-3 font-mono text-sm text-text-secondary">
             {hasProject ? diff?.originalContent ?? '' : data?.content ?? ''}
@@ -981,7 +981,7 @@ export default function CodePage() {
       setSelectedProjectId('');
       showToast({
         message: localize(
-          promotionMode === 'existing' ? 'com_ui_moved_to_project' : 'com_ui_project_created',
+          promotionMode === 'existing' ? 'com_ui_moved_to_zdock' : 'com_ui_zdock_created',
         ),
         severity: NotificationSeverity.SUCCESS,
         showIcon: true,
@@ -998,8 +998,8 @@ export default function CodePage() {
       showToast({
         message: localize(
           promotionMode === 'existing'
-            ? 'com_ui_error_move_to_project'
-            : 'com_ui_error_create_project',
+            ? 'com_ui_error_move_to_zdock'
+            : 'com_ui_error_create_zdock',
         ),
         severity: NotificationSeverity.ERROR,
         showIcon: true,
@@ -1012,7 +1012,7 @@ export default function CodePage() {
       <OGDialog open={showPromoteDialog} onOpenChange={setShowPromoteDialog}>
         <OGDialogContent className="w-11/12 max-w-md" showCloseButton={false}>
           <OGDialogHeader>
-            <OGDialogTitle>{localize('com_ui_create_project')}</OGDialogTitle>
+            <OGDialogTitle>{localize('com_ui_create_zdock')}</OGDialogTitle>
           </OGDialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-text-secondary">
@@ -1023,30 +1023,30 @@ export default function CodePage() {
                 variant={promotionMode === 'create' ? 'default' : 'outline'}
                 onClick={() => setPromotionMode('create')}
               >
-                {localize('com_ui_create_project')}
+                {localize('com_ui_create_zdock')}
               </Button>
               <Button
                 variant={promotionMode === 'existing' ? 'default' : 'outline'}
                 onClick={() => setPromotionMode('existing')}
               >
-                {localize('com_ui_open_project')}
+                {localize('com_ui_open_zdock')}
               </Button>
             </div>
             {promotionMode === 'create' ? (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-text-primary">
-                  {localize('com_ui_project_name')}
+                  {localize('com_ui_zdock_name')}
                 </label>
                 <Input
                   value={projectName}
                   onChange={(event) => setProjectName(event.target.value)}
-                  placeholder={localize('com_ui_project_name_placeholder')}
+                  placeholder={localize('com_ui_zdock_name_placeholder')}
                 />
               </div>
             ) : (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-text-primary">
-                  {localize('com_ui_open_project')}
+                  {localize('com_ui_open_zdock')}
                 </label>
                 <select
                   className="flex h-10 w-full rounded-md border border-border-light bg-transparent px-3 text-sm text-text-primary outline-none"
@@ -1061,7 +1061,7 @@ export default function CodePage() {
                   ))}
                 </select>
                 {!projectsData?.projects?.length ? (
-                  <p className="text-sm text-text-secondary">{localize('com_ui_no_projects')}</p>
+                  <p className="text-sm text-text-secondary">{localize('com_ui_no_zdocks')}</p>
                 ) : null}
               </div>
             )}
@@ -1085,7 +1085,7 @@ export default function CodePage() {
                 (promotionMode === 'existing' ? !selectedProjectId : !projectName.trim())
               }
             >
-              {localize('com_ui_code_promote_project')}
+              {localize('com_ui_code_promote_zdock')}
             </Button>
           </OGDialogFooter>
         </OGDialogContent>

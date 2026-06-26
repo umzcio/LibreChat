@@ -26,16 +26,16 @@ export default function ZdockCard({ project }: { project: TZdock }) {
       setRenaming(false);
     },
     onError: () => {
-      showToast({ message: localize('com_ui_error_save_project'), status: 'error' });
+      showToast({ message: localize('com_ui_error_save_zdock'), status: 'error' });
     },
   });
 
   const deleteMutation = useDeleteZdockMutation({
     onSuccess: () => {
-      showToast({ message: localize('com_ui_project_deleted'), status: 'success' });
+      showToast({ message: localize('com_ui_zdock_deleted'), status: 'success' });
     },
     onError: () => {
-      showToast({ message: localize('com_ui_error_delete_project'), status: 'error' });
+      showToast({ message: localize('com_ui_error_delete_zdock'), status: 'error' });
     },
   });
 
@@ -128,7 +128,7 @@ export default function ZdockCard({ project }: { project: TZdock }) {
           trigger={
             <Ariakit.MenuButton
               id={`project-menu-${project.zdockId}`}
-              aria-label={localize('com_ui_project_options')}
+              aria-label={localize('com_ui_zdock_options')}
               aria-expanded={isMenuOpen}
               className={cn(
                 'inline-flex h-7 w-7 items-center justify-center rounded-md border-none p-0 text-sm ring-ring-primary transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 disabled:opacity-50',

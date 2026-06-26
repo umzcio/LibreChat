@@ -40,13 +40,13 @@ export default function AddConversationsToZdockDialog({
 
   const assignMutation = useAssignConversationsToZdockMutation({
     onSuccess: () => {
-      showToast({ message: localize('com_ui_moved_to_project'), status: 'success' });
+      showToast({ message: localize('com_ui_moved_to_zdock'), status: 'success' });
       queryClient.invalidateQueries([QueryKeys.zdockConversations, zdockId]);
       onOpenChange(false);
       setSelected(new Set());
     },
     onError: () => {
-      showToast({ message: localize('com_ui_error_move_to_project'), status: 'error' });
+      showToast({ message: localize('com_ui_error_move_to_zdock'), status: 'error' });
     },
   });
 

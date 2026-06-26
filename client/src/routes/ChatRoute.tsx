@@ -3,8 +3,6 @@ import { ToolCallsMapProvider } from '~/Providers';
 import ChatView from '~/components/Chat/ChatView';
 import useConversationRoute from './useConversationRoute';
 
-  zdockId != null && /^[a-f\d]{24}$/i.test(zdockId);
-
 export default function ChatRoute() {
   const { conversation, conversationId, isAuthenticated, isConversationReady, isLoading } =
     useConversationRoute();

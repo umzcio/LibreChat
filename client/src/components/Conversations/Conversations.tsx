@@ -2,11 +2,14 @@ import { useMemo, memo, useState, type FC, useCallback, useEffect, useRef } from
 import throttle from 'lodash/throttle';
 import { ChevronDown, FolderKanban } from 'lucide-react';
 import { useAtomValue } from 'jotai';
-import { Spinner, useMediaQuery } from '@librechat/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { QueryKeys } from 'librechat-data-provider';
+import { Spinner, TooltipAnchor, NewChatIcon, useMediaQuery } from '@librechat/client';
 import { List, AutoSizer, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import type { TConversation } from 'librechat-data-provider';
 import {
   useLocalize,
+  useNewConvo,
   TranslationKeys,
   useFavorites,
   useShowMarketplace,
@@ -16,7 +19,7 @@ import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
 import ZdockCreateDialog from '~/components/SidePanel/Zdocks/ZdockCreateDialog';
 import { ZdockCard } from '~/components/SidePanel/Zdocks';
 import { useActiveJobs, useListZdocksQuery } from '~/data-provider';
-import { groupConversationsByDate, cn } from '~/utils';
+import { groupConversationsByDate, clearMessagesCache, cn } from '~/utils';
 import Convo from './Convo';
 import store from '~/store';
 
@@ -93,7 +96,7 @@ const ChatsHeader: FC<ChatsHeaderProps> = memo(({ isExpanded, onToggle }) => {
   const localize = useLocalize();
   const queryClient = useQueryClient();
   const { newConversation } = useNewConvo();
-  const conversation = useRecoilValue(store.conversationByIndex(0));
+  const conversation = useAtomValue(store.conversationByIndex(0));
 
   const handleNewChat = useCallback(() => {
     clearMessagesCache(queryClient, conversation?.conversationId);
@@ -404,7 +407,7 @@ const Conversations: FC<ConversationsProps> = ({
                 className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-xs font-bold text-text-secondary outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
                 type="button"
               >
-                <span className="select-none">{localize('com_ui_projects')}</span>
+                <span className="select-none">{localize('com_ui_zdocks')}</span>
                 <ChevronDown
                   className={cn(
                     'h-3 w-3 transition-transform duration-200',
@@ -421,7 +424,7 @@ const Conversations: FC<ConversationsProps> = ({
                       onClick={() => setCreateZdockOpen(true)}
                     >
                       <FolderKanban className="size-4" aria-hidden="true" />
-                      {localize('com_ui_new_project')}
+                      {localize('com_ui_new_zdock')}
                     </button>
                   </ZdockCreateDialog>
                   {projects.map((proj) => (

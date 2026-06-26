@@ -195,7 +195,7 @@ export default function ZdockCreateDialog({
 
   const createMutation = useCreateZdockMutation({
     onSuccess: () => {
-      showToast({ message: localize('com_ui_project_created'), status: 'success' });
+      showToast({ message: localize('com_ui_zdock_created'), status: 'success' });
       onOpenChange(false);
       setName('');
       setColor(PROJECT_COLORS[6]);
@@ -203,7 +203,7 @@ export default function ZdockCreateDialog({
       setShowIconPicker(false);
     },
     onError: () => {
-      showToast({ message: localize('com_ui_error_create_project'), status: 'error' });
+      showToast({ message: localize('com_ui_error_create_zdock'), status: 'error' });
     },
   });
 
@@ -227,14 +227,14 @@ export default function ZdockCreateDialog({
         {/* Header */}
         <div className="px-5 pb-4 pt-5">
           <h2 className="text-lg font-semibold text-text-primary">
-            {localize('com_ui_create_project')}
+            {localize('com_ui_create_zdock')}
           </h2>
         </div>
 
         {/* Name input with icon button */}
         <div className="px-5 pb-4">
           <p className="mb-2 text-xs text-text-secondary">
-            {localize('com_ui_project_name')}
+            {localize('com_ui_zdock_name')}
           </p>
           <div className="flex items-center gap-3">
             <button
@@ -248,7 +248,7 @@ export default function ZdockCreateDialog({
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder={localize('com_ui_project_name_placeholder')}
+              placeholder={localize('com_ui_zdock_name_placeholder')}
               className="text-text-primary"
               autoFocus
               onKeyDown={(e) => {
@@ -275,7 +275,7 @@ export default function ZdockCreateDialog({
         {/* Info text */}
         <div className="border-t border-border-light px-5 py-4">
           <p className="text-xs leading-relaxed text-text-tertiary">
-            {localize('com_ui_project_info')}
+            {localize('com_ui_zdock_info')}
           </p>
         </div>
 
@@ -286,7 +286,7 @@ export default function ZdockCreateDialog({
             disabled={!name.trim() || createMutation.isLoading}
             size="sm"
           >
-            {localize('com_ui_create_project')}
+            {localize('com_ui_create_zdock')}
           </Button>
         </div>
       </OGDialogContent>

@@ -5,9 +5,9 @@ import { Copy, CopyCheck } from 'lucide-react';
 import { useGetSharedLinkQuery } from 'librechat-data-provider/react-query';
 import { OGDialogTemplate, Button, Spinner, OGDialog } from '@librechat/client';
 import { useLocalize, useCopyToClipboard } from '~/hooks';
-import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import SharedLinkButton from './SharedLinkButton';
 import { buildShareLinkUrl, cn } from '~/utils';
+import store from '~/store';
 
 export default function ShareButton({
   conversationId,

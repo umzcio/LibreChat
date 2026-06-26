@@ -44,6 +44,7 @@ function ChatView({
 }) {
   const { conversationId } = useParams();
   const rootSubmission = useAtomValue(store.submissionByIndex(index));
+  const isSubmitting = useAtomValue(store.isSubmittingFamily(index));
   const centerFormOnLanding = useAtomValue(store.centerFormOnLanding);
 
   const methods = useForm<ChatFormValues>({

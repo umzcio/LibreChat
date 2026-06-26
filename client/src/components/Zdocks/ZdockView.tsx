@@ -239,20 +239,20 @@ export default function ZdockView() {
 
   const updateMutation = useUpdateZdockMutation({
     onSuccess: () => {
-      showToast({ message: localize('com_ui_project_saved'), status: 'success' });
+      showToast({ message: localize('com_ui_zdock_saved'), status: 'success' });
     },
     onError: () => {
-      showToast({ message: localize('com_ui_error_save_project'), status: 'error' });
+      showToast({ message: localize('com_ui_error_save_zdock'), status: 'error' });
     },
   });
 
   const deleteMutation = useDeleteZdockMutation({
     onSuccess: () => {
-      showToast({ message: localize('com_ui_project_deleted'), status: 'success' });
+      showToast({ message: localize('com_ui_zdock_deleted'), status: 'success' });
       navigate('/c/new');
     },
     onError: () => {
-      showToast({ message: localize('com_ui_error_delete_project'), status: 'error' });
+      showToast({ message: localize('com_ui_error_delete_zdock'), status: 'error' });
     },
   });
 
@@ -370,7 +370,7 @@ export default function ZdockView() {
   if (!project) {
     return (
       <div className="flex h-full w-full items-center justify-center">
-        <p className="text-text-secondary">{localize('com_ui_project_not_found')}</p>
+        <p className="text-text-secondary">{localize('com_ui_zdock_not_found')}</p>
       </div>
     );
   }
@@ -424,7 +424,7 @@ export default function ZdockView() {
           }}
         >
           <PenLine className="size-3.5" aria-hidden="true" />
-          {localize('com_ui_start_chat_in_project')}
+          {localize('com_ui_start_chat_in_zdock')}
         </button>
 
         {/* Conversation list */}
@@ -448,7 +448,7 @@ export default function ZdockView() {
             ))
           ) : (
             <p className="px-3 pt-4 text-sm text-text-secondary">
-              {localize('com_ui_project_conversations_desc')}
+              {localize('com_ui_zdock_conversations_desc')}
             </p>
           )}
         </div>
@@ -484,7 +484,7 @@ export default function ZdockView() {
         {/* Project Memory */}
         <div className="border-b border-border-light p-4">
           <div className="mb-2.5 text-[10px] font-medium uppercase tracking-widest text-text-tertiary">
-            {localize('com_ui_project_memory')}
+            {localize('com_ui_zdock_memory')}
           </div>
           {project.memory && project.memory.length > 0 ? (
             <div className="rounded-lg border border-border-light bg-surface-hover p-2.5">
@@ -520,7 +520,7 @@ export default function ZdockView() {
         {/* Instructions */}
         <div className="border-b border-border-light p-4">
           <div className="mb-2.5 text-[10px] font-medium uppercase tracking-widest text-text-tertiary">
-            {localize('com_ui_project_instructions')}
+            {localize('com_ui_zdock_instructions')}
           </div>
           {project.instructions ? (
             <>
@@ -621,7 +621,7 @@ export default function ZdockView() {
             className="w-full rounded-[7px] border border-red-800/35 px-3 py-2 text-center text-xs text-red-700 hover:bg-red-500/10"
             onClick={() => setShowDeleteConfirm(true)}
           >
-            {localize('com_ui_delete_project')}
+            {localize('com_ui_delete_zdock')}
           </button>
         </div>
       </div>
@@ -659,7 +659,7 @@ export default function ZdockView() {
               <Input
                 value={editDesc}
                 onChange={(e) => setEditDesc(e.target.value)}
-                placeholder={localize('com_ui_project_description_placeholder')}
+                placeholder={localize('com_ui_zdock_description_placeholder')}
                 className="text-text-primary"
               />
             </div>
@@ -688,13 +688,13 @@ export default function ZdockView() {
       <OGDialog open={showEditInstructions} onOpenChange={setShowEditInstructions}>
         <OGDialogContent className="max-w-lg gap-0 p-0">
           <OGDialogHeader className="px-5 pb-3 pt-5">
-            <OGDialogTitle className="text-base">{localize('com_ui_project_instructions')}</OGDialogTitle>
+            <OGDialogTitle className="text-base">{localize('com_ui_zdock_instructions')}</OGDialogTitle>
           </OGDialogHeader>
           <div className="px-5 pb-4">
             <Textarea
               value={editInstructions}
               onChange={(e) => setEditInstructions(e.target.value)}
-              placeholder={localize('com_ui_project_instructions_placeholder')}
+              placeholder={localize('com_ui_zdock_instructions_placeholder')}
               className="min-h-[400px] resize-y text-sm text-text-primary"
               autoFocus
             />
@@ -734,12 +734,12 @@ export default function ZdockView() {
         <OGDialogContent className="max-w-sm gap-0 p-0">
           <OGDialogHeader className="px-5 pb-3 pt-5">
             <OGDialogTitle className="text-base text-red-500">
-              {localize('com_ui_delete_project')}
+              {localize('com_ui_delete_zdock')}
             </OGDialogTitle>
           </OGDialogHeader>
           <div className="px-5 pb-4">
             <p className="text-sm leading-relaxed text-text-secondary">
-              {localize('com_ui_delete_project_confirm', {
+              {localize('com_ui_delete_zdock_confirm', {
                 count: convosData?.conversations?.length ?? 0,
               })}
             </p>
@@ -758,7 +758,7 @@ export default function ZdockView() {
               disabled={deleteMutation.isLoading}
             >
               <Trash2 className="mr-1.5 size-3.5" aria-hidden="true" />
-              {localize('com_ui_delete_project')}
+              {localize('com_ui_delete_zdock')}
             </Button>
           </OGDialogFooter>
         </OGDialogContent>

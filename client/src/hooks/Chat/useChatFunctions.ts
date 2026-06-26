@@ -252,6 +252,7 @@ export default function useChatFunctions({
         overrideConvoId,
         overrideUserMessageId,
       },
+      convo,
     ) as TEndpointOption;
     if (endpoint !== EModelEndpoint.agents) {
       endpointOption.key = getExpiry();

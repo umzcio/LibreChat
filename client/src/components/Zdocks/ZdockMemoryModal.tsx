@@ -70,7 +70,7 @@ export default function ZdockMemoryModal({
       <OGDialogContent className="max-w-md gap-0 p-0">
         <OGDialogHeader className="px-5 pb-3 pt-5">
           <OGDialogTitle className="text-base">
-            {localize('com_ui_project_memory')}
+            {localize('com_ui_zdock_memory')}
           </OGDialogTitle>
         </OGDialogHeader>
 

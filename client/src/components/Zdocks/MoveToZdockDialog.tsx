@@ -33,11 +33,11 @@ export default function MoveToZdockDialog({
 
   const assignMutation = useAssignConversationsToZdockMutation({
     onSuccess: () => {
-      showToast({ message: localize('com_ui_moved_to_project'), status: 'success' });
+      showToast({ message: localize('com_ui_moved_to_zdock'), status: 'success' });
       onOpenChange(false);
     },
     onError: () => {
-      showToast({ message: localize('com_ui_error_move_to_project'), status: 'error' });
+      showToast({ message: localize('com_ui_error_move_to_zdock'), status: 'error' });
     },
   });
 
@@ -62,7 +62,7 @@ export default function MoveToZdockDialog({
         <OGDialogHeader className="px-5 pb-2 pt-5">
           <OGDialogTitle className="flex items-center gap-2 text-base">
             <FolderInput className="size-5" aria-hidden="true" />
-            {localize('com_ui_move_to_project')}
+            {localize('com_ui_move_to_zdock')}
           </OGDialogTitle>
         </OGDialogHeader>
 
@@ -70,7 +70,7 @@ export default function MoveToZdockDialog({
           <input
             type="text"
             className="w-full rounded-lg border border-border-medium bg-surface-primary px-3 py-2 text-sm text-text-primary placeholder:text-text-tertiary focus:outline-none"
-            placeholder={localize('com_ui_search_projects')}
+            placeholder={localize('com_ui_search_zdocks')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
@@ -84,7 +84,7 @@ export default function MoveToZdockDialog({
             </div>
           ) : filtered.length === 0 ? (
             <p className="py-4 text-center text-sm text-text-secondary">
-              {localize('com_ui_no_projects_found')}
+              {localize('com_ui_no_zdocks_found')}
             </p>
           ) : (
             <div className="space-y-0.5">
