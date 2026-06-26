@@ -3,6 +3,7 @@ import { TOptions } from 'i18next';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import translationEn from '~/locales/en/translation.json';
+import store from '~/store';
 
 export type TranslationKeys = keyof typeof translationEn;
 
