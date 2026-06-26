@@ -264,7 +264,61 @@ function buildSessionView(
   };
 }
 
-export function createCodeWorkspaceService(deps: CodeServiceDeps) {
+export interface CodeWorkspaceService {
+  applyChanges(
+    userId: string,
+    conversationId: string,
+    relativePaths?: string[],
+  ): Promise<CodeWorkspaceSessionView>;
+  bootstrapWorkspace(userId: string, conversationId: string): Promise<CodeWorkspaceSessionView>;
+  createItem(
+    userId: string,
+    conversationId: string,
+    relativePath: string,
+    type: 'directory' | 'file',
+  ): Promise<{ created: boolean; path: string; type: 'directory' | 'file' }>;
+  deleteItem(
+    userId: string,
+    conversationId: string,
+    relativePath: string,
+  ): Promise<{ deleted: boolean; path: string }>;
+  discardChanges(
+    userId: string,
+    conversationId: string,
+    relativePaths?: string[],
+  ): Promise<{ discarded: boolean }>;
+  getDiff(userId: string, conversationId: string, relativePath: string): Promise<CodeDiff>;
+  getFileContent(
+    userId: string,
+    conversationId: string,
+    relativePath: string,
+  ): Promise<{ content: string; path: string }>;
+  listChanges(userId: string, conversationId: string): Promise<CodeChange[]>;
+  listFiles(
+    userId: string,
+    conversationId: string,
+    relativePath?: string,
+  ): Promise<{ entries: CodeDirectoryEntry[]; path: string }>;
+  promoteWorkspace(
+    userId: string,
+    conversationId: string,
+    options?: { zdockId?: string; projectName?: string },
+  ): Promise<CodeWorkspaceSessionView>;
+  renameItem(
+    userId: string,
+    conversationId: string,
+    relativePath: string,
+    nextRelativePath: string,
+  ): Promise<CodeRenameResult>;
+  saveFileContent(
+    userId: string,
+    conversationId: string,
+    relativePath: string,
+    content: string,
+  ): Promise<{ path: string; saved: boolean }>;
+}
+
+export function createCodeWorkspaceService(deps: CodeServiceDeps): CodeWorkspaceService {
   async function loadConversation(userId: string, conversationId: string) {
     const conversation = await deps.getConvo(userId, conversationId);
 

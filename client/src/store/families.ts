@@ -425,6 +425,19 @@ const pendingManualSkillsByConvoId = atomFamily((_param: string) => {
   return a;
 });
 
+/**
+ * Per-conversation queue of verbatim excerpts the user quoted via the
+ * "Add to chat" selection popup for the next submission. The submit pipeline
+ * (`useChatFunctions.ask`) drains this onto the user message's `quotes` field,
+ * then resets to `[]`. Compose-time chips above the textarea read this atom
+ * directly so users can see and dismiss each quote before sending.
+ */
+const pendingQuotesByConvoId = atomFamily((_param: string) => {
+  const a = atom<string[]>([]);
+  a.debugLabel = 'pendingQuotesByConvoId';
+  return a;
+});
+
 const messagesSiblingIdxFamily = atomFamily((_param: string | null | undefined) => {
   const a = atom<number>(0);
   a.debugLabel = 'messagesSiblingIdxFamily';
@@ -604,5 +617,6 @@ export default {
   showPromptsPopoverFamily,
   showSkillsPopoverFamily,
   pendingManualSkillsByConvoId,
+  pendingQuotesByConvoId,
   updateConversationSelector,
 };

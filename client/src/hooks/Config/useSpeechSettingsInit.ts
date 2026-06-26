@@ -1,33 +1,37 @@
 import { useEffect, useRef } from 'react';
-import { useSetAtom } from 'jotai';
+import { useRecoilState, useSetRecoilState } from 'recoil';
 import { useGetCustomConfigSpeechQuery } from 'librechat-data-provider/react-query';
+import { TTSEndpoints } from '~/common';
 import { logger } from '~/utils';
 import store from '~/store';
 
+const VALID_TTS_ENGINES: string[] = [TTSEndpoints.browser, TTSEndpoints.external];
+
 /**
- * Initializes speech-related Jotai values from the server-side custom
+ * Initializes speech-related Recoil values from the server-side custom
  * configuration on first load (only when the user is authenticated)
  */
 export default function useSpeechSettingsInit(isAuthenticated: boolean) {
   const { data } = useGetCustomConfigSpeechQuery({ enabled: isAuthenticated });
+  const [engineTTS, setEngineTTS] = useRecoilState<string>(store.engineTTS);
 
   const setters = useRef({
-    conversationMode: useSetAtom(store.conversationMode),
-    advancedMode: useSetAtom(store.advancedMode),
-    speechToText: useSetAtom(store.speechToText),
-    textToSpeech: useSetAtom(store.textToSpeech),
-    cacheTTS: useSetAtom(store.cacheTTS),
-    engineSTT: useSetAtom(store.engineSTT),
-    languageSTT: useSetAtom(store.languageSTT),
-    autoTranscribeAudio: useSetAtom(store.autoTranscribeAudio),
-    decibelValue: useSetAtom(store.decibelValue),
-    autoSendText: useSetAtom(store.autoSendText),
-    engineTTS: useSetAtom(store.engineTTS),
-    voice: useSetAtom(store.voice),
-    cloudBrowserVoices: useSetAtom(store.cloudBrowserVoices),
-    languageTTS: useSetAtom(store.languageTTS),
-    automaticPlayback: useSetAtom(store.automaticPlayback),
-    playbackRate: useSetAtom(store.playbackRate),
+    conversationMode: useSetRecoilState(store.conversationMode),
+    advancedMode: useSetRecoilState(store.advancedMode),
+    speechToText: useSetRecoilState(store.speechToText),
+    textToSpeech: useSetRecoilState(store.textToSpeech),
+    cacheTTS: useSetRecoilState(store.cacheTTS),
+    engineSTT: useSetRecoilState(store.engineSTT),
+    languageSTT: useSetRecoilState(store.languageSTT),
+    autoTranscribeAudio: useSetRecoilState(store.autoTranscribeAudio),
+    decibelValue: useSetRecoilState(store.decibelValue),
+    autoSendText: useSetRecoilState(store.autoSendText),
+    engineTTS: setEngineTTS,
+    voice: useSetRecoilState(store.voice),
+    cloudBrowserVoices: useSetRecoilState(store.cloudBrowserVoices),
+    languageTTS: useSetRecoilState(store.languageTTS),
+    automaticPlayback: useSetRecoilState(store.automaticPlayback),
+    playbackRate: useSetRecoilState(store.playbackRate),
   }).current;
 
   useEffect(() => {
@@ -43,10 +47,14 @@ export default function useSpeechSettingsInit(isAuthenticated: boolean) {
       const setter = setters[key as keyof typeof setters];
       if (setter) {
         logger.log(`Setting default speech setting: ${key} = ${value}`);
-        (setter as (val: string | boolean | number) => void)(
-          value as string | boolean | number,
-        );
+        setter(value as any);
       }
     });
   }, [isAuthenticated, data, setters]);
+
+  useEffect(() => {
+    if (VALID_TTS_ENGINES.includes(engineTTS)) return;
+    logger.log(`Resetting invalid TTS engine "${engineTTS}" to ${TTSEndpoints.browser}`);
+    setEngineTTS(TTSEndpoints.browser);
+  }, [engineTTS, setEngineTTS]);
 }

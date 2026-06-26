@@ -21,7 +21,14 @@ export interface ZdockHandlerDeps {
   getZdockConversationCount: ZdockMethods['getZdockConversationCount'];
 }
 
-export function createZdockHandlers(deps: ZdockHandlerDeps) {
+export function createZdockHandlers(deps: ZdockHandlerDeps): {
+  create: (req: AuthenticatedRequest, res: Response) => Promise<Response>;
+  list: (req: AuthenticatedRequest, res: Response) => Promise<Response>;
+  get: (req: AuthenticatedRequest, res: Response) => Promise<Response>;
+  update: (req: AuthenticatedRequest, res: Response) => Promise<Response>;
+  remove: (req: AuthenticatedRequest, res: Response) => Promise<Response>;
+  getFiles: (req: AuthenticatedRequest, res: Response) => Promise<Response>;
+} {
   async function create(req: AuthenticatedRequest, res: Response) {
     try {
       const userId = req.user?.id;

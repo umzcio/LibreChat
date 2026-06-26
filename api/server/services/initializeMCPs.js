@@ -5,6 +5,21 @@ const { createMCPServersRegistry, createMCPManager, getMCPServersRegistry } = re
 const db = require('~/models');
 
 /**
+ * Resolves the current request's effective MCP allowlists from the merged (tenant-scoped)
+ * config. The registry calls this per inspection/connection so admin-panel `mcpSettings`
+ * overrides are honored without a restart. Tenant comes from the ALS context inside
+ * `getAppConfig`; `userId`/`role` pick up user/role-scoped overrides when an actor exists.
+ * @param {{ userId?: string, role?: string }} [ctx]
+ */
+async function resolveMCPAllowlists(ctx) {
+  const appConfig = await getAppConfig({ role: ctx?.role, userId: ctx?.userId });
+  return {
+    allowedDomains: appConfig?.mcpSettings?.allowedDomains,
+    allowedAddresses: appConfig?.mcpSettings?.allowedAddresses,
+  };
+}
+
+/**
  * Initialize MCP servers
  */
 async function initializeMCPs() {
@@ -16,6 +31,7 @@ async function initializeMCPs() {
       mongoose,
       appConfig?.mcpSettings?.allowedDomains,
       appConfig?.mcpSettings?.allowedAddresses,
+      resolveMCPAllowlists,
     );
   } catch (error) {
     logger.error('[MCP] Failed to initialize MCPServersRegistry:', error);

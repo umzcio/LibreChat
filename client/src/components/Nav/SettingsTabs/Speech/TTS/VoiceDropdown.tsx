@@ -1,4 +1,4 @@
-import { useAtomValue } from 'jotai';
+import { useRecoilValue } from 'recoil';
 import { BrowserVoiceDropdown, ExternalVoiceDropdown } from '~/components/Audio/Voices';
 import { TTSEndpoints } from '~/common';
 import store from '~/store';
@@ -9,12 +9,13 @@ const voiceDropdownComponentsMap = {
 };
 
 export default function VoiceDropdown() {
-  const engineTTS = useAtomValue(store.engineTTS);
+  const engineTTS = useRecoilValue<string>(store.engineTTS);
+  const textToSpeech = useRecoilValue(store.textToSpeech);
   const VoiceDropdownComponent = voiceDropdownComponentsMap[engineTTS];
 
   if (!VoiceDropdownComponent) {
     return null;
   }
 
-  return <VoiceDropdownComponent />;
+  return <VoiceDropdownComponent disabled={!textToSpeech} />;
 }

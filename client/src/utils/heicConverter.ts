@@ -1,5 +1,19 @@
-import { heicTo, isHeic } from 'heic-to';
-import logger from './logger';
+const HEIC_MIME_TYPES = new Set(['image/heic', 'image/heif']);
+const HEIC_EXTENSION_REGEX = /\.(heic|heif)$/i;
+type HeicToModule = typeof import('heic-to');
+
+let heicConverterPromise: Promise<HeicToModule> | null = null;
+
+const loadHeicConverter = async (): Promise<HeicToModule> => {
+  heicConverterPromise ??= import('heic-to').catch((error) => {
+    heicConverterPromise = null;
+    throw error;
+  });
+  return heicConverterPromise;
+};
+
+const hasHEICMetadata = (file: File): boolean =>
+  HEIC_MIME_TYPES.has(file.type.toLowerCase()) || HEIC_EXTENSION_REGEX.test(file.name);
 
 /**
  * Check if a file is in HEIC format
@@ -7,10 +21,15 @@ import logger from './logger';
  * @returns Promise<boolean> - True if the file is HEIC
  */
 export const isHEICFile = async (file: File): Promise<boolean> => {
+  if (!hasHEICMetadata(file)) {
+    return false;
+  }
+
   try {
+    const { isHeic } = await loadHeicConverter();
     return await isHeic(file);
   } catch (error) {
-    logger.warn('HEIC', 'Error checking if file is HEIC:', error);
+    console.warn('Error checking if file is HEIC:', error);
     // Fallback to mime type check
     return file.type === 'image/heic' || file.type === 'image/heif';
   }
@@ -32,6 +51,7 @@ export const convertHEICToJPEG = async (
     // Report conversion start
     onProgress?.(0.3);
 
+    const { heicTo } = await loadHeicConverter();
     const convertedBlob = await heicTo({
       blob: file,
       type: 'image/jpeg',
@@ -52,7 +72,7 @@ export const convertHEICToJPEG = async (
 
     return convertedFile;
   } catch (error) {
-    logger.error('HEIC', 'Error converting HEIC to JPEG:', error);
+    console.error('Error converting HEIC to JPEG:', error);
     throw new Error('Failed to convert HEIC image to JPEG');
   }
 };
@@ -72,7 +92,7 @@ export const processFileForUpload = async (
   const isHEIC = await isHEICFile(file);
 
   if (isHEIC) {
-    logger.log('HEIC', 'HEIC file detected, converting to JPEG...');
+    console.log('HEIC file detected, converting to JPEG...');
     return convertHEICToJPEG(file, quality, onProgress);
   }
 

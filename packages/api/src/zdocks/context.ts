@@ -17,7 +17,9 @@ export interface ProjectContextOptions {
   userQuery?: string;
 }
 
-export function createZdockContextBuilder(deps: ProjectContextDeps) {
+export function createZdockContextBuilder(deps: ProjectContextDeps): {
+  buildZdockContext: (options: ProjectContextOptions) => Promise<string | undefined>;
+} {
   async function queryRag(
     embeddedFiles: IMongoFile[],
     userId: string,

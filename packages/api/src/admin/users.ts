@@ -45,7 +45,11 @@ export interface AdminUsersDeps {
   deleteUserCascade?: (userId: string, userObjectId: Types.ObjectId) => Promise<void>;
 }
 
-export function createAdminUsersHandlers(deps: AdminUsersDeps) {
+export function createAdminUsersHandlers(deps: AdminUsersDeps): {
+  listUsers: (req: ServerRequest, res: Response) => Promise<Response>;
+  searchUsers: (req: ServerRequest, res: Response) => Promise<Response>;
+  deleteUser: (req: ServerRequest, res: Response) => Promise<Response>;
+} {
   const { findUsers, countUsers, deleteUserById, deleteConfig, deleteAclEntries, deleteUserCascade } = deps;
 
   async function listUsersHandler(req: ServerRequest, res: Response) {

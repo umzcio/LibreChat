@@ -22,6 +22,7 @@ export * from './SearchContext';
 export * from './BadgeRowContext';
 export * from './DragDropContext';
 export * from './ArtifactsContext';
+export * from './ArtifactContext';
 export * from './PromptGroupsContext';
 export * from './MessagesViewContext';
 export { default as BadgeRowProvider } from './BadgeRowContext';

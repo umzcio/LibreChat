@@ -4,8 +4,8 @@ import { ChevronDown, FolderKanban } from 'lucide-react';
 import { useAtomValue } from 'jotai';
 import { useQueryClient } from '@tanstack/react-query';
 import { QueryKeys } from 'librechat-data-provider';
+import { List, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import { Spinner, TooltipAnchor, NewChatIcon, useMediaQuery } from '@librechat/client';
-import { List, AutoSizer, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import type { TConversation } from 'librechat-data-provider';
 import {
   useLocalize,
@@ -14,12 +14,13 @@ import {
   useFavorites,
   useShowMarketplace,
   useLocalStorage,
+  useElementSize,
 } from '~/hooks';
+import { groupConversationsByDate, clearMessagesCache, cn } from '~/utils';
 import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
 import ZdockCreateDialog from '~/components/SidePanel/Zdocks/ZdockCreateDialog';
 import { ZdockCard } from '~/components/SidePanel/Zdocks';
 import { useActiveJobs, useListZdocksQuery } from '~/data-provider';
-import { groupConversationsByDate, clearMessagesCache, cn } from '~/utils';
 import Convo from './Convo';
 import store from '~/store';
 
@@ -140,6 +141,17 @@ const ChatsHeader: FC<ChatsHeaderProps> = memo(({ isExpanded, onToggle }) => {
 
 ChatsHeader.displayName = 'ChatsHeader';
 
+const PinnedHeader: FC = memo(() => {
+  const localize = useLocalize();
+  return (
+    <h2 className="pl-1 pt-1 text-text-secondary" style={{ fontSize: '0.7rem' }}>
+      {localize('com_ui_pinned')}
+    </h2>
+  );
+});
+
+PinnedHeader.displayName = 'PinnedHeader';
+
 const DateLabel: FC<{ groupName: string; isFirst?: boolean }> = memo(({ groupName, isFirst }) => {
   const localize = useLocalize();
   return (
@@ -161,43 +173,13 @@ type FlattenedItem =
   | { type: 'favorites' }
   | { type: 'projects' }
   | { type: 'chats-header' }
+  | { type: 'pinned-header' }
+  | { type: 'pinned-convo'; convo: TConversation }
   | { type: 'header'; groupName: string }
   | { type: 'convo'; convo: TConversation }
   | { type: 'loading' };
 
 type DynamicRowType = 'favorites' | 'projects';
-
-const MemoizedConvo = memo(
-  ({
-    conversation,
-    retainView,
-    toggleNav,
-    isGenerating,
-  }: {
-    conversation: TConversation;
-    retainView: () => void;
-    toggleNav: () => void;
-    isGenerating: boolean;
-  }) => {
-    return (
-      <Convo
-        conversation={conversation}
-        retainView={retainView}
-        toggleNav={toggleNav}
-        isGenerating={isGenerating}
-      />
-    );
-  },
-  (prevProps, nextProps) => {
-    return (
-      prevProps.conversation.conversationId === nextProps.conversation.conversationId &&
-      prevProps.conversation.title === nextProps.conversation.title &&
-      prevProps.conversation.endpoint === nextProps.conversation.endpoint &&
-      prevProps.isGenerating === nextProps.isGenerating
-    );
-  },
-);
-
 const Conversations: FC<ConversationsProps> = ({
   conversations: rawConversations,
   moveToTop,
@@ -216,6 +198,11 @@ const Conversations: FC<ConversationsProps> = ({
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const convoHeight = isSmallScreen ? 44 : 34;
   const showAgentMarketplace = useShowMarketplace();
+  const {
+    ref: listContainerRef,
+    width: listWidth,
+    height: listHeight,
+  } = useElementSize<HTMLDivElement>();
 
   const favoritesContentKeyRef = useRef('');
   const zdocksContentKeyRef = useRef('');
@@ -251,6 +238,11 @@ const Conversations: FC<ConversationsProps> = ({
     [rawConversations],
   );
 
+  const pinnedConversations = useMemo(
+    () => filteredConversations.filter((c) => c.pinned),
+    [filteredConversations],
+  );
+
   const groupedConversations = useMemo(
     () => groupConversationsByDate(filteredConversations),
     [filteredConversations],
@@ -266,6 +258,13 @@ const Conversations: FC<ConversationsProps> = ({
     items.push({ type: 'chats-header' });
 
     if (isChatsExpanded) {
+      if (!search.query && pinnedConversations.length > 0) {
+        items.push({ type: 'pinned-header' });
+        items.push(
+          ...pinnedConversations.map((convo) => ({ type: 'pinned-convo' as const, convo })),
+        );
+      }
+
       groupedConversations.forEach(([groupName, convos]) => {
         items.push({ type: 'header', groupName });
         items.push(...convos.map((convo) => ({ type: 'convo' as const, convo })));
@@ -276,7 +275,14 @@ const Conversations: FC<ConversationsProps> = ({
       }
     }
     return items;
-  }, [groupedConversations, isLoading, isChatsExpanded, shouldShowFavorites]);
+  }, [
+    groupedConversations,
+    pinnedConversations,
+    isLoading,
+    isChatsExpanded,
+    shouldShowFavorites,
+    search.query,
+  ]);
 
   // Store flattenedItems in a ref for keyMapper to access without recreating cache
   const flattenedItemsRef = useRef(flattenedItems);
@@ -302,8 +308,15 @@ const Conversations: FC<ConversationsProps> = ({
           if (item.type === 'chats-header') {
             return 'chats-header';
           }
+          if (item.type === 'pinned-header') {
+            return 'pinned-header';
+          }
+          if (item.type === 'pinned-convo') {
+            return `pinned-${item.convo.conversationId}`;
+          }
           if (item.type === 'header') {
-            return `header-${item.groupName}`;
+            const firstHeaderIndex = flattenedItemsRef.current[0]?.type === 'favorites' ? 1 : 0;
+            return `header-${item.groupName}-${index === firstHeaderIndex ? 'first' : 'sub'}`;
           }
           if (item.type === 'convo') {
             return `convo-${item.convo.conversationId}`;
@@ -377,6 +390,17 @@ const Conversations: FC<ConversationsProps> = ({
     return () => cancelAnimationFrame(frameId);
   }, [search.query, cache, containerRef]);
 
+  /** Grid only re-derives row offsets when the row count changes; reorders that
+   *  keep the count (e.g. a convo bumped across date groups) need an explicit recompute. */
+  useEffect(() => {
+    const frameId = requestAnimationFrame(() => {
+      if (containerRef.current && 'recomputeRowHeights' in containerRef.current) {
+        containerRef.current.recomputeRowHeights(0);
+      }
+    });
+    return () => cancelAnimationFrame(frameId);
+  }, [flattenedItems, containerRef]);
+
   const rowRenderer = useCallback(
     ({ index, key, parent, style }) => {
       const item = flattenedItems[index];
@@ -437,6 +461,14 @@ const Conversations: FC<ConversationsProps> = ({
         );
       }
 
+      if (item.type === 'pinned-header') {
+        return (
+          <MeasuredRow key={key} {...rowProps}>
+            <PinnedHeader />
+          </MeasuredRow>
+        );
+      }
+
       if (item.type === 'chats-header') {
         return (
           <MeasuredRow key={key} {...rowProps}>
@@ -448,11 +480,25 @@ const Conversations: FC<ConversationsProps> = ({
         );
       }
 
+      if (item.type === 'pinned-convo') {
+        const isGenerating = activeJobIds.has(item.convo.conversationId ?? '');
+        return (
+          <MeasuredRow key={key} {...rowProps}>
+            <Convo
+              conversation={item.convo}
+              retainView={moveToTop}
+              toggleNav={toggleNav}
+              isGenerating={isGenerating}
+            />
+          </MeasuredRow>
+        );
+      }
+
       if (item.type === 'header') {
-        // First date header index depends on whether favorites row is included
-        // With favorites: [favorites, projects, chats-header, first-header] → index 3
-        // Without favorites: [projects, chats-header, first-header] → index 2
-        const firstHeaderIndex = shouldShowFavorites ? 3 : 2;
+        // First date header index = favorites(0/1) + projects + chats-header + pinned section
+        // Order: [favorites?, projects, chats-header, (pinned-header, #pinned-convos)?, first-header]
+        const pinnedOffset = pinnedConversations.length > 0 ? pinnedConversations.length + 1 : 0;
+        const firstHeaderIndex = (shouldShowFavorites ? 1 : 0) + 2 + pinnedOffset;
         return (
           <MeasuredRow key={key} {...rowProps}>
             <DateLabel groupName={item.groupName} isFirst={index === firstHeaderIndex} />
@@ -464,7 +510,7 @@ const Conversations: FC<ConversationsProps> = ({
         const isGenerating = activeJobIds.has(item.convo.conversationId ?? '');
         return (
           <MeasuredRow key={key} {...rowProps}>
-            <MemoizedConvo
+            <Convo
               conversation={item.convo}
               retainView={moveToTop}
               toggleNav={toggleNav}
@@ -491,6 +537,7 @@ const Conversations: FC<ConversationsProps> = ({
       setIsProjectsExpanded,
       createZdockOpen,
       projects,
+      pinnedConversations,
     ],
   );
 
@@ -527,28 +574,24 @@ const Conversations: FC<ConversationsProps> = ({
           <span className="ml-2 text-text-primary">{localize('com_ui_loading')}</span>
         </div>
       ) : (
-        <div className="flex-1">
-          <AutoSizer>
-            {({ width, height }) => (
-              <List
-                ref={containerRef}
-                width={width}
-                height={height}
-                deferredMeasurementCache={cache}
-                rowCount={flattenedItems.length}
-                rowHeight={getRowHeight}
-                rowRenderer={rowRenderer}
-                overscanRowCount={10}
-                aria-readonly={false}
-                className="outline-none"
-                aria-label="Conversations"
-                onRowsRendered={handleRowsRendered}
-                tabIndex={-1}
-                style={{ outline: 'none' }}
-                containerRole="rowgroup"
-              />
-            )}
-          </AutoSizer>
+        <div ref={listContainerRef} className="min-h-0 flex-1 overflow-hidden">
+          <List
+            ref={containerRef}
+            width={listWidth}
+            height={listHeight}
+            deferredMeasurementCache={cache}
+            rowCount={flattenedItems.length}
+            rowHeight={getRowHeight}
+            rowRenderer={rowRenderer}
+            overscanRowCount={10}
+            aria-readonly={false}
+            className="outline-none"
+            aria-label="Conversations"
+            onRowsRendered={handleRowsRendered}
+            tabIndex={-1}
+            style={{ outline: 'none' }}
+            containerRole="rowgroup"
+          />
         </div>
       )}
     </div>

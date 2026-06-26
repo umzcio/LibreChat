@@ -44,6 +44,7 @@ export default function useClearStates() {
         jotaiStore.set(store.audioRunFamily(key), null);
         jotaiStore.set(store.messagesSiblingIdxFamily(key.toString()), 0);
         jotaiStore.set(store.pendingManualSkillsByConvoId(key.toString()), []);
+        jotaiStore.set(store.pendingQuotesByConvoId(key.toString()), []);
       }
 
       clearLocalStorage(skipFirst);

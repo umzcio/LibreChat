@@ -2,8 +2,8 @@ import { useCallback } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { replaceSpecialVars } from 'librechat-data-provider';
 import { useChatContext, useChatFormContext, useAddedChatContext } from '~/Providers';
-import { useAuthContext } from '~/hooks/AuthContext';
 import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
+import { useAuthContext } from '~/hooks/AuthContext';
 import { mainTextareaId } from '~/common';
 import { logger } from '~/utils';
 import store from '~/store';
@@ -32,7 +32,7 @@ export default function useSubmitMessage() {
         setMessages([...(rootMessages || []), latestMessage]);
       }
 
-      ask(
+      const submitted = ask(
         {
           text: data.text,
         },
@@ -40,6 +40,9 @@ export default function useSubmitMessage() {
           addedConvo: addedConvo ?? undefined,
         },
       );
+      if (submitted === false) {
+        return false;
+      }
       methods.reset();
     },
     [ask, methods, addedConvo, setMessages, getMessages, latestMessage],

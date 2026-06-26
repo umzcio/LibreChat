@@ -1,4 +1,5 @@
 import React from 'react';
+import { RecoilRoot } from 'recoil';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EModelEndpoint, EToolResources, Providers } from 'librechat-data-provider';
@@ -129,14 +130,16 @@ function setupMocks(overrides: { provider?: string } = {}) {
 function renderMenu(props: Record<string, unknown> = {}) {
   return render(
     <QueryClientProvider client={queryClient}>
-      <AttachFileMenu
-        conversationId="test-convo"
-        files={new Map()}
-        setFiles={() => {}}
-        setFilesLoading={() => {}}
-        conversation={null}
-        {...props}
-      />
+      <RecoilRoot>
+        <AttachFileMenu
+          conversationId="test-convo"
+          files={new Map()}
+          setFiles={() => {}}
+          setFilesLoading={() => {}}
+          conversation={null}
+          {...props}
+        />
+      </RecoilRoot>
     </QueryClientProvider>,
   );
 }

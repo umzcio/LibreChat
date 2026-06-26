@@ -1,21 +1,29 @@
 import React from 'react';
 import { render, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { RecoilRoot } from 'recoil';
 import { DndProvider } from 'react-dnd';
-import { HTML5Backend } from 'react-dnd-html5-backend';
 import { BrowserRouter } from 'react-router-dom';
 import { dataService } from 'librechat-data-provider';
+import { HTML5Backend } from 'react-dnd-html5-backend';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Agent } from 'librechat-data-provider';
 
 // Mock store before importing FavoritesList
 jest.mock('~/store', () => {
-  const { atom } = jest.requireActual('jotai');
+  const { atom } = jest.requireActual('recoil');
   return {
     __esModule: true,
     default: {
-      search: atom({ query: '' }),
-      conversationByIndex: () => atom(null),
+      search: atom({
+        key: 'mock-search-atom',
+        default: { query: '' },
+      }),
+      conversationByIndex: (index: number) =>
+        atom({
+          key: `mock-conversation-atom-${index}`,
+          default: null,
+        }),
     },
   };
 });
@@ -63,7 +71,7 @@ jest.mock('~/hooks/Input/useSelectMention', () => () => ({
   onSelectSpec: mockOnSelectSpec,
 }));
 
-const mockUseGetStartupConfig = jest.fn(() => ({
+const mockUseGetStartupConfig = jest.fn((): { data?: { modelSpecs: { list: unknown[] } } } => ({
   data: { modelSpecs: { list: [] as unknown[] } },
 }));
 
@@ -102,9 +110,11 @@ const renderWithProviders = (ui: React.ReactElement) => {
   const queryClient = createTestQueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <DndProvider backend={HTML5Backend}>{ui}</DndProvider>
-      </BrowserRouter>
+      <RecoilRoot>
+        <BrowserRouter>
+          <DndProvider backend={HTML5Backend}>{ui}</DndProvider>
+        </BrowserRouter>
+      </RecoilRoot>
     </QueryClientProvider>,
   );
 };
@@ -269,11 +279,13 @@ describe('FavoritesList', () => {
 
       rerender(
         <QueryClientProvider client={createTestQueryClient()}>
-          <BrowserRouter>
-            <DndProvider backend={HTML5Backend}>
-              <FavoritesList />
-            </DndProvider>
-          </BrowserRouter>
+          <RecoilRoot>
+            <BrowserRouter>
+              <DndProvider backend={HTML5Backend}>
+                <FavoritesList />
+              </DndProvider>
+            </BrowserRouter>
+          </RecoilRoot>
         </QueryClientProvider>,
       );
 

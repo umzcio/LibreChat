@@ -28,10 +28,12 @@ export * from './zdock';
 export * from './workspace';
 /* Skills */
 export * from './skill';
+export * from './skillSync';
 /* Access Control */
 export * from './accessRole';
 export * from './aclEntry';
 export * from './systemGrant';
+export * from './auditLog';
 export * from './group';
 /* Config */
 export * from './config';

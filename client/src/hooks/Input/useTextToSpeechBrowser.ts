@@ -1,7 +1,6 @@
-import { useAtomValue } from 'jotai';
 import { useState, useEffect, useCallback } from 'react';
+import { useRecoilValue } from 'recoil';
 import type { VoiceOption } from '~/common';
-import { logger } from '~/utils';
 import store from '~/store';
 
 function useTextToSpeechBrowser({
@@ -9,9 +8,9 @@ function useTextToSpeechBrowser({
 }: {
   setIsSpeaking: React.Dispatch<React.SetStateAction<boolean>>;
 }) {
-  const voiceName = useAtomValue(store.voice);
+  const voiceName = useRecoilValue(store.voice);
   const [voices, setVoices] = useState<VoiceOption[]>([]);
-  const cloudBrowserVoices = useAtomValue(store.cloudBrowserVoices);
+  const cloudBrowserVoices = useRecoilValue(store.cloudBrowserVoices);
   const [isSpeechSynthesisSupported, setIsSpeechSynthesisSupported] = useState(true);
 
   const updateVoices = useCallback(() => {
@@ -24,7 +23,7 @@ function useTextToSpeechBrowser({
     try {
       const availableVoices = synth.getVoices();
       if (!Array.isArray(availableVoices)) {
-        logger.error('TTS','getVoices() did not return an array');
+        console.error('getVoices() did not return an array');
         return;
       }
 
@@ -38,7 +37,7 @@ function useTextToSpeechBrowser({
 
       setVoices(voiceOptions);
     } catch (error) {
-      logger.error('TTS','Error updating voices:', error);
+      console.error('Error updating voices:', error);
       setIsSpeechSynthesisSupported(false);
     }
   }, [cloudBrowserVoices]);
@@ -57,7 +56,7 @@ function useTextToSpeechBrowser({
         synth.onvoiceschanged = updateVoices;
       }
     } catch (error) {
-      logger.error('TTS','Error in useEffect:', error);
+      console.error('Error in useEffect:', error);
       setIsSpeechSynthesisSupported(false);
     }
 
@@ -70,7 +69,7 @@ function useTextToSpeechBrowser({
 
   const generateSpeechLocal = (text: string) => {
     if (!isSpeechSynthesisSupported) {
-      logger.warn('TTS','Speech synthesis is not supported');
+      console.warn('Speech synthesis is not supported');
       return;
     }
 
@@ -78,7 +77,7 @@ function useTextToSpeechBrowser({
     const voice = voices.find((v) => v.value === voiceName);
 
     if (!voice) {
-      logger.warn('TTS','Selected voice not found');
+      console.warn('Selected voice not found');
       return;
     }
 
@@ -90,13 +89,18 @@ function useTextToSpeechBrowser({
         setIsSpeaking(false);
       };
       utterance.onerror = (event) => {
-        logger.error('TTS','Speech synthesis error:', event);
+        if (event.error === 'interrupted' || event.error === 'canceled') {
+          setIsSpeaking(false);
+          return;
+        }
+
+        console.error('Speech synthesis error:', event);
         setIsSpeaking(false);
       };
       setIsSpeaking(true);
       synth.speak(utterance);
     } catch (error) {
-      logger.error('TTS','Error generating speech:', error);
+      console.error('Error generating speech:', error);
       setIsSpeaking(false);
     }
   };
@@ -109,7 +113,7 @@ function useTextToSpeechBrowser({
     try {
       window.speechSynthesis.cancel();
     } catch (error) {
-      logger.error('TTS','Error cancelling speech:', error);
+      console.error('Error cancelling speech:', error);
     } finally {
       setIsSpeaking(false);
     }

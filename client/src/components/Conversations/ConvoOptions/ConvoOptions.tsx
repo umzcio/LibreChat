@@ -9,14 +9,28 @@ import {
 } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import { DropdownPopup, Spinner, useToastContext } from '@librechat/client';
-import { Ellipsis, Share2, CopyPlus, Archive, Pen, Trash, FolderInput, FolderOutput, Code2 } from 'lucide-react';
+import {
+  Ellipsis,
+  Share2,
+  CopyPlus,
+  Archive,
+  Pen,
+  Pin,
+  Trash,
+  FolderInput,
+  FolderOutput,
+  FolderX,
+  Code2,
+} from 'lucide-react';
 import type { MouseEvent } from 'react';
 import type { TMessage } from 'librechat-data-provider';
+import type { MouseEvent } from 'react';
 import {
   useDuplicateConversationMutation,
   useDeleteConversationMutation,
   useGetStartupConfig,
   useArchiveConvoMutation,
+  usePinConversationMutation,
 } from '~/data-provider';
 import { useHasAccess, useLocalize, useNavigateToConvo, useNewConvo } from '~/hooks';
 import { NotificationSeverity } from '~/common';
@@ -28,6 +42,7 @@ import { buildConversationPath, cn, getConversationModeFromPath } from '~/utils'
 function ConvoOptions({
   conversationId,
   title,
+  isPinned = false,
   retainView,
   renameHandler,
   isPopoverActive,
@@ -39,6 +54,7 @@ function ConvoOptions({
 }: {
   conversationId: string | null;
   title: string | null;
+  isPinned?: boolean;
   retainView: () => void;
   renameHandler: (e: MouseEvent) => void;
   isPopoverActive: boolean;
@@ -74,6 +90,7 @@ function ConvoOptions({
   });
 
   const archiveConvoMutation = useArchiveConvoMutation();
+  const pinConvoMutation = usePinConversationMutation();
 
   const deleteMutation = useDeleteConversationMutation({
     onSuccess: () => {
@@ -129,6 +146,7 @@ function ConvoOptions({
 
   const isDuplicateLoading = duplicateConversation.isLoading;
   const isArchiveLoading = archiveConvoMutation.isLoading;
+  const isPinLoading = pinConvoMutation.isLoading;
   const isDeleteLoading = deleteMutation.isLoading;
 
   const shareHandler = useCallback(() => {
@@ -209,6 +227,26 @@ function ConvoOptions({
     ],
   );
 
+  const handlePinClick = useCallback(() => {
+    const convoId = conversationId ?? '';
+    if (!convoId) {
+      return;
+    }
+    pinConvoMutation.mutate(
+      { conversationId: convoId, pinned: !isPinned },
+      {
+        onSuccess: () => setIsPopoverActive(false),
+        onError: () => {
+          showToast({
+            message: localize(isPinned ? 'com_ui_unpin_error' : 'com_ui_pin_error'),
+            severity: NotificationSeverity.ERROR,
+            showIcon: true,
+          });
+        },
+      },
+    );
+  }, [conversationId, isPinned, pinConvoMutation, setIsPopoverActive, showToast, localize]);
+
   const handleDuplicateClick = useCallback(() => {
     duplicateConversation.mutate({
       conversationId: conversationId ?? '',
@@ -228,6 +266,16 @@ function ConvoOptions({
         hideOnClick: false,
         ref: shareButtonRef,
         render: (props) => <button {...props} />,
+      },
+      {
+        label: localize(isPinned ? 'com_ui_unpin' : 'com_ui_pin'),
+        onClick: handlePinClick,
+        hideOnClick: false,
+        icon: isPinLoading ? (
+          <Spinner className="size-4" />
+        ) : (
+          <Pin className="icon-sm mr-2 text-text-primary" aria-hidden="true" />
+        ),
       },
       {
         label: localize('com_ui_rename'),
@@ -339,12 +387,15 @@ function ConvoOptions({
     ],
     [
       localize,
+      isPinned,
+      isPinLoading,
       shareHandler,
       startupConfig,
       renameHandler,
       deleteHandler,
       isArchiveLoading,
       isDuplicateLoading,
+      handlePinClick,
       handleArchiveClick,
       canCreateSharedLinks,
       handleDuplicateClick,
@@ -470,6 +521,7 @@ export default memo(ConvoOptions, (prevProps, nextProps) => {
   return (
     prevProps.conversationId === nextProps.conversationId &&
     prevProps.title === nextProps.title &&
+    prevProps.isPinned === nextProps.isPinned &&
     prevProps.isPopoverActive === nextProps.isPopoverActive &&
     prevProps.isActiveConvo === nextProps.isActiveConvo &&
     prevProps.isShiftHeld === nextProps.isShiftHeld &&

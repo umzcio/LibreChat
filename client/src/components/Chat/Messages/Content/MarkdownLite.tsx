@@ -6,10 +6,10 @@ import supersub from 'remark-supersub';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import type { PluggableList } from 'unified';
-import { code, codeNoExecution, a, p, img } from './MarkdownComponents';
-import { CodeBlockProvider } from '~/Providers';
+import { code, codeNoExecution, a, p, img, table } from './MarkdownComponents';
+import { CodeBlockProvider, ArtifactProvider } from '~/Providers';
 import MarkdownErrorBoundary from './MarkdownErrorBoundary';
-import { langSubset } from '~/utils';
+import { langSubset, remarkApproxTilde } from '~/utils';
 
 const MarkdownLite = memo(
   ({ content = '', codeExecution = true }: { content?: string; codeExecution?: boolean }) => {
@@ -27,30 +27,34 @@ const MarkdownLite = memo(
 
     return (
       <MarkdownErrorBoundary content={content} codeExecution={codeExecution}>
-        <CodeBlockProvider>
-          <ReactMarkdown
-            remarkPlugins={[
-              // @ts-expect-error - remark plugin types incompatible with unified v11
-              supersub,
-              remarkGfm,
-              [remarkMath, { singleDollarTextMath: false }],
-            ]}
-            // @ts-expect-error - rehype plugin types incompatible with unified v11
-            rehypePlugins={rehypePlugins}
-            components={
-              {
-                code: codeExecution ? code : codeNoExecution,
-                a,
-                p,
-                img,
-              } as {
-                [nodeType: string]: React.ElementType;
+        <ArtifactProvider>
+          <CodeBlockProvider>
+            <ReactMarkdown
+              remarkPlugins={[
+                remarkApproxTilde,
+                /** @ts-ignore */
+                supersub,
+                remarkGfm,
+                [remarkMath, { singleDollarTextMath: false }],
+              ]}
+              /** @ts-ignore */
+              rehypePlugins={rehypePlugins}
+              components={
+                {
+                  code: codeExecution ? code : codeNoExecution,
+                  a,
+                  p,
+                  img,
+                  table,
+                } as {
+                  [nodeType: string]: React.ElementType;
+                }
               }
-            }
-          >
-            {content}
-          </ReactMarkdown>
-        </CodeBlockProvider>
+            >
+              {content}
+            </ReactMarkdown>
+          </CodeBlockProvider>
+        </ArtifactProvider>
       </MarkdownErrorBoundary>
     );
   },

@@ -2,10 +2,9 @@ import { useCallback, useEffect } from 'react';
 import { TOptions } from 'i18next';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
-import { resources } from '~/locales/i18n';
-import store from '~/store';
+import translationEn from '~/locales/en/translation.json';
 
-export type TranslationKeys = keyof typeof resources.en.translation;
+export type TranslationKeys = keyof typeof translationEn;
 
 export default function useLocalize() {
   const lang = useAtomValue(store.lang);

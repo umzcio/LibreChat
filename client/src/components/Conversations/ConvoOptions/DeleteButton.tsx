@@ -27,11 +27,13 @@ type DeleteButtonProps = {
   setShowDeleteDialog?: (value: boolean) => void;
   triggerRef?: React.RefObject<HTMLButtonElement>;
   setMenuOpen?: (open: boolean) => void;
+  currentConversationId?: string;
 };
 
 export function DeleteConversationDialog({
   setShowDeleteDialog,
   conversationId,
+  currentConversationId,
   setMenuOpen,
   retainView,
   title,
@@ -39,6 +41,7 @@ export function DeleteConversationDialog({
   setMenuOpen?: (open: boolean) => void;
   setShowDeleteDialog: (value: boolean) => void;
   conversationId: string;
+  currentConversationId?: string;
   retainView: () => void;
   title: string;
 }) {
@@ -48,7 +51,8 @@ export function DeleteConversationDialog({
   const queryClient = useQueryClient();
   const { showToast } = useToastContext();
   const { newConversation } = useNewConvo();
-  const { conversationId: currentConvoId, zdockId } = useParams();
+  const { conversationId: routeConversationId, zdockId } = useParams();
+  const currentConvoId = currentConversationId ?? routeConversationId;
 
   const deleteMutation = useDeleteConversationMutation({
     onSuccess: () => {
@@ -121,6 +125,7 @@ export function DeleteConversationDialog({
 
 export default function DeleteButton({
   conversationId,
+  currentConversationId,
   retainView,
   title,
   setMenuOpen,
@@ -141,6 +146,7 @@ export default function DeleteButton({
       <DeleteConversationDialog
         setShowDeleteDialog={setShowDeleteDialog}
         conversationId={conversationId}
+        currentConversationId={currentConversationId}
         setMenuOpen={setMenuOpen}
         retainView={retainView}
         title={title}

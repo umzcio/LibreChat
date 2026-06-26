@@ -7,7 +7,20 @@ export interface MCPCosmeticOverrideData {
   iconPath?: string;
 }
 
-export function createMCPCosmeticOverrideMethods(mongoose: typeof import('mongoose')) {
+export interface MCPCosmeticOverrideMethods {
+  upsertCosmeticOverride(
+    serverName: string,
+    data: MCPCosmeticOverrideData,
+    updatedBy: string | Types.ObjectId,
+  ): Promise<MCPCosmeticOverrideDocument>;
+  getCosmeticOverride(serverName: string): Promise<MCPCosmeticOverrideDocument | null>;
+  getAllCosmeticOverrides(): Promise<MCPCosmeticOverrideDocument[]>;
+  deleteCosmeticOverride(serverName: string): Promise<MCPCosmeticOverrideDocument | null>;
+}
+
+export function createMCPCosmeticOverrideMethods(
+  mongoose: typeof import('mongoose'),
+): MCPCosmeticOverrideMethods {
   async function upsertCosmeticOverride(
     serverName: string,
     data: MCPCosmeticOverrideData,
@@ -48,5 +61,3 @@ export function createMCPCosmeticOverrideMethods(mongoose: typeof import('mongoo
     deleteCosmeticOverride,
   };
 }
-
-export type MCPCosmeticOverrideMethods = ReturnType<typeof createMCPCosmeticOverrideMethods>;

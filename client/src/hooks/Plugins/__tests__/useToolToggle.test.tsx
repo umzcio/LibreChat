@@ -1,7 +1,8 @@
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { useAtomValue, useSetAtom } from 'jotai';
 import { LocalStorageKeys, Tools } from 'librechat-data-provider';
+import { RecoilRoot, useRecoilValue, useSetRecoilState } from 'recoil';
+import useLocalStorage from '~/hooks/useLocalStorageAlt';
 import { ephemeralAgentByConvoId } from '~/store';
 import { useToolToggle } from '../useToolToggle';
 
@@ -17,11 +18,15 @@ import { useToolToggle } from '../useToolToggle';
  * - The hook reflects the current ephemeral agent state
  */
 
-// Mock data-provider auth query
+// Mutable startup config so tests can vary `interface.defaultPinnedTools`
+let mockStartupConfig: { interface?: { defaultPinnedTools?: string[] } } | undefined;
+
+// Mock data-provider auth query + startup config
 jest.mock('~/data-provider', () => ({
   useVerifyAgentToolAuth: jest.fn().mockReturnValue({
     data: { authenticated: true },
   }),
+  useGetStartupConfig: jest.fn(() => ({ data: mockStartupConfig })),
 }));
 
 // Mock timestamps (track calls without actual localStorage timestamp logic)
@@ -33,13 +38,14 @@ jest.mock('~/utils/timestamps', () => ({
 jest.mock('~/hooks/useLocalStorageAlt', () => jest.fn(() => [false, jest.fn()]));
 
 const Wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <>{children}</>
+  <RecoilRoot>{children}</RecoilRoot>
 );
 
 describe('useToolToggle', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     localStorage.clear();
+    mockStartupConfig = undefined;
   });
 
   // ─── Dual-Write Behavior ───────────────────────────────────────────
@@ -142,7 +148,7 @@ describe('useToolToggle', () => {
           localStorageKey: LocalStorageKeys.LAST_CODE_TOGGLE_,
           isAuthenticated: true,
         });
-        const ephemeralAgent = useAtomValue(ephemeralAgentByConvoId(conversationId));
+        const ephemeralAgent = useRecoilValue(ephemeralAgentByConvoId(conversationId));
         return { toggle, ephemeralAgent };
       };
 
@@ -182,7 +188,7 @@ describe('useToolToggle', () => {
           localStorageKey: LocalStorageKeys.LAST_CODE_TOGGLE_,
           isAuthenticated: true,
         });
-        const ephemeralAgent = useAtomValue(ephemeralAgentByConvoId(conversationId));
+        const ephemeralAgent = useRecoilValue(ephemeralAgentByConvoId(conversationId));
         return { toggle, ephemeralAgent };
       };
 
@@ -214,7 +220,7 @@ describe('useToolToggle', () => {
           localStorageKey: LocalStorageKeys.LAST_WEB_SEARCH_TOGGLE_,
           isAuthenticated: true,
         });
-        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(conversationId));
+        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(conversationId));
         return { toggle, setEphemeralAgent };
       };
 
@@ -240,7 +246,7 @@ describe('useToolToggle', () => {
           localStorageKey: LocalStorageKeys.LAST_FILE_SEARCH_TOGGLE_,
           isAuthenticated: true,
         });
-        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(conversationId));
+        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(conversationId));
         return { toggle, setEphemeralAgent };
       };
 
@@ -286,7 +292,7 @@ describe('useToolToggle', () => {
           localStorageKey: LocalStorageKeys.LAST_ARTIFACTS_TOGGLE_,
           isAuthenticated: true,
         });
-        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(conversationId));
+        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(conversationId));
         return { toggle, setEphemeralAgent };
       };
 
@@ -310,7 +316,7 @@ describe('useToolToggle', () => {
           localStorageKey: LocalStorageKeys.LAST_ARTIFACTS_TOGGLE_,
           isAuthenticated: true,
         });
-        const setEphemeralAgent = useSetAtom(ephemeralAgentByConvoId(conversationId));
+        const setEphemeralAgent = useSetRecoilState(ephemeralAgentByConvoId(conversationId));
         return { toggle, setEphemeralAgent };
       };
 
@@ -323,6 +329,48 @@ describe('useToolToggle', () => {
       await waitFor(() => {
         expect(result.current.toggle.isToolEnabled).toBe(false);
       });
+    });
+  });
+
+  // ─── Default pinned state from interface.defaultPinnedTools ─────────
+
+  describe('defaultPinnedTools (admin-configured default pin)', () => {
+    const renderToolToggle = () =>
+      renderHook(
+        () =>
+          useToolToggle({
+            toolKey: Tools.execute_code,
+            localStorageKey: LocalStorageKeys.LAST_CODE_TOGGLE_,
+            isAuthenticated: true,
+          }),
+        { wrapper: Wrapper },
+      );
+
+    it('seeds the pinned state to true when the tool key is listed', () => {
+      mockStartupConfig = { interface: { defaultPinnedTools: ['execute_code', 'mcp'] } };
+      renderToolToggle();
+      expect(useLocalStorage).toHaveBeenCalledWith(
+        `${LocalStorageKeys.LAST_CODE_TOGGLE_}pinned`,
+        true,
+      );
+    });
+
+    it('seeds the pinned state to false when the tool key is not listed', () => {
+      mockStartupConfig = { interface: { defaultPinnedTools: ['artifacts'] } };
+      renderToolToggle();
+      expect(useLocalStorage).toHaveBeenCalledWith(
+        `${LocalStorageKeys.LAST_CODE_TOGGLE_}pinned`,
+        false,
+      );
+    });
+
+    it('seeds the pinned state to false when defaultPinnedTools is not configured', () => {
+      mockStartupConfig = undefined;
+      renderToolToggle();
+      expect(useLocalStorage).toHaveBeenCalledWith(
+        `${LocalStorageKeys.LAST_CODE_TOGGLE_}pinned`,
+        false,
+      );
     });
   });
 });

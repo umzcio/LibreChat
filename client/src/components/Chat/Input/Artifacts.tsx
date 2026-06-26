@@ -1,10 +1,10 @@
 import React, { memo, useState, useCallback, useMemo, useEffect } from 'react';
 import * as Ariakit from '@ariakit/react';
 import { CheckboxButton } from '@librechat/client';
-import { ArtifactModes } from 'librechat-data-provider';
 import { WandSparkles, ChevronDown } from 'lucide-react';
+import { ArtifactModes, defaultAgentCapabilities } from 'librechat-data-provider';
+import { useLocalize, useAgentCapabilities } from '~/hooks';
 import { useBadgeRowContext } from '~/Providers';
-import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
 
 interface ArtifactsToggleState {
@@ -16,6 +16,10 @@ function Artifacts() {
   const localize = useLocalize();
   const context = useBadgeRowContext();
   const { toggleState, debouncedChange, isPinned } = context?.artifacts ?? {};
+
+  const { artifactsEnabled } = useAgentCapabilities(
+    context?.agentsConfig?.capabilities ?? defaultAgentCapabilities,
+  );
 
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const [isButtonExpanded, setIsButtonExpanded] = useState(false);
@@ -73,7 +77,13 @@ function Artifacts() {
     }
   }, [isCustomEnabled, debouncedChange]);
 
-  /* Always show the artifacts toggle — don't hide it when unpinned */
+  if (!artifactsEnabled) {
+    return null;
+  }
+
+  if (!isEnabled && !isPinned) {
+    return null;
+  }
 
   return (
     <div className="flex">
@@ -134,7 +144,7 @@ function Artifacts() {
                   isShadcnEnabled && 'bg-surface-active',
                 )}
               >
-                <span className="text-sm">{localize('com_ui_include_shadcnui')}</span>
+                <span className="text-sm">{localize('com_ui_include_shadcnui' as any)}</span>
                 <div className="ml-auto flex items-center">
                   <Ariakit.MenuItemCheck checked={isShadcnEnabled} />
                 </div>
@@ -155,7 +165,7 @@ function Artifacts() {
                   isCustomEnabled && 'bg-surface-active',
                 )}
               >
-                <span className="text-sm">{localize('com_ui_custom_prompt_mode')}</span>
+                <span className="text-sm">{localize('com_ui_custom_prompt_mode' as any)}</span>
                 <div className="ml-auto flex items-center">
                   <Ariakit.MenuItemCheck checked={isCustomEnabled} />
                 </div>

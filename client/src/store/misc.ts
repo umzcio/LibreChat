@@ -50,6 +50,27 @@ queriesEnabled.debugLabel = 'queriesEnabled';
 const isEditingBadges = atom<boolean>(false);
 isEditingBadges.debugLabel = 'isEditingBadges';
 
+const showShortcutsDialog = atom<boolean>(false);
+showShortcutsDialog.debugLabel = 'showShortcutsDialog';
+
+export type KeyboardDeleteTarget = {
+  conversationId: string;
+  title: string;
+};
+
+const keyboardDeleteTarget = atom<KeyboardDeleteTarget | null>(null);
+keyboardDeleteTarget.debugLabel = 'keyboardDeleteTarget';
+
+export type ShortcutOverride = {
+  mac: string | null;
+  other: string | null;
+};
+
+const customShortcuts = createStorageAtom<Record<string, ShortcutOverride>>(
+  'customKeyboardShortcuts',
+  {},
+);
+
 const chatBadges = createStorageAtom<Pick<BadgeItem, 'id'>[]>('chatBadges', [
   // When adding new badges, make sure to add them to useChatBadges.ts as well and add them as last item
   // DO NOT CHANGE THE ORDER OF THE BADGES ALREADY IN THE ARRAY
@@ -64,5 +85,8 @@ export default {
   conversationAttachmentsSelector,
   queriesEnabled,
   isEditingBadges,
+  showShortcutsDialog,
+  keyboardDeleteTarget,
+  customShortcuts,
   chatBadges,
 };
