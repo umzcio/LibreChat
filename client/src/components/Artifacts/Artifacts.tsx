@@ -397,7 +397,6 @@ export default function Artifacts() {
                 artifact={currentArtifact}
                 previewRef={previewRef as React.MutableRefObject<SandpackPreviewRef>}
                 isSharedConvo={isSharedConvo}
-                onSwitchToCode={() => setActiveTab('code')}
               />
             </div>
 
