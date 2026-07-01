@@ -135,17 +135,17 @@ describe('AccessRole Model Tests', () => {
           permBits: RoleBits.EDITOR,
         }),
         methods.createRole({
-          accessRoleId: 'zdock_viewer',
+          accessRoleId: 'project_viewer',
           name: 'Project Viewer',
           description: 'Can view projects',
-          resourceType: 'zdock',
+          resourceType: 'project',
           permBits: RoleBits.VIEWER,
         }),
         methods.createRole({
-          accessRoleId: 'zdock_editor',
+          accessRoleId: 'project_editor',
           name: 'Project Editor',
           description: 'Can edit projects',
-          resourceType: 'zdock',
+          resourceType: 'project',
           permBits: RoleBits.EDITOR,
         }),
       ]);
@@ -161,7 +161,7 @@ describe('AccessRole Model Tests', () => {
       const projectRoles = await methods.findRolesByResourceType('project');
       expect(projectRoles).toHaveLength(2);
       expect(projectRoles.map((r) => r.accessRoleId).sort()).toEqual(
-        ['zdock_editor', 'zdock_viewer'].sort(),
+        ['project_editor', 'project_viewer'].sort(),
       );
     });
 
@@ -311,9 +311,9 @@ describe('AccessRole Model Tests', () => {
     test('should find role for resource-specific permissions', async () => {
       // Create a role for a different resource type
       await methods.createRole({
-        accessRoleId: 'zdock_viewer',
+        accessRoleId: 'project_viewer',
         name: 'Project Viewer',
-        resourceType: 'zdock',
+        resourceType: 'project',
         permBits: RoleBits.VIEWER,
       });
 
@@ -323,9 +323,9 @@ describe('AccessRole Model Tests', () => {
       expect(agentRole?.accessRoleId).toBe(AccessRoleIds.AGENT_VIEWER);
 
       // Query for project roles
-      const projectRole = await methods.getRoleForPermissions('zdock', RoleBits.VIEWER);
+      const projectRole = await methods.getRoleForPermissions('project', RoleBits.VIEWER);
       expect(projectRole).toBeDefined();
-      expect(projectRole?.accessRoleId).toBe('zdock_viewer');
+      expect(projectRole?.accessRoleId).toBe('project_viewer');
     });
   });
 });

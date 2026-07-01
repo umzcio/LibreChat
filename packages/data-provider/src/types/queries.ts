@@ -19,12 +19,12 @@ export type ConversationListParams = {
   sortDirection?: 'asc' | 'desc';
   tags?: string[];
   search?: string;
-  zdockId?: string;
+  projectId?: string;
 };
 
 export type MinimalConversation = Pick<
   s.TConversation,
-  'conversationId' | 'endpoint' | 'title' | 'createdAt' | 'updatedAt' | 'user' 
+  'conversationId' | 'endpoint' | 'title' | 'createdAt' | 'updatedAt' | 'user' | 'chatProjectId'
 >;
 
 export type ConversationListResponse = {
@@ -38,7 +38,7 @@ export type ConversationUpdater = (
   conversation: s.TConversation,
 ) => ConversationData;
 
-export type ZdockListParams = {
+export type ProjectListParams = {
   cursor?: string;
   limit?: number;
   sortBy?: 'name' | 'createdAt' | 'lastConversationAt';
@@ -46,11 +46,12 @@ export type ZdockListParams = {
   search?: string;
 };
 
-export type ZdockListResponse = {
+export type ProjectListResponse = {
+  projects: t.TChatProject[];
   nextCursor: string | null;
 };
 
-export type ProjectData = InfiniteData<ZdockListResponse>;
+export type ProjectData = InfiniteData<ProjectListResponse>;
 
 /* Messages */
 export type MessagesListParams = {

@@ -4,7 +4,6 @@ import type { CodeEnvRef } from 'librechat-data-provider';
 export interface IMongoFile extends Omit<Document, 'model'> {
   user: Types.ObjectId;
   conversationId?: string;
-  zdockId?: string;
   messageId?: string;
   file_id: string;
   temp_file_id?: string;

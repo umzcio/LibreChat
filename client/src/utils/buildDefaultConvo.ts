@@ -84,11 +84,6 @@ const buildDefaultConvo = ({
 
   defaultConvo.tools = lastConversationSetup?.tools ?? lastSelectedTools ?? defaultConvo.tools;
 
-  // Preserve zdockId from original conversation
-  if (conversation.zdockId && !defaultConvo.zdockId) {
-    defaultConvo.zdockId = conversation.zdockId;
-  }
-
   return defaultConvo;
 };
 

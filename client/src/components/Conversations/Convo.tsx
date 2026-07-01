@@ -1,6 +1,6 @@
 import React, { memo, useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Pin } from 'lucide-react';
-import { useAtomValue } from 'jotai';
+import { useRecoilValue } from 'recoil';
 import { useParams } from 'react-router-dom';
 import { Constants } from 'librechat-data-provider';
 import { useToastContext, useMediaQuery } from '@librechat/client';
@@ -12,7 +12,7 @@ import { areConversationRenderPropsEqual } from './utils';
 import { NotificationSeverity } from '~/common';
 import { ConvoOptions } from './ConvoOptions';
 import RenameForm from './RenameForm';
-import { buildConversationPath, cn, logger } from '~/utils';
+import { cn, logger } from '~/utils';
 import ConvoLink from './ConvoLink';
 import store from '~/store';
 
@@ -30,13 +30,12 @@ function Conversation({
   isGenerating = false,
 }: ConversationProps) {
   const params = useParams();
-
   const localize = useLocalize();
   const { showToast } = useToastContext();
   const { navigateToConvo } = useNavigateToConvo();
   const currentConvoId = useMemo(() => params.conversationId, [params.conversationId]);
   const updateConvoMutation = useUpdateConversationMutation(currentConvoId ?? '');
-  const activeConvos = useAtomValue(store.allConversationsSelector);
+  const activeConvos = useRecoilValue(store.allConversationsSelector);
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const isShiftHeld = useShiftKey();
   const { conversationId, title = '' } = conversation;
@@ -146,10 +145,7 @@ function Conversation({
     if (ctrlOrMetaKey && !isGenerating) {
       toggleNav();
       const baseUrl = window.location.origin;
-      const path = buildConversationPath({
-        conversationId: conversationId ?? Constants.NEW_CONVO,
-        zdockId: conversation.zdockId,
-      });
+      const path = `/c/${conversationId}`;
       window.open(baseUrl + path, '_blank');
       return;
     }
@@ -176,6 +172,7 @@ function Conversation({
     renameHandler: handleRename,
     isActiveConvo,
     conversationId,
+    chatProjectId: conversation.chatProjectId,
     isPopoverActive,
     setIsPopoverActive: handlePopoverOpenChange,
     isShiftHeld: isActiveConvo ? isShiftHeld : false,

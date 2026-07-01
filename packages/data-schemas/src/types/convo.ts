@@ -35,7 +35,6 @@ export interface IConversation extends Document {
   resendFiles?: boolean;
   imageDetail?: string;
   agent_id?: string;
-  zdockId?: string;
   assistant_id?: string;
   instructions?: string;
   stop?: string[];
@@ -45,6 +44,7 @@ export interface IConversation extends Document {
   greeting?: string;
   spec?: string;
   tags?: string[];
+  chatProjectId?: string | null;
   tools?: string[];
   maxContextTokens?: number;
   max_tokens?: number;

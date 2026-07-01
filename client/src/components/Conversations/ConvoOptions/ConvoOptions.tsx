@@ -1,32 +1,25 @@
 import { useState, useId, useRef, memo, useCallback, useMemo } from 'react';
 import * as Ariakit from '@ariakit/react';
-import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import {
-  QueryKeys,
-  PermissionTypes,
-  Permissions,
-  dataService,
-} from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
+import { useParams, useNavigate } from 'react-router-dom';
 import { DropdownPopup, Spinner, useToastContext } from '@librechat/client';
+import { QueryKeys, PermissionTypes, Permissions } from 'librechat-data-provider';
 import {
   Ellipsis,
   Share2,
   CopyPlus,
   Archive,
+  FolderInput,
+  FolderX,
   Pen,
   Pin,
   Trash,
-  FolderInput,
-  FolderOutput,
-  FolderX,
-  Code2,
 } from 'lucide-react';
-import type { MouseEvent } from 'react';
 import type { TMessage } from 'librechat-data-provider';
 import type { MouseEvent } from 'react';
 import {
   useDuplicateConversationMutation,
+  useAssignConversationToProjectMutation,
   useDeleteConversationMutation,
   useGetStartupConfig,
   useArchiveConvoMutation,
@@ -34,13 +27,15 @@ import {
 } from '~/data-provider';
 import { useHasAccess, useLocalize, useNavigateToConvo, useNewConvo } from '~/hooks';
 import { NotificationSeverity } from '~/common';
-import MoveToZdockDialog from '~/components/Zdocks/MoveToZdockDialog';
+import { useChatContext } from '~/Providers';
+import ProjectButton from './ProjectButton';
 import DeleteButton from './DeleteButton';
 import ShareButton from './ShareButton';
-import { buildConversationPath, cn, getConversationModeFromPath } from '~/utils';
+import { cn } from '~/utils';
 
 function ConvoOptions({
   conversationId,
+  chatProjectId,
   title,
   isPinned = false,
   retainView,
@@ -49,10 +44,9 @@ function ConvoOptions({
   setIsPopoverActive,
   isActiveConvo,
   isShiftHeld = false,
-  index = 0,
-  zdockId,
 }: {
   conversationId: string | null;
+  chatProjectId?: string | null;
   title: string | null;
   isPinned?: boolean;
   retainView: () => void;
@@ -61,27 +55,25 @@ function ConvoOptions({
   setIsPopoverActive: (open: boolean) => void;
   isActiveConvo: boolean;
   isShiftHeld?: boolean;
-  index?: number;
-  zdockId?: string;
 }) {
   const localize = useLocalize();
   const queryClient = useQueryClient();
+  const { index } = useChatContext();
   const { data: startupConfig } = useGetStartupConfig();
   const { navigateToConvo } = useNavigateToConvo(index);
   const { showToast } = useToastContext();
 
   const navigate = useNavigate();
-  const location = useLocation();
-  const { conversationId: currentConvoId, zdockId: routeProjectId } = useParams();
+  const { conversationId: currentConvoId } = useParams();
   const { newConversation } = useNewConvo();
 
   const menuId = useId();
   const shareButtonRef = useRef<HTMLButtonElement>(null);
   const deleteButtonRef = useRef<HTMLButtonElement>(null);
-  const moveButtonRef = useRef<HTMLButtonElement>(null);
+  const projectButtonRef = useRef<HTMLButtonElement>(null);
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showMoveDialog, setShowMoveDialog] = useState(false);
+  const [showProjectDialog, setShowProjectDialog] = useState(false);
   const [announcement, setAnnouncement] = useState('');
 
   const canCreateSharedLinks = useHasAccess({
@@ -90,20 +82,14 @@ function ConvoOptions({
   });
 
   const archiveConvoMutation = useArchiveConvoMutation();
+  const assignConversationToProject = useAssignConversationToProjectMutation();
   const pinConvoMutation = usePinConversationMutation();
 
   const deleteMutation = useDeleteConversationMutation({
     onSuccess: () => {
       if (currentConvoId === conversationId || currentConvoId === 'new') {
         newConversation();
-        navigate(
-          buildConversationPath({
-            conversationId: 'new',
-            mode: getConversationModeFromPath(location.pathname),
-            zdockId: zdockId ?? routeProjectId,
-          }),
-          { replace: true },
-        );
+        navigate('/c/new', { replace: true });
       }
       retainView();
       showToast({
@@ -157,6 +143,37 @@ function ConvoOptions({
     setShowDeleteDialog(true);
   }, []);
 
+  const projectHandler = useCallback(() => {
+    setShowProjectDialog(true);
+  }, []);
+
+  const removeProjectHandler = useCallback(() => {
+    const convoId = conversationId ?? '';
+    if (!convoId) {
+      return;
+    }
+    assignConversationToProject.mutate(
+      { conversationId: convoId, projectId: null },
+      {
+        onSuccess: () => {
+          setIsPopoverActive(false);
+          showToast({
+            message: localize('com_ui_project_updated'),
+            severity: NotificationSeverity.SUCCESS,
+            showIcon: true,
+          });
+        },
+        onError: () => {
+          showToast({
+            message: localize('com_ui_project_update_error'),
+            severity: NotificationSeverity.ERROR,
+            showIcon: true,
+          });
+        },
+      },
+    );
+  }, [assignConversationToProject, conversationId, localize, setIsPopoverActive, showToast]);
+
   const handleInstantDelete = useCallback(
     (e: MouseEvent) => {
       e.stopPropagation();
@@ -190,14 +207,7 @@ function ConvoOptions({
             }, 10000);
             if (currentConvoId === convoId || currentConvoId === 'new') {
               newConversation();
-              navigate(
-                buildConversationPath({
-                  conversationId: 'new',
-                  mode: getConversationModeFromPath(location.pathname),
-                  zdockId: zdockId ?? routeProjectId,
-                }),
-                { replace: true },
-              );
+              navigate('/c/new', { replace: true });
             }
             retainView();
             setIsPopoverActive(false);
@@ -218,8 +228,6 @@ function ConvoOptions({
       archiveConvoMutation,
       navigate,
       newConversation,
-      zdockId,
-      routeProjectId,
       retainView,
       setIsPopoverActive,
       showToast,
@@ -293,75 +301,25 @@ function ConvoOptions({
         ),
       },
       {
-        label: localize('com_ui_open_in_librecode'),
-        onClick: () => {
-          if (!conversationId) {
-            return;
-          }
-
-          navigate(
-            buildConversationPath({
-              conversationId,
-              mode: 'code',
-              zdockId,
-            }),
-          );
-          setIsPopoverActive(false);
-        },
-        icon: <Code2 className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
-      },
-      {
-        label: localize('com_ui_move_to_zdock'),
-        onClick: () => {
-          setShowMoveDialog(true);
-        },
+        label: localize('com_ui_change_project'),
+        onClick: projectHandler,
         icon: <FolderInput className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
         ariaHasPopup: 'dialog' as const,
-        ariaControls: 'move-to-project-dialog',
+        ariaControls: 'project-conversation-dialog',
         hideOnClick: false,
-        ref: moveButtonRef,
+        ref: projectButtonRef,
         render: (props) => <button {...props} />,
       },
       {
-        label: localize('com_ui_remove_from_zdock'),
-        onClick: (e: MouseEvent) => {
-          e.stopPropagation();
-          if (!zdockId || !conversationId) {
-            return;
-          }
-          // Optimistic: remove from cache immediately
-          queryClient.setQueryData(
-            [QueryKeys.zdockConversations, zdockId],
-            (old: { conversations: Array<{ conversationId?: string }> } | undefined) => {
-              if (!old) {
-                return old;
-              }
-              return {
-                ...old,
-                conversations: old.conversations.filter(
-                  (c) => c.conversationId !== conversationId,
-                ),
-              };
-            },
-          );
-          // Fire API call in background
-          dataService.removeConversationFromProject(zdockId, conversationId).catch(() => {
-            // Revert on failure
-            queryClient.invalidateQueries([QueryKeys.zdockConversations, zdockId]);
-            showToast({
-              message: localize('com_ui_error_remove_from_zdock'),
-              severity: NotificationSeverity.ERROR,
-              showIcon: true,
-            });
-          });
-          showToast({
-            message: localize('com_ui_removed_from_zdock'),
-            severity: NotificationSeverity.SUCCESS,
-            showIcon: true,
-          });
-        },
-        icon: <FolderOutput className="icon-sm mr-2 text-text-primary" aria-hidden="true" />,
-        show: !!zdockId,
+        label: localize('com_ui_remove_from_project'),
+        onClick: removeProjectHandler,
+        show: Boolean(chatProjectId),
+        hideOnClick: false,
+        icon: assignConversationToProject.isLoading ? (
+          <Spinner className="size-4" />
+        ) : (
+          <FolderX className="icon-sm mr-2 text-text-primary" aria-hidden="true" />
+        ),
       },
       {
         label: localize('com_ui_archive'),
@@ -399,14 +357,10 @@ function ConvoOptions({
       handleArchiveClick,
       canCreateSharedLinks,
       handleDuplicateClick,
-      zdockId,
-      conversationId,
-      queryClient,
-      showToast,
-      setIsPopoverActive,
-      retainView,
-      navigate,
-      location.pathname,
+      projectHandler,
+      removeProjectHandler,
+      chatProjectId,
+      assignConversationToProject.isLoading,
     ],
   );
 
@@ -505,12 +459,14 @@ function ConvoOptions({
           setShowDeleteDialog={setShowDeleteDialog}
         />
       )}
-      {showMoveDialog && (
-        <MoveToZdockDialog
-          open={showMoveDialog}
-          onOpenChange={setShowMoveDialog}
-          conversationIds={conversationId ? [conversationId] : []}
-          triggerRef={moveButtonRef}
+      {showProjectDialog && (
+        <ProjectButton
+          conversationId={conversationId ?? ''}
+          chatProjectId={chatProjectId}
+          setMenuOpen={setIsPopoverActive}
+          triggerRef={projectButtonRef}
+          showProjectDialog={showProjectDialog}
+          setShowProjectDialog={setShowProjectDialog}
         />
       )}
     </>
@@ -521,11 +477,10 @@ export default memo(ConvoOptions, (prevProps, nextProps) => {
   return (
     prevProps.conversationId === nextProps.conversationId &&
     prevProps.title === nextProps.title &&
+    prevProps.chatProjectId === nextProps.chatProjectId &&
     prevProps.isPinned === nextProps.isPinned &&
     prevProps.isPopoverActive === nextProps.isPopoverActive &&
     prevProps.isActiveConvo === nextProps.isActiveConvo &&
-    prevProps.isShiftHeld === nextProps.isShiftHeld &&
-    prevProps.zdockId === nextProps.zdockId &&
-    prevProps.retainView === nextProps.retainView
+    prevProps.isShiftHeld === nextProps.isShiftHeld
   );
 });

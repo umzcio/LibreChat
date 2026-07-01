@@ -106,7 +106,7 @@ describe('AclEntry Model Tests', () => {
       await methods.grantPermission(
         PrincipalType.USER,
         userId,
-        'zdock',
+        'project',
         new mongoose.Types.ObjectId(),
         PermissionBits.EDIT,
         grantedById,
@@ -653,7 +653,7 @@ describe('AclEntry Model Tests', () => {
     });
 
     test('should handle inherited permissions', async () => {
-      const zdockId = new mongoose.Types.ObjectId();
+      const projectId = new mongoose.Types.ObjectId();
       const childResourceId = new mongoose.Types.ObjectId();
 
       /** Grant inherited permission on child resource */
@@ -665,7 +665,7 @@ describe('AclEntry Model Tests', () => {
         resourceId: childResourceId,
         permBits: PermissionBits.VIEW,
         grantedBy: grantedById,
-        inheritedFrom: zdockId,
+        inheritedFrom: projectId,
       });
 
       /** Get effective permissions */

@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useSetAtom } from 'jotai';
+import { useSetRecoilState } from 'recoil';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -20,7 +20,6 @@ import {
   getDefaultEndpoint,
   clearMessagesCache,
   buildDefaultConvo,
-  buildConversationPath,
   logger,
 } from '~/utils';
 import { useApplyModelSpecEffects } from '~/hooks/Agents';
@@ -29,12 +28,10 @@ import store from '~/store';
 
 const useNavigateToConvo = (index = 0) => {
   const navigate = useNavigate();
-
   const queryClient = useQueryClient();
   const clearAllConversations = store.useClearConvoState();
   const applyModelSpecEffects = useApplyModelSpecEffects();
-  const setSubmission = useSetAtom(store.submissionByIndex(index));
-  const clearAllLatestMessages = store.useClearLatestMessages(`useNavigateToConvo ${index}`);
+  const setSubmission = useSetRecoilState(store.submissionByIndex(index));
   const { hasSetConversation, setConversation: setConvo } = store.useCreateConversationAtom(index);
 
   const setConversation = useCallback(
@@ -54,14 +51,6 @@ const useNavigateToConvo = (index = 0) => {
     [setConvo, queryClient, applyModelSpecEffects],
   );
 
-  const buildConvoPath = (convo?: Partial<TConversation>, convoId?: string) => {
-    const id = convoId ?? convo?.conversationId ?? Constants.NEW_CONVO;
-    return buildConversationPath({
-      conversationId: id,
-      zdockId: convo?.zdockId,
-    });
-  };
-
   const fetchFreshData = async (conversation?: Partial<TConversation>) => {
     const conversationId = conversation?.conversationId;
     if (!conversationId) {
@@ -76,12 +65,12 @@ const useNavigateToConvo = (index = 0) => {
       const convoData = { ...data };
       clearModelForNonEphemeralAgent(convoData);
       setConversation(convoData);
-      navigate(buildConvoPath(convoData, conversationId), { state: { focusChat: true } });
+      navigate(`/c/${conversationId ?? Constants.NEW_CONVO}`, { state: { focusChat: true } });
     } catch (error) {
-      logger.error('Navigation', 'Error fetching conversation data on navigation', error);
+      console.error('Error fetching conversation data on navigation', error);
       if (conversation) {
         setConversation(conversation as TConversation);
-        navigate(buildConvoPath(conversation, conversationId), { state: { focusChat: true } });
+        navigate(`/c/${conversationId}`, { state: { focusChat: true } });
       }
     }
   };
@@ -142,7 +131,7 @@ const useNavigateToConvo = (index = 0) => {
       fetchFreshData(convo);
     } else {
       setConversation(convo);
-      navigate(buildConvoPath(convo), { state: { focusChat: true } });
+      navigate(`/c/${convo.conversationId ?? Constants.NEW_CONVO}`, { state: { focusChat: true } });
     }
   };
 

@@ -95,8 +95,8 @@ export function validateVertexConfig(
   const errors: string[] = [];
 
   // Extract and validate environment variables
-  // zdockId is optional - will be auto-detected from service key if not provided
-  const zdockId = vertexConfig.zdockId ? extractEnvVariable(vertexConfig.zdockId) : undefined;
+  // projectId is optional - will be auto-detected from service key if not provided
+  const projectId = vertexConfig.projectId ? extractEnvVariable(vertexConfig.projectId) : undefined;
   const region = extractEnvVariable(vertexConfig.region || 'us-east5');
   const serviceKeyFile = vertexConfig.serviceKeyFile
     ? extractEnvVariable(vertexConfig.serviceKeyFile)
@@ -106,9 +106,9 @@ export function validateVertexConfig(
     : undefined;
 
   // Check for unresolved environment variables
-  if (zdockId && envVarRegex.test(zdockId)) {
+  if (projectId && envVarRegex.test(projectId)) {
     errors.push(
-      `Vertex AI zdockId environment variable "${vertexConfig.zdockId}" was not found.`,
+      `Vertex AI projectId environment variable "${vertexConfig.projectId}" was not found.`,
     );
   }
 
@@ -134,13 +134,13 @@ export function validateVertexConfig(
     defaultDeploymentName,
   );
 
-  // Note: zdockId is optional - if not provided, it will be auto-detected from the service key file
+  // Note: projectId is optional - if not provided, it will be auto-detected from the service key file
 
   const isValid = errors.length === 0;
 
   return {
     enabled: vertexConfig.enabled !== false,
-    zdockId,
+    projectId,
     region,
     serviceKeyFile,
     deploymentName: defaultDeploymentName,
@@ -189,7 +189,7 @@ export function vertexConfigSetup(config: Partial<TCustomConfig>): TVertexAIConf
   }
 
   logger.info('Vertex AI configuration loaded successfully', {
-    zdockId: validatedConfig.zdockId,
+    projectId: validatedConfig.projectId,
     region: validatedConfig.region,
     modelCount: validatedConfig.modelNames?.length || 0,
     models: validatedConfig.modelNames,

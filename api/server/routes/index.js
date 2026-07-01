@@ -14,7 +14,7 @@ const staticRoute = require('./static');
 const messages = require('./messages');
 const memories = require('./memories');
 const presets = require('./presets');
-const zdocks = require('./zdocks');
+const projects = require('./projects');
 const prompts = require('./prompts');
 const skills = require('./skills');
 const balance = require('./balance');
@@ -35,7 +35,6 @@ const auth = require('./auth');
 const keys = require('./keys');
 const user = require('./user');
 const mcp = require('./mcp');
-const code = require('./code');
 const rum = require('./rum');
 
 module.exports = {
@@ -65,7 +64,7 @@ module.exports = {
   config,
   models,
   prompts,
-  zdocks,
+  projects,
   skills,
   actions,
   presets,
@@ -77,5 +76,4 @@ module.exports = {
   categories,
   staticRoute,
   accessPermissions,
-  code,
 };

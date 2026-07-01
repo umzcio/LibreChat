@@ -43,16 +43,12 @@ export * from './memory';
 export * from './modelSpecs';
 /* Agents */
 export * from './agents';
-/* Zdocks */
-export * from './zdocks';
-/* Code */
-export * from './code';
 /* Actions */
 export * from './actions';
 /* Prompts */
 export * from './prompts';
 /* Projects */
-export * from './zdocks';
+export * from './projects';
 /* Skills */
 export * from './skills';
 /* Endpoints */

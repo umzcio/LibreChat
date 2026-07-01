@@ -15,10 +15,6 @@ const file: Schema<IMongoFile> = new Schema(
       ref: 'Conversation',
       index: true,
     },
-    zdockId: {
-      type: String,
-      index: true,
-    },
     messageId: {
       type: String,
       index: true,

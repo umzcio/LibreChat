@@ -17,7 +17,7 @@ const accessRoleSchema: Schema<IAccessRole> = new Schema<IAccessRole>(
       type: String,
       enum: [
         'agent',
-        'zdock',
+        'project',
         'file',
         'promptGroup',
         'mcpServer',

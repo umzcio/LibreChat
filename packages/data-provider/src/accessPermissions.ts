@@ -47,7 +47,6 @@ export enum ResourceType {
   PROMPTGROUP = 'promptGroup',
   MCPSERVER = 'mcpServer',
   REMOTE_AGENT = 'remoteAgent',
-  PROJECT = 'zdock',
   SKILL = 'skill',
   SHARED_LINK = 'sharedLink',
 }
@@ -82,9 +81,6 @@ export enum AccessRoleIds {
   REMOTE_AGENT_VIEWER = 'remoteAgent_viewer',
   REMOTE_AGENT_EDITOR = 'remoteAgent_editor',
   REMOTE_AGENT_OWNER = 'remoteAgent_owner',
-  ZDOCK_VIEWER = 'zdock_viewer',
-  ZDOCK_EDITOR = 'zdock_editor',
-  ZDOCK_OWNER = 'zdock_owner',
   SKILL_VIEWER = 'skill_viewer',
   SKILL_EDITOR = 'skill_editor',
   SKILL_OWNER = 'skill_owner',
@@ -312,7 +308,7 @@ export interface TPermissionCheck {
 /**
  * Convert permission bits to access level
  */
-function permBitsToAccessLevel(permBits: number): TAccessLevel {
+export function permBitsToAccessLevel(permBits: number): TAccessLevel {
   if ((permBits & PermissionBits.DELETE) > 0) return 'owner';
   if ((permBits & PermissionBits.EDIT) > 0) return 'editor';
   if ((permBits & PermissionBits.VIEW) > 0) return 'viewer';
@@ -322,7 +318,7 @@ function permBitsToAccessLevel(permBits: number): TAccessLevel {
 /**
  * Convert access role ID to permission bits
  */
-function accessRoleToPermBits(accessRoleId: string): number {
+export function accessRoleToPermBits(accessRoleId: string): number {
   switch (accessRoleId) {
     case AccessRoleIds.AGENT_VIEWER:
     case AccessRoleIds.PROMPTGROUP_VIEWER:
@@ -341,16 +337,11 @@ function accessRoleToPermBits(accessRoleId: string): number {
     case AccessRoleIds.PROMPTGROUP_OWNER:
     case AccessRoleIds.MCPSERVER_OWNER:
     case AccessRoleIds.REMOTE_AGENT_OWNER:
-    case AccessRoleIds.ZDOCK_OWNER:
     case AccessRoleIds.SKILL_OWNER:
     case AccessRoleIds.SHARED_LINK_OWNER:
       return (
         PermissionBits.VIEW | PermissionBits.EDIT | PermissionBits.DELETE | PermissionBits.SHARE
       );
-    case AccessRoleIds.ZDOCK_VIEWER:
-      return PermissionBits.VIEW;
-    case AccessRoleIds.ZDOCK_EDITOR:
-      return PermissionBits.VIEW | PermissionBits.EDIT;
     default:
       return PermissionBits.VIEW;
   }

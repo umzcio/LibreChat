@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, Outlet, useParams } from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import {
   Login,
   VerifyEmail,
@@ -10,7 +10,6 @@ import {
 } from '~/components/Auth';
 import { MarketplaceProvider } from '~/components/Agents/MarketplaceContext';
 import AgentMarketplace from '~/components/Agents/Marketplace';
-import CodePage from '~/components/Code/CodePage';
 import { OAuthSuccess, OAuthError } from '~/components/OAuth';
 import { AuthContextProvider } from '~/hooks/AuthContext';
 import WithRum from '~/lib/rum/WithRum';
@@ -19,7 +18,6 @@ import StartupLayout from './Layouts/Startup';
 import LoginLayout from './Layouts/Login';
 import dashboardRoutes from './Dashboard';
 import ShareRoute from './ShareRoute';
-import ZdockView from '~/components/Zdocks/ZdockView';
 import ChatRoute from './ChatRoute';
 import Search from './Search';
 import Root from './Root';
@@ -43,14 +41,18 @@ const loadSkillsView = () =>
     Component: m.default,
   }));
 
+const loadProjectsView = () =>
+  import('~/components/Projects').then((m) => ({
+    Component: m.ProjectsView,
+  }));
+
+const loadProjectWorkspace = () =>
+  import('~/components/Projects').then((m) => ({
+    Component: m.ProjectWorkspace,
+  }));
 
 const baseEl = document.querySelector('base');
 const baseHref = baseEl?.getAttribute('href') || '/';
-
-const CodeRedirect = () => {
-  const { zdockId } = useParams();
-  return <Navigate to={zdockId ? `/p/${zdockId}/code/new` : '/code/new'} replace={true} />;
-};
 
 export const router = createBrowserRouter(
   [
@@ -129,30 +131,6 @@ export const router = createBrowserRouter(
               element: <ChatRoute />,
             },
             {
-              path: 'code',
-              element: <CodeRedirect />,
-            },
-            {
-              path: 'code/:conversationId?',
-              element: <CodePage />,
-            },
-            {
-              path: 'p/:zdockId',
-              element: <ZdockView />,
-            },
-            {
-              path: 'p/:zdockId/c/:conversationId?',
-              element: <ChatRoute />,
-            },
-            {
-              path: 'p/:zdockId/code',
-              element: <CodeRedirect />,
-            },
-            {
-              path: 'p/:zdockId/code/:conversationId?',
-              element: <CodePage />,
-            },
-            {
               path: 'search',
               element: <Search />,
             },
@@ -183,6 +161,14 @@ export const router = createBrowserRouter(
             {
               path: 'skills/:skillId/edit',
               lazy: loadSkillsView,
+            },
+            {
+              path: 'projects',
+              lazy: loadProjectsView,
+            },
+            {
+              path: 'projects/:projectId',
+              lazy: loadProjectWorkspace,
             },
             {
               path: 'agents',

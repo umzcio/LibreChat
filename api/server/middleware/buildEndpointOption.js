@@ -1,6 +1,5 @@
 const {
   handleError,
-  createZdockContextBuilder,
   applyModelSpecPreset,
   findModelSpecByName,
   isModelSpecEndpointMatch,
@@ -18,7 +17,7 @@ const azureAssistants = require('~/server/services/Endpoints/azureAssistants');
 const assistants = require('~/server/services/Endpoints/assistants');
 const { getEndpointsConfig } = require('~/server/services/Config');
 const agents = require('~/server/services/Endpoints/agents');
-const { updateFilesUsage, getZdock, getZdockFiles } = require('~/models');
+const { updateFilesUsage } = require('~/models');
 
 const buildFunction = {
   [EModelEndpoint.agents]: agents.buildOptions,
@@ -63,7 +62,12 @@ async function buildEndpointOption(req, res, next) {
     const { list } = appConfig.modelSpecs;
     const rawSpec = req.body.spec;
     const spec = parsedBody.spec ?? (typeof rawSpec === 'string' ? rawSpec : undefined);
-    const parsedBodyForModelSpec = parsedBody;
+    const rawChatProjectId = req.body.chatProjectId;
+    const parsedBodyForModelSpec =
+      parsedBody.chatProjectId === undefined &&
+      (typeof rawChatProjectId === 'string' || rawChatProjectId === null)
+        ? { ...parsedBody, chatProjectId: rawChatProjectId }
+        : parsedBody;
 
     if (!spec) {
       return handleError(res, { text: 'No model spec selected' });
@@ -139,26 +143,6 @@ async function buildEndpointOption(req, res, next) {
         user: req.user.id,
         tenantId: req.user.tenantId,
       });
-    }
-
-    /** Persist zdockId in endpointOption so it's saved to the conversation */
-    if (req.body.zdockId) {
-      req.body.endpointOption.zdockId = req.body.zdockId;
-    }
-
-    /** Inject project context for non-agent endpoints */
-    if (req.body.zdockId && !isAgents) {
-      const { buildZdockContext } = createZdockContextBuilder({ getZdock, getZdockFiles });
-      const projectContext = await buildZdockContext({
-        zdockId: req.body.zdockId,
-        userId: req.user.id,
-        userQuery: req.body.text || '',
-      });
-      if (projectContext) {
-        const existingSystem = req.body.endpointOption.promptPrefix || '';
-        req.body.endpointOption.promptPrefix = projectContext +
-          (existingSystem ? '\n\n' + existingSystem : '');
-      }
     }
 
     next();

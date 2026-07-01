@@ -149,6 +149,40 @@ export type ConversationCursorData = {
   nextCursor?: string | null;
 };
 
+function getConversationQueryProjectId(queryKey: readonly unknown[]): string | undefined {
+  const params = queryKey[1];
+  if (!params || typeof params !== 'object') {
+    return undefined;
+  }
+  return (params as { projectId?: string }).projectId;
+}
+
+function conversationMatchesProjectQuery(
+  queryKey: readonly unknown[],
+  conversation: Pick<TConversation, 'chatProjectId'>,
+): boolean {
+  const projectId = getConversationQueryProjectId(queryKey);
+  if (!projectId) {
+    return true;
+  }
+  if (projectId === 'unassigned') {
+    return !conversation.chatProjectId;
+  }
+  return conversation.chatProjectId === projectId;
+}
+
+/**
+ * Reads the project id from the current URL's `?projectId` param — the source of
+ * truth for a new chat's project scope (the conversation atom can lag behind it).
+ */
+export function getRouteChatProjectId(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const projectId = new URLSearchParams(window.location.search).get('projectId');
+  return projectId != null && /^[a-f\d]{24}$/i.test(projectId) ? projectId : null;
+}
+
 // === InfiniteData helpers for cursor-based convo queries ===
 
 export function findConversationInInfinite(
@@ -215,6 +249,9 @@ export function addConversationToAllConversationsQueries(
     .findAll([QueryKeys.allConversations], { exact: false });
 
   for (const query of queries) {
+    if (!conversationMatchesProjectQuery(query.queryKey, newConversation)) {
+      continue;
+    }
     queryClient.setQueryData<InfiniteData<ConversationCursorData>>(query.queryKey, (old) => {
       if (
         !old ||
@@ -329,6 +366,9 @@ export function addConvoToAllQueries(queryClient: QueryClient, newConvo: TConver
     .findAll([QueryKeys.allConversations], { exact: false });
 
   for (const query of queries) {
+    if (!conversationMatchesProjectQuery(query.queryKey, newConvo)) {
+      continue;
+    }
     queryClient.setQueryData<InfiniteData<ConversationCursorData>>(query.queryKey, (oldData) => {
       if (!oldData) {
         return oldData;
@@ -388,6 +428,9 @@ export function upsertConvoInAllQueries(
 
       const now = new Date().toISOString();
       if (pageIdx === -1) {
+        if (!conversationMatchesProjectQuery(query.queryKey, nextConvo)) {
+          return oldData;
+        }
         const firstPage = oldData.pages[0] ?? { conversations: [], nextCursor: null };
         return {
           ...oldData,
@@ -410,6 +453,11 @@ export function upsertConvoInAllQueries(
         ...nextConvo,
         updatedAt: nextConvo.updatedAt ?? (moveToTop ? now : found.updatedAt),
       };
+
+      if (!conversationMatchesProjectQuery(query.queryKey, updated)) {
+        return removeConvoFromInfinitePages(oldData, updated.conversationId ?? '');
+      }
+
       if (!moveToTop || (pageIdx === 0 && convoIdx === 0)) {
         return {
           ...oldData,
@@ -485,6 +533,11 @@ export function updateConvoInAllQueries(
       const updated = moveToTop
         ? { ...updater(found), updatedAt: new Date().toISOString() }
         : updater(found);
+
+      if (!conversationMatchesProjectQuery(query.queryKey, updated)) {
+        return removeConvoFromInfinitePages(oldData, conversationId);
+      }
+
       // If not moving to top, or already at top of page 0, update in place
       if (!moveToTop || (pageIdx === 0 && convoIdx === 0)) {
         return {

@@ -1,10 +1,8 @@
 import { v4 } from 'uuid';
 import { cloneDeep } from 'lodash';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAtomValue, useSetAtom } from 'jotai';
-import { RESET } from 'jotai/utils';
-import { useRecoilCallback } from 'recoil';
+import { useSetRecoilState, useRecoilValue, useRecoilCallback } from 'recoil';
 import {
   Constants,
   QueryKeys,
@@ -26,13 +24,13 @@ import type {
   TEndpointsConfig,
   EndpointSchemaKey,
 } from 'librechat-data-provider';
-import type { TAskFunction, ExtendedFile, AtomSetter } from '~/common';
+import type { SetterOrUpdater } from 'recoil';
+import type { TAskFunction, ExtendedFile } from '~/common';
 import {
   logger,
   hasStreamStartFailed,
-  buildConversationPath,
   createDualMessageContent,
-  getConversationModeFromPath,
+  getRouteChatProjectId,
 } from '~/utils';
 import useFocusRegeneratedResponse from '~/hooks/Chat/useFocusRegeneratedResponse';
 import useSetFilesToDelete from '~/hooks/Files/useSetFilesToDelete';
@@ -202,23 +200,19 @@ export default function useChatFunctions({
   getMessages: () => TMessage[] | undefined;
   setMessages: (messages: TMessage[]) => void;
   files?: Map<string, ExtendedFile>;
-  setFiles?: AtomSetter<Map<string, ExtendedFile>>;
-  setSubmission: AtomSetter<TSubmission | null>;
-  setLatestMessage?: AtomSetter<TMessage | null>;
+  setFiles?: SetterOrUpdater<Map<string, ExtendedFile>>;
+  setSubmission: SetterOrUpdater<TSubmission | null>;
 }) {
   const navigate = useNavigate();
-  const location = useLocation();
   const getSender = useGetSender();
   const { user } = useAuthContext();
   const queryClient = useQueryClient();
   const setFilesToDelete = useSetFilesToDelete();
   const getEphemeralAgent = useGetEphemeralAgent();
-  const isTemporary = useAtomValue(store.isTemporary);
+  const isTemporary = useRecoilValue(store.isTemporary);
   const { getExpiry } = useUserKey(immutableConversation?.endpoint ?? '');
-  const setIsSubmitting = useSetAtom(store.isSubmittingFamily(index));
-  const setShowStopButton = useSetAtom(store.showStopButtonByIndex(index));
-  const _setLatestMultiMessage = useSetAtom(store.latestMessageFamily(index + 1));
-  const resetLatestMultiMessage = () => _setLatestMultiMessage(RESET);
+  const setIsSubmitting = useSetRecoilState(store.isSubmittingFamily(index));
+  const setShowStopButton = useSetRecoilState(store.showStopButtonByIndex(index));
   const focusRegeneratedResponse = useFocusRegeneratedResponse();
 
   /**
@@ -298,18 +292,18 @@ export default function useChatFunctions({
 
     const endpoint = conversation?.endpoint;
     if (endpoint === null) {
-      logger.error('useChatFunctions', 'No endpoint available');
+      console.error('No endpoint available');
       return;
     }
 
     conversationId = conversationId ?? conversation?.conversationId ?? null;
     if (conversationId == 'search') {
-      logger.error('useChatFunctions', 'cannot send any message under search view!');
+      console.error('cannot send any message under search view!');
       return;
     }
 
     if (isContinued && !latestMessage) {
-      logger.error('useChatFunctions', 'cannot continue AI message without latestMessage!');
+      console.error('cannot continue AI message without latestMessage!');
       return;
     }
 
@@ -372,7 +366,12 @@ export default function useChatFunctions({
       });
     }
 
-    const conversationForPayload = conversation ?? {};
+    const chatProjectId =
+      conversationId === Constants.NEW_CONVO
+        ? getRouteChatProjectId()
+        : (conversation?.chatProjectId ?? null);
+    const conversationForPayload =
+      chatProjectId != null ? { ...(conversation ?? {}), chatProjectId } : (conversation ?? {});
 
     // construct the query message
     // this is not a real messageId, it is used as placeholder before real messageId returned
@@ -395,14 +394,8 @@ export default function useChatFunctions({
       parentMessageId = Constants.NO_PARENT;
       currentMessages = [];
       conversationId = null;
-      navigate(
-        buildConversationPath({
-          conversationId: Constants.NEW_CONVO,
-          mode: getConversationModeFromPath(location.pathname),
-          zdockId: conversation?.zdockId,
-        }),
-        { state: { focusChat: true } },
-      );
+      const projectSearch = chatProjectId ? `?projectId=${encodeURIComponent(chatProjectId)}` : '';
+      navigate(`/c/new${projectSearch}`, { state: { focusChat: true } });
     }
 
     const targetParentMessageId = isRegenerate ? messageId : latestMessage?.parentMessageId;
@@ -451,6 +444,7 @@ export default function useChatFunctions({
         overrideUserMessageId,
       },
       convo,
+      chatProjectId ? { chatProjectId } : {},
     ) as TEndpointOption;
     if (endpoint !== EModelEndpoint.agents) {
       endpointOption.key = getExpiry();
@@ -606,6 +600,7 @@ export default function useChatFunctions({
     const submission: TSubmission = {
       conversation: {
         ...conversation,
+        ...(chatProjectId ? { chatProjectId } : {}),
         conversationId,
       },
       endpointOption,
@@ -668,8 +663,7 @@ export default function useChatFunctions({
         },
       );
     } else {
-      logger.error(
-        'useChatFunctions',
+      console.error(
         'Failed to regenerate the message: parentMessage not found or not created by user.',
       );
     }

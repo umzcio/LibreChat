@@ -472,7 +472,7 @@ endpoints:
   #     # serviceKeyFile: "/path/to/service-account.json"
   #     # Google Cloud Project ID (optional) - auto-detected from service key file
   #     # Only specify if you need to override the project_id in your service key
-  #     # zdockId: "${VERTEX_PROJECT_ID}"
+  #     # projectId: "${VERTEX_PROJECT_ID}"
   #
   #     # ============================================================================
   #     # Model Configuration - Set Visible Model Names and Deployment Mappings

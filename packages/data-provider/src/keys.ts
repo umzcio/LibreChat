@@ -44,6 +44,9 @@ export enum QueryKeys {
   promptGroups = 'promptGroups',
   allPromptGroups = 'allPromptGroups',
   promptGroup = 'promptGroup',
+  projects = 'projects',
+  project = 'project',
+  projectConversations = 'projectConversations',
   categories = 'categories',
   randomPrompts = 'randomPrompts',
   agentCategories = 'agentCategories',
@@ -64,15 +67,6 @@ export enum QueryKeys {
   /* MCP Servers */
   mcpServers = 'mcpServers',
   mcpServer = 'mcpServer',
-  /* Projects */
-  zdocks = 'zdocks',
-  project = 'zdock',
-  zdockConversations = 'zdockConversations',
-  zdockFiles = 'zdockFiles',
-  codeSession = 'codeSession',
-  codeFiles = 'codeFiles',
-  codeChanges = 'codeChanges',
-  codeDiff = 'codeDiff',
   /* Active Jobs */
   activeJobs = 'activeJobs',
   /* Agent API Keys */
@@ -123,9 +117,10 @@ export enum MutationKeys {
   enableTwoFactor = 'enableTwoFactor',
   verifyTwoFactor = 'verifyTwoFactor',
   updateMemoryPreferences = 'updateMemoryPreferences',
-  createZdock = 'createZdock',
-  updateZdock = 'updateZdock',
-  deleteZdock = 'deleteZdock',
+  createProject = 'createProject',
+  updateProject = 'updateProject',
+  deleteProject = 'deleteProject',
+  assignConversationToProject = 'assignConversationToProject',
   /* Skill mutations from the original UI PR — tree/node operations are
    * phase 2 and currently stubbed in the data-service layer. */
   createSkillNode = 'createSkillNode',

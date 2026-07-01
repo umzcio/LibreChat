@@ -24,7 +24,7 @@ export async function initializeAnthropic({
   const { key: expiresAt } = req.body;
 
   let credentials: Record<string, unknown> = {};
-  let vertexOptions: { region?: string; zdockId?: string } | undefined;
+  let vertexOptions: { region?: string; projectId?: string } | undefined;
 
   /** @type {undefined | import('librechat-data-provider').TVertexAIConfig} */
   const vertexConfig = appConfig?.endpoints?.[EModelEndpoint.anthropic]?.vertexConfig;
@@ -43,7 +43,7 @@ export async function initializeAnthropic({
     if (vertexConfig) {
       vertexOptions = {
         region: vertexConfig.region,
-        zdockId: vertexConfig.zdockId,
+        projectId: vertexConfig.projectId,
       };
     }
   } else {

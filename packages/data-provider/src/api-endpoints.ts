@@ -136,6 +136,17 @@ export const forkConversation = () => `${conversationsRoot}/fork`;
 
 export const duplicateConversation = () => `${conversationsRoot}/duplicate`;
 
+export const projectsRoot = `${BASE_URL}/api/projects`;
+
+export const projects = (params: q.ProjectListParams = {}) => {
+  return `${projectsRoot}${buildQuery(params)}`;
+};
+
+export const projectById = (id: string) => `${projectsRoot}/${encodeURIComponent(id)}`;
+
+export const projectConversation = (conversationId: string) =>
+  `${projectsRoot}/conversations/${encodeURIComponent(conversationId)}`;
+
 export const search = (q: string, cursor?: string | null) =>
   `${BASE_URL}/api/search?q=${q}${cursor ? `&cursor=${cursor}` : ''}`;
 
@@ -205,6 +216,9 @@ export function buildLoginRedirectUrl(pathname?: string, search?: string, hash?:
 export const resendVerificationEmail = () => `${BASE_URL}/api/user/verify/resend`;
 
 export const plugins = () => `${BASE_URL}/api/plugins`;
+
+export const mcpServerCosmetics = (serverName: string) =>
+  `${BASE_URL}/api/mcp/servers/${encodeURIComponent(serverName)}/cosmetics`;
 
 export const mcpReinitialize = (serverName: string) =>
   `${BASE_URL}/api/mcp/${serverName}/reinitialize`;
@@ -289,9 +303,6 @@ export const mcp = {
 };
 
 export const mcpServer = (serverName: string) => `${BASE_URL}/api/mcp/servers/${serverName}`;
-
-export const mcpServerCosmetics = (serverName: string) =>
-  `${BASE_URL}/api/mcp/servers/${encodeURIComponent(serverName)}/cosmetics`;
 
 export const revertAgentVersion = (agent_id: string) => `${agents({ path: `${agent_id}/revert` })}`;
 
@@ -474,27 +485,6 @@ export const confirmTwoFactor = () => `${BASE_URL}/api/auth/2fa/confirm`;
 export const disableTwoFactor = () => `${BASE_URL}/api/auth/2fa/disable`;
 export const regenerateBackupCodes = () => `${BASE_URL}/api/auth/2fa/backup/regenerate`;
 export const verifyTwoFactorTemp = () => `${BASE_URL}/api/auth/2fa/verify-temp`;
-
-/* Zdocks */
-export const zdocks = () => `${BASE_URL}/api/zdocks`;
-export const zdock = (zdockId: string) =>
-  `${zdocks()}/${encodeURIComponent(zdockId)}`;
-export const zdockFiles = (zdockId: string) => `${zdock(zdockId)}/files`;
-export const zdockConversations = (zdockId: string) =>
-  `${zdock(zdockId)}/conversations`;
-export const zdockConversation = (zdockId: string, conversationId: string) =>
-  `${zdockConversations(zdockId)}/${encodeURIComponent(conversationId)}`;
-
-const codeRoot = `${BASE_URL}/api/code`;
-export const codeSession = () => `${codeRoot}/session`;
-export const codeFiles = () => `${codeRoot}/files`;
-export const codeRename = () => `${codeRoot}/files`;
-export const codeFileContent = () => `${codeRoot}/files/content`;
-export const codeChanges = () => `${codeRoot}/changes`;
-export const codeDiff = () => `${codeRoot}/diff`;
-export const codeApply = () => `${codeRoot}/apply`;
-export const codeDiscard = () => `${codeRoot}/discard`;
-export const codePromote = () => `${codeRoot}/promote`;
 
 /* Memories */
 export const memories = () => `${BASE_URL}/api/memories`;

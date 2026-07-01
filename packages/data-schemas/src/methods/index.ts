@@ -59,8 +59,7 @@ import { createTransactionMethods, type TransactionMethods } from './transaction
 import { createSpendTokensMethods, type SpendTokensMethods } from './spendTokens';
 import { createPromptMethods, type PromptMethods, type PromptDeps } from './prompt';
 /* Projects */
-import { createZdockMethods, type ZdockMethods } from './zdock';
-import { createWorkspaceMethods, type WorkspaceMethods } from './workspace';
+import { createChatProjectMethods, type ChatProjectMethods } from './chatProject';
 /* Skills */
 import {
   createSkillMethods,
@@ -143,8 +142,7 @@ export type AllMethods = UserMethods &
   SkillMethods &
   SkillSyncMethods &
   AgentMethods &
-  ZdockMethods &
-  WorkspaceMethods &
+  ChatProjectMethods &
   ConfigMethods;
 
 /** Dependencies injected from the api layer into createMethods */
@@ -273,8 +271,7 @@ export function createMethods(
     ...spendTokensMethods,
     ...promptMethods,
     /* Projects */
-    ...createZdockMethods(mongoose),
-    ...createWorkspaceMethods(mongoose),
+    ...createChatProjectMethods(mongoose),
     /* Skills */
     ...skillMethods,
     ...createSkillSyncMethods(mongoose),
@@ -333,7 +330,6 @@ export type {
   UpsertSkillSyncCredentialInput,
   SkillSyncMethods,
   AgentMethods,
-  ZdockMethods,
-  WorkspaceMethods,
+  ChatProjectMethods,
   ConfigMethods,
 };

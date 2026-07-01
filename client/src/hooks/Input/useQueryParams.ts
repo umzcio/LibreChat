@@ -1,10 +1,9 @@
 import { useEffect, useCallback, useRef } from 'react';
-import { useAtomValue } from 'jotai';
+import { useRecoilValue } from 'recoil';
 import { useSearchParams } from 'react-router-dom';
 import { QueryClient, useQueryClient } from '@tanstack/react-query';
 import { QueryKeys, EModelEndpoint, PermissionBits } from 'librechat-data-provider';
 import type {
-  Agent,
   AgentListResponse,
   TEndpointsConfig,
   TStartupConfig,
@@ -24,9 +23,9 @@ import { startupConfigKey, useGetAgentByIdQuery } from '~/data-provider';
 import { useChatContext, useChatFormContext } from '~/Providers';
 import store from '~/store';
 
-const PROJECT_ID_SEARCH_PARAM = 'zdockId';
+const PROJECT_ID_SEARCH_PARAM = 'projectId';
 
-const injectAgentIntoAgentsMap = (queryClient: QueryClient, agent: Agent) => {
+const injectAgentIntoAgentsMap = (queryClient: QueryClient, agent: any) => {
   const editCacheKey = [QueryKeys.agents, { requiredPermission: PermissionBits.EDIT }];
   const editCache = queryClient.getQueryData<AgentListResponse>(editCacheKey);
 
@@ -65,8 +64,8 @@ export default function useQueryParams({
   const methods = useChatFormContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const getDefaultConversation = useDefaultConvo();
-  const modularChat = useAtomValue(store.modularChat);
-  const availableTools = useAtomValue(store.availableTools);
+  const modularChat = useRecoilValue(store.modularChat);
+  const availableTools = useRecoilValue(store.availableTools);
   const { submitMessage } = useSubmitMessage();
 
   const queryClient = useQueryClient();
@@ -77,9 +76,9 @@ export default function useQueryParams({
 
   const getPreservedSearchParams = useCallback(() => {
     const preservedParams = new URLSearchParams();
-    const zdockId = searchParams.get(PROJECT_ID_SEARCH_PARAM);
-    if (zdockId) {
-      preservedParams.set(PROJECT_ID_SEARCH_PARAM, zdockId);
+    const projectId = searchParams.get(PROJECT_ID_SEARCH_PARAM);
+    if (projectId) {
+      preservedParams.set(PROJECT_ID_SEARCH_PARAM, projectId);
     }
     return preservedParams;
   }, [searchParams]);
@@ -180,6 +179,7 @@ export default function useQueryParams({
       }
 
       newConversation({
+        template: { chatProjectId: conversation?.chatProjectId ?? null },
         preset: newPreset,
         keepAddedConvos: true,
       });
@@ -264,7 +264,7 @@ export default function useQueryParams({
       if (processedRef.current || attemptsRef.current >= maxAttempts) {
         clearInterval(intervalId);
         if (attemptsRef.current >= maxAttempts) {
-          logger.warn('QueryParams', 'Max attempts reached, failed to process parameters');
+          console.warn('Max attempts reached, failed to process parameters');
         }
         return;
       }

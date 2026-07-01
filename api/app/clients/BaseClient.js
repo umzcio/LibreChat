@@ -993,14 +993,6 @@ class BaseClient {
       createdAtOnInsert: shouldSetCreatedAtOnInsert ? validCreatedAtOnInsert : undefined,
     });
 
-    if (options?.req?.body?.zdockId) {
-      const { synthesizeProjectMemory } = require('~/server/services/ZdockMemory/synthesize');
-      synthesizeProjectMemory(
-        options.req.body.zdockId,
-        options.req.user.id,
-      ).catch((err) => logger.error('[BaseClient] Project memory synthesis failed', err));
-    }
-
     return { message: savedMessage, conversation };
   }
 

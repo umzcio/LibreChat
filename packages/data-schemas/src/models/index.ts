@@ -28,8 +28,7 @@ import { createPresetModel } from './preset';
 import { createPromptModel } from './prompt';
 import { createMemoryModel } from './memory';
 import { createGroupModel } from './group';
-import { createZdockModel } from './zdock';
-import { createWorkspaceSessionModel } from './workspace';
+import { createChatProjectModel } from './chatProject';
 import { createConfigModel } from './config';
 import { createTokenModel } from './token';
 import { createSkillModel } from './skill';
@@ -113,8 +112,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
     SystemGrant: createSystemGrantModel(mongoose),
     AuditLog: createAuditLogModel(mongoose),
     Group: createGroupModel(mongoose),
-    Project: createZdockModel(mongoose),
-    WorkspaceSession: createWorkspaceSessionModel(mongoose),
+    ChatProject: createChatProjectModel(mongoose),
     Config: createConfigModel(mongoose),
   };
 }

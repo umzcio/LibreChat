@@ -1,26 +1,23 @@
-import { useMemo, memo, useState, type FC, useCallback, useEffect, useRef } from 'react';
+import { useMemo, memo, type FC, useCallback, useEffect, useRef } from 'react';
 import throttle from 'lodash/throttle';
-import { ChevronDown, FolderKanban } from 'lucide-react';
-import { useAtomValue } from 'jotai';
-import { useQueryClient } from '@tanstack/react-query';
+import { useRecoilValue } from 'recoil';
+import { ChevronDown } from 'lucide-react';
 import { QueryKeys } from 'librechat-data-provider';
+import { useQueryClient } from '@tanstack/react-query';
 import { List, CellMeasurer, CellMeasurerCache } from 'react-virtualized';
 import { Spinner, TooltipAnchor, NewChatIcon, useMediaQuery } from '@librechat/client';
 import type { TConversation } from 'librechat-data-provider';
 import {
   useLocalize,
-  useNewConvo,
   TranslationKeys,
   useFavorites,
   useShowMarketplace,
-  useLocalStorage,
+  useNewConvo,
   useElementSize,
 } from '~/hooks';
 import { groupConversationsByDate, clearMessagesCache, cn } from '~/utils';
 import FavoritesList from '~/components/Nav/Favorites/FavoritesList';
-import ZdockCreateDialog from '~/components/SidePanel/Zdocks/ZdockCreateDialog';
-import { ZdockCard } from '~/components/SidePanel/Zdocks';
-import { useActiveJobs, useListZdocksQuery } from '~/data-provider';
+import { useActiveJobs } from '~/data-provider';
 import Convo from './Convo';
 import store from '~/store';
 
@@ -102,7 +99,7 @@ const ChatsHeader: FC<ChatsHeaderProps> = memo(({ isExpanded, onToggle }) => {
   const localize = useLocalize();
   const queryClient = useQueryClient();
   const { newConversation } = useNewConvo();
-  const conversation = useAtomValue(store.conversationByIndex(0));
+  const conversation = useRecoilValue(store.conversationByIndex(0));
 
   const handleNewChat = useCallback(() => {
     clearMessagesCache(queryClient, conversation?.conversationId);
@@ -176,15 +173,12 @@ DateLabel.displayName = 'DateLabel';
 
 type FlattenedItem =
   | { type: 'favorites' }
-  | { type: 'projects' }
-  | { type: 'chats-header' }
   | { type: 'pinned-header' }
   | { type: 'pinned-convo'; convo: TConversation }
   | { type: 'header'; groupName: string }
   | { type: 'convo'; convo: TConversation }
   | { type: 'loading' };
 
-type DynamicRowType = 'favorites' | 'projects';
 const Conversations: FC<ConversationsProps> = ({
   conversations: rawConversations,
   moveToTop,
@@ -198,7 +192,7 @@ const Conversations: FC<ConversationsProps> = ({
   showFavorites = true,
 }) => {
   const localize = useLocalize();
-  const search = useAtomValue(store.search);
+  const search = useRecoilValue(store.search);
   const { favorites, isLoading: isFavoritesLoading } = useFavorites();
   const isSmallScreen = useMediaQuery('(max-width: 768px)');
   const convoHeight = isSmallScreen ? 44 : 34;
@@ -210,15 +204,6 @@ const Conversations: FC<ConversationsProps> = ({
   } = useElementSize<HTMLDivElement>();
 
   const favoritesContentKeyRef = useRef('');
-  const zdocksContentKeyRef = useRef('');
-  const [isZdocksExpanded, setIsProjectsExpanded] = useLocalStorage('projectsExpanded', true);
-  const [createZdockOpen, setCreateZdockOpen] = useState(false);
-  const { data: projectsData } = useListZdocksQuery();
-  const projects = useMemo(() => projectsData?.projects ?? [], [projectsData]);
-  const projectsContentKey = useMemo(
-    () => projects.map(({ zdockId }) => zdockId).join(':'),
-    [projects],
-  );
 
   // Fetch active job IDs for showing generation indicators
   const { data: activeJobsData } = useActiveJobs();
@@ -233,10 +218,7 @@ const Conversations: FC<ConversationsProps> = ({
     !search.query &&
     (isFavoritesLoading || favorites.length > 0 || showAgentMarketplace);
 
-  const favoritesContentKey = `${favorites.length}-${showAgentMarketplace ? 1 : 0}-${isFavoritesLoading ? 1 : 0}`;
-
-  favoritesContentKeyRef.current = favoritesContentKey;
-  zdocksContentKeyRef.current = `${projectsContentKey}-${isZdocksExpanded ? 1 : 0}`;
+  favoritesContentKeyRef.current = `${favorites.length}-${showAgentMarketplace ? 1 : 0}-${isFavoritesLoading ? 1 : 0}`;
 
   const filteredConversations = useMemo(
     () => rawConversations.filter(Boolean) as TConversation[],
@@ -259,8 +241,6 @@ const Conversations: FC<ConversationsProps> = ({
     if (shouldShowFavorites) {
       items.push({ type: 'favorites' });
     }
-    items.push({ type: 'projects' });
-    items.push({ type: 'chats-header' });
 
     if (isChatsExpanded) {
       if (!search.query && pinnedConversations.length > 0) {
@@ -276,7 +256,7 @@ const Conversations: FC<ConversationsProps> = ({
       });
 
       if (isLoading) {
-        items.push({ type: 'loading' });
+        items.push({ type: 'loading' } as any);
       }
     }
     return items;
@@ -307,12 +287,6 @@ const Conversations: FC<ConversationsProps> = ({
           if (item.type === 'favorites') {
             return `favorites-${favoritesContentKeyRef.current}`;
           }
-          if (item.type === 'projects') {
-            return `projects-${zdocksContentKeyRef.current}`;
-          }
-          if (item.type === 'chats-header') {
-            return 'chats-header';
-          }
           if (item.type === 'pinned-header') {
             return 'pinned-header';
           }
@@ -335,55 +309,21 @@ const Conversations: FC<ConversationsProps> = ({
     [convoHeight],
   );
 
-  const clearMeasuredRows = useCallback(
-    (rowTypes: DynamicRowType[]) => {
-      const rowsToClear = new Set(rowTypes);
-      let firstRowIndex = -1;
-
-      for (let index = 0; index < flattenedItemsRef.current.length; index += 1) {
-        const item = flattenedItemsRef.current[index];
-
-        if (item.type !== 'favorites' && item.type !== 'projects') {
-          continue;
-        }
-
-        if (!rowsToClear.has(item.type)) {
-          continue;
-        }
-
-        cache.clear(index, 0);
-
-        if (firstRowIndex === -1) {
-          firstRowIndex = index;
-        }
-
-        rowsToClear.delete(item.type);
-
-        if (rowsToClear.size === 0) {
-          break;
-        }
-      }
-
+  const clearFavoritesCache = useCallback(() => {
+    if (cache) {
+      cache.clear(0, 0);
       if (containerRef.current && 'recomputeRowHeights' in containerRef.current) {
-        containerRef.current.recomputeRowHeights(firstRowIndex === -1 ? 0 : firstRowIndex);
+        containerRef.current.recomputeRowHeights(0);
       }
-    },
-    [cache, containerRef],
-  );
+    }
+  }, [cache, containerRef]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
-      clearMeasuredRows(['favorites', 'projects']);
+      clearFavoritesCache();
     });
     return () => cancelAnimationFrame(frameId);
-  }, [favoritesContentKey, shouldShowFavorites, clearMeasuredRows]);
-
-  useEffect(() => {
-    const frameId = requestAnimationFrame(() => {
-      clearMeasuredRows(['projects']);
-    });
-    return () => cancelAnimationFrame(frameId);
-  }, [projectsContentKey, isZdocksExpanded, clearMeasuredRows]);
+  }, [favorites.length, isFavoritesLoading, showAgentMarketplace, clearFavoritesCache]);
 
   useEffect(() => {
     const frameId = requestAnimationFrame(() => {
@@ -445,60 +385,10 @@ const Conversations: FC<ConversationsProps> = ({
         );
       }
 
-      if (item.type === 'projects') {
-        return (
-          <MeasuredRow key={key} {...rowProps}>
-            <div className="px-1">
-              <button
-                onClick={() => setIsProjectsExpanded(!isZdocksExpanded)}
-                className="group flex w-full items-center justify-between rounded-lg px-1 py-2 text-xs font-bold text-text-secondary outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-black dark:focus-visible:ring-white"
-                type="button"
-              >
-                <span className="select-none">{localize('com_ui_zdocks')}</span>
-                <ChevronDown
-                  className={cn(
-                    'h-3 w-3 transition-transform duration-200',
-                    isZdocksExpanded ? 'rotate-180' : '',
-                  )}
-                />
-              </button>
-              {isZdocksExpanded && (
-                <div className="space-y-0.5 pb-1">
-                  <ZdockCreateDialog open={createZdockOpen} onOpenChange={setCreateZdockOpen}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary"
-                      onClick={() => setCreateZdockOpen(true)}
-                    >
-                      <FolderKanban className="size-4" aria-hidden="true" />
-                      {localize('com_ui_new_zdock')}
-                    </button>
-                  </ZdockCreateDialog>
-                  {projects.map((proj) => (
-                    <ZdockCard key={proj.zdockId} project={proj} />
-                  ))}
-                </div>
-              )}
-            </div>
-          </MeasuredRow>
-        );
-      }
-
       if (item.type === 'pinned-header') {
         return (
           <MeasuredRow key={key} {...rowProps}>
             <PinnedHeader />
-          </MeasuredRow>
-        );
-      }
-
-      if (item.type === 'chats-header') {
-        return (
-          <MeasuredRow key={key} {...rowProps}>
-            <ChatsHeader
-              isExpanded={isChatsExpanded}
-              onToggle={() => setIsChatsExpanded(!isChatsExpanded)}
-            />
           </MeasuredRow>
         );
       }
@@ -518,10 +408,10 @@ const Conversations: FC<ConversationsProps> = ({
       }
 
       if (item.type === 'header') {
-        // First date header index = favorites(0/1) + projects + chats-header + pinned section
-        // Order: [favorites?, projects, chats-header, (pinned-header, #pinned-convos)?, first-header]
+        // First date header index depends on favorites row, pinned header, and pinned convos
+        // At most: [favorites, pinned-header, # pinned-convos] → first-header
         const pinnedOffset = pinnedConversations.length > 0 ? pinnedConversations.length + 1 : 0;
-        const firstHeaderIndex = (shouldShowFavorites ? 1 : 0) + 2 + pinnedOffset;
+        const firstHeaderIndex = (flattenedItems[0]?.type === 'favorites' ? 1 : 0) + pinnedOffset;
         return (
           <MeasuredRow key={key} {...rowProps}>
             <DateLabel groupName={item.groupName} isFirst={index === firstHeaderIndex} />
@@ -545,23 +435,7 @@ const Conversations: FC<ConversationsProps> = ({
 
       return null;
     },
-    [
-      cache,
-      flattenedItems,
-      moveToTop,
-      toggleNav,
-      isSmallScreen,
-      isChatsExpanded,
-      setIsChatsExpanded,
-      shouldShowFavorites,
-      activeJobIds,
-      localize,
-      isZdocksExpanded,
-      setIsProjectsExpanded,
-      createZdockOpen,
-      projects,
-      pinnedConversations,
-    ],
+    [cache, flattenedItems, moveToTop, toggleNav, isSmallScreen, pinnedConversations, activeJobIds],
   );
 
   const getRowHeight = useCallback(

@@ -45,6 +45,7 @@ export const defaultRetrievalModels = [
 ];
 
 export const excludedKeys = new Set([
+  'chatProjectId',
   'conversationId',
   'title',
   'iconURL',
@@ -447,7 +448,7 @@ export type SchemaDefaults<T> = ExtractDefaults<SchemaShape<T>>;
 
 export type TConfigDefaults = SchemaDefaults<typeof configSchema>;
 
-function getSchemaDefaults<Schema extends z.AnyZodObject>(
+export function getSchemaDefaults<Schema extends z.AnyZodObject>(
   schema: Schema,
 ): ExtractDefaults<SchemaShape<Schema>> {
   const shape = schema.shape;
@@ -1014,10 +1015,10 @@ export type TVertexModelConfig = z.infer<typeof vertexModelConfigSchema>;
  * Similar to Azure configuration, this allows running Anthropic models through Google Cloud.
  */
 export const vertexAISchema = z.object({
+  projectId: z.string().optional(),
   /** Enable Vertex AI mode for Anthropic (defaults to true when vertex config is present) */
   enabled: z.boolean().optional(),
   /** Google Cloud Project ID (optional - auto-detected from service key file if not provided) */
-  zdockId: z.string().optional(),
   /** Vertex AI region (e.g., 'us-east5', 'europe-west1') */
   region: z.string().default('us-east5'),
   /** Optional: Path to service account key file */

@@ -13,7 +13,7 @@ export interface VertexCredentialOptions {
   /** Path to service account key file (overrides env var) */
   serviceKeyFile?: string;
   /** Project ID for Vertex AI */
-  zdockId?: string;
+  projectId?: string;
   /** Region for Vertex AI */
   region?: string;
 }
@@ -24,7 +24,7 @@ export interface VertexCredentialOptions {
  */
 export interface VertexAIConfigInput {
   enabled?: boolean;
-  zdockId?: string;
+  projectId?: string;
   region?: string;
   serviceKeyFile?: string;
   deploymentName?: string;
@@ -65,7 +65,7 @@ export async function loadAnthropicVertexCredentials(
 export function getVertexCredentialOptions(config?: VertexAIConfigInput): VertexCredentialOptions {
   return {
     serviceKeyFile: config?.serviceKeyFile,
-    zdockId: config?.zdockId,
+    projectId: config?.projectId,
     region: config?.region,
   };
 }
@@ -166,11 +166,11 @@ export function getVertexDeploymentName(
 
 /**
  * Creates and configures a Vertex AI client for Anthropic.
- * Supports both YAML configuration and environment variables for region/zdockId.
- * The zdockId is automatically extracted from the service key if not explicitly provided.
+ * Supports both YAML configuration and environment variables for region/projectId.
+ * The projectId is automatically extracted from the service key if not explicitly provided.
  * @param credentials - The Google service account credentials
  * @param options - SDK client options
- * @param vertexOptions - Vertex AI specific options (region, zdockId) from YAML config
+ * @param vertexOptions - Vertex AI specific options (region, projectId) from YAML config
  */
 export function createAnthropicVertexClient(
   credentials: AnthropicCredentials,
@@ -185,14 +185,14 @@ export function createAnthropicVertexClient(
 
   // Priority: vertexOptions > env vars > service key project_id
   const region = vertexOptions?.region || process.env.ANTHROPIC_VERTEX_REGION || 'us-east5';
-  const zdockId =
-    vertexOptions?.zdockId || process.env.VERTEX_PROJECT_ID || serviceKey.project_id;
+  const projectId =
+    vertexOptions?.projectId || process.env.VERTEX_PROJECT_ID || serviceKey.project_id;
 
   try {
     const googleAuth = new GoogleAuth({
       credentials: serviceKey,
       scopes: 'https://www.googleapis.com/auth/cloud-platform',
-      ...(zdockId && { zdockId }),
+      ...(projectId && { projectId }),
     });
 
     // Filter out unsupported anthropic-beta header values for Vertex AI
@@ -208,7 +208,7 @@ export function createAnthropicVertexClient(
     return new AnthropicVertex({
       region: region,
       googleAuth: googleAuth,
-      ...(zdockId && { zdockId }),
+      ...(projectId && { projectId }),
       ...filteredOptions,
     });
   } catch (error) {

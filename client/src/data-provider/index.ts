@@ -3,14 +3,11 @@ export * from './Agents';
 export * from './Endpoints';
 export * from './Skills';
 export * from './Files';
-export * from './Code';
 /* Memories */
 export * from './Memories';
-/* Projects */
-export * from './Zdocks';
 export * from './Messages';
 export * from './Misc';
-export * from './Zdocks';
+export * from './Projects';
 export * from './Tools';
 export * from './connection';
 export * from './Favorites';

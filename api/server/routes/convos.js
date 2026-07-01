@@ -41,9 +41,9 @@ router.get(
     const search = req.query.search ? decodeURIComponent(req.query.search) : undefined;
     const sortBy = req.query.sortBy || 'updatedAt';
     const sortDirection = req.query.sortDirection || 'desc';
-    const zdockId = Array.isArray(req.query.zdockId)
-      ? req.query.zdockId[0]
-      : req.query.zdockId;
+    const projectId = Array.isArray(req.query.projectId)
+      ? req.query.projectId[0]
+      : req.query.projectId;
 
     let tags;
     if (req.query.tags) {
@@ -58,7 +58,7 @@ router.get(
       search,
       sortBy,
       sortDirection,
-      zdockId,
+      projectId,
     });
     res.status(200).json(result);
   }),

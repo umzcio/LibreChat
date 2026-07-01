@@ -22,11 +22,9 @@ export * from './roles';
 export * from './types';
 export * from './types/agents';
 export * from './types/assistants';
-export * from './types/code';
 export * from './types/files';
 export * from './types/mcpServers';
 export * from './types/mutations';
-export * from './types/zdocks';
 export * from './types/queries';
 export * from './types/skills';
 export * from './types/runs';
@@ -52,6 +50,8 @@ import * as dataService from './data-service';
 export * from './utils';
 export * from './actions';
 export { default as createPayload } from './createPayload';
+// /* react query hooks */
+// export * from './react-query/react-query-service';
 /* feedback */
 export * from './feedback';
 export * from './parameterSettings';

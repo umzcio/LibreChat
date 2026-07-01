@@ -595,13 +595,13 @@ async function exchangeJWTForAccessToken(jwt: string): Promise<string> {
 async function performGoogleVertexOCR({
   url,
   accessToken,
-  zdockId,
+  projectId,
   model,
   documentType = 'document_url',
 }: {
   url: string;
   accessToken: string;
-  zdockId: string;
+  projectId: string;
   model: string;
   documentType?: 'document_url' | 'image_url';
 }): Promise<OCRResult> {
@@ -610,9 +610,9 @@ async function performGoogleVertexOCR({
 
   let baseURL: string;
   if (location === 'global') {
-    baseURL = `https://aiplatform.googleapis.com/v1/projects/${zdockId}/locations/global/publishers/mistralai/models/${modelId}:rawPredict`;
+    baseURL = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/global/publishers/mistralai/models/${modelId}:rawPredict`;
   } else {
-    baseURL = `https://${location}-aiplatform.googleapis.com/v1/projects/${zdockId}/locations/${location}/publishers/mistralai/models/${modelId}:rawPredict`;
+    baseURL = `https://${location}-aiplatform.googleapis.com/v1/projects/${projectId}/locations/${location}/publishers/mistralai/models/${modelId}:rawPredict`;
   }
 
   const documentKey = documentType === 'image_url' ? 'image_url' : 'document_url';
@@ -693,7 +693,7 @@ export const uploadGoogleVertexMistralOCR = async (
     const ocrResult = await performGoogleVertexOCR({
       url: `${base64Prefix}${base64}`,
       accessToken,
-      zdockId: serviceAccount.project_id!,
+      projectId: serviceAccount.project_id!,
       model,
       documentType,
     });

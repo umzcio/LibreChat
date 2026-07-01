@@ -18,7 +18,6 @@ import {
   remoteAgentsPermissionsSchema,
   temporaryChatPermissionsSchema,
   fileCitationsPermissionsSchema,
-  projectPermissionsSchema,
 } from './permissions';
 
 /**
@@ -102,12 +101,6 @@ const defaultRolesSchema = z.object({
         [Permissions.CONFIGURE_OBO]: z.boolean().default(true),
       }),
       [PermissionTypes.REMOTE_AGENTS]: remoteAgentsPermissionsSchema.extend({
-        [Permissions.USE]: z.boolean().default(true),
-        [Permissions.CREATE]: z.boolean().default(true),
-        [Permissions.SHARE]: z.boolean().default(true),
-        [Permissions.SHARE_PUBLIC]: z.boolean().default(true),
-      }),
-      [PermissionTypes.ZDOCKS]: projectPermissionsSchema.extend({
         [Permissions.USE]: z.boolean().default(true),
         [Permissions.CREATE]: z.boolean().default(true),
         [Permissions.SHARE]: z.boolean().default(true),
@@ -207,12 +200,6 @@ export const roleDefaults = defaultRolesSchema.parse({
         [Permissions.SHARE]: true,
         [Permissions.SHARE_PUBLIC]: true,
       },
-      [PermissionTypes.ZDOCKS]: {
-        [Permissions.USE]: true,
-        [Permissions.CREATE]: true,
-        [Permissions.SHARE]: true,
-        [Permissions.SHARE_PUBLIC]: true,
-      },
       [PermissionTypes.SKILLS]: {
         [Permissions.USE]: true,
         [Permissions.CREATE]: true,
@@ -267,12 +254,6 @@ export const roleDefaults = defaultRolesSchema.parse({
       [PermissionTypes.REMOTE_AGENTS]: {
         [Permissions.USE]: false,
         [Permissions.CREATE]: false,
-        [Permissions.SHARE]: false,
-        [Permissions.SHARE_PUBLIC]: false,
-      },
-      [PermissionTypes.ZDOCKS]: {
-        [Permissions.USE]: true,
-        [Permissions.CREATE]: true,
         [Permissions.SHARE]: false,
         [Permissions.SHARE_PUBLIC]: false,
       },

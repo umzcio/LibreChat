@@ -26,7 +26,6 @@ export default function createPayload(submission: t.TSubmission) {
     manualSkills,
   } = submission;
   const { conversationId } = s.tConvoUpdateSchema.parse(conversation);
-  const zdockId = (conversation as Record<string, unknown>)?.zdockId as string | undefined;
   const { endpoint: _e, endpointType } = endpointOption as {
     endpoint: s.EModelEndpoint;
     endpointType?: s.EModelEndpoint;
@@ -49,7 +48,6 @@ export default function createPayload(submission: t.TSubmission) {
     isRegenerate,
     editedContent,
     conversationId,
-    zdockId,
     isContinued: !!(isEdited && isContinued),
     ephemeralAgent: s.isAssistantsEndpoint(endpoint) ? undefined : ephemeralAgent,
     manualSkills: s.isAssistantsEndpoint(endpoint) ? undefined : manualSkills,

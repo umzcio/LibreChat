@@ -48,7 +48,7 @@ export function createAccessRoleMethods(mongoose: typeof import('mongoose')): {
 
   /**
    * Find all access roles for a specific resource type
-   * @param resourceType - The type of resource ('agent', 'zdock', 'file')
+   * @param resourceType - The type of resource ('agent', 'project', 'file')
    * @returns Array of role documents
    */
   async function findRolesByResourceType(resourceType: string): Promise<IAccessRole[]> {

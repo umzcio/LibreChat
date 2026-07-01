@@ -2,12 +2,11 @@ import { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import copy from 'copy-to-clipboard';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Code, Code2, Maximize2, Minimize2, Play, RefreshCw, X } from 'lucide-react';
+import { Code, Maximize2, Minimize2, Play, RefreshCw, X } from 'lucide-react';
 import { useAtom, useSetAtom, useAtomValue } from 'jotai';
 import { RESET } from 'jotai/utils';
-import { useNavigate, useParams } from 'react-router-dom';
 import { Button, Spinner, useMediaQuery, Radio } from '@librechat/client';
-import { Constants } from 'librechat-data-provider';
+
 import type { SandpackPreviewRef } from '@codesandbox/sandpack-react';
 import CopyButton from '~/components/Messages/Content/CopyButton';
 import { useShareContext, useMutationState } from '~/Providers';
@@ -19,7 +18,7 @@ import ArtifactTabs from './ArtifactTabs';
 import { isCodeOnlyArtifact, isPreviewOnlyArtifact } from '~/utils/artifacts';
 import { displayFilename } from '~/components/Chat/Messages/Content/Parts/attachmentTypes';
 import { useLocalize } from '~/hooks';
-import { buildConversationPath, cn } from '~/utils';
+import { cn } from '~/utils';
 import store from '~/store';
 
 const MAX_BLUR_AMOUNT = 32;
@@ -27,10 +26,8 @@ const MAX_BACKDROP_OPACITY = 0.3;
 
 export default function Artifacts() {
   const localize = useLocalize();
-  const navigate = useNavigate();
   const { isMutating } = useMutationState();
   const { isSharedConvo } = useShareContext();
-  const { conversationId: routeConversationId = '', zdockId: routeProjectId } = useParams();
   const conversation = useAtomValue(store.conversationByIndex(0));
   const isMobile = useMediaQuery('(max-width: 868px)');
   const previewRef = useRef<SandpackPreviewRef>();
@@ -201,15 +198,6 @@ export default function Artifacts() {
     return null;
   }
 
-  const targetConversationId =
-    conversation?.conversationId && conversation.conversationId !== Constants.SEARCH
-      ? conversation.conversationId
-      : routeConversationId && routeConversationId !== Constants.SEARCH
-        ? routeConversationId
-        : '';
-  const targetProjectId = conversation?.zdockId ?? routeProjectId;
-  const canOpenInCode = !isSharedConvo && !!targetConversationId && !!currentArtifact.id;
-
   const handleRefresh = () => {
     setIsRefreshing(true);
     const client = previewRef.current?.getClient();
@@ -239,20 +227,6 @@ export default function Artifacts() {
     blurAmount > 0
       ? (Math.min(blurAmount, MAX_BLUR_AMOUNT) / MAX_BLUR_AMOUNT) * MAX_BACKDROP_OPACITY
       : 0;
-
-  const handleOpenInCode = () => {
-    if (!canOpenInCode) {
-      return;
-    }
-
-    navigate(
-      `${buildConversationPath({
-        conversationId: targetConversationId,
-        mode: 'code',
-        zdockId: targetProjectId,
-      })}?openArtifact=${encodeURIComponent(currentArtifact.id)}`,
-    );
-  };
 
   const panelContent = (
     <Tabs.Root value={displayedTab} onValueChange={setActiveTab} asChild>
@@ -369,17 +343,6 @@ export default function Artifacts() {
               {displayedTab !== 'preview' && isMutating && (
                 <RefreshCw size={16} className="animate-spin text-text-secondary" />
               )}
-              {canOpenInCode ? (
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-9 w-9"
-                  onClick={handleOpenInCode}
-                  aria-label={localize('com_ui_open_in_librecode')}
-                >
-                  <Code2 size={16} aria-hidden="true" />
-                </Button>
-              ) : null}
               {orderedArtifactIds.length > 1 && (
                 <ArtifactVersion
                   currentIndex={currentIndex}
