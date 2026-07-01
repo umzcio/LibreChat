@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { Spinner } from '@librechat/client';
 import { useParams } from 'react-router-dom';
 import { Constants, buildTree } from 'librechat-data-provider';
-import type { TMessage } from 'librechat-data-provider';
+import type { TChatProject, TMessage } from 'librechat-data-provider';
 import type { ChatFormValues } from '~/common';
 import {
   useAddedResponse,
@@ -18,6 +18,7 @@ import ConversationStarters from './Input/ConversationStarters';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
 import Presentation from './Presentation';
+import ProjectLandingChip from './ProjectLandingChip';
 import ChatForm from './Input/ChatForm';
 import Landing from './Landing';
 import Header from './Header';
@@ -37,12 +38,15 @@ function LoadingSpinner() {
 
 function ChatView({
   index = 0,
+  project,
   showArtifactsPanel = true,
 }: {
   index?: number;
+  project?: TChatProject;
   showArtifactsPanel?: boolean;
 }) {
   const { conversationId } = useParams();
+  const localize = useLocalize();
   const rootSubmission = useAtomValue(store.submissionByIndex(index));
   const isSubmitting = useAtomValue(store.isSubmittingFamily(index));
   const centerFormOnLanding = useAtomValue(store.centerFormOnLanding);
@@ -81,6 +85,11 @@ function ChatView({
   const isLandingPage =
     (!messagesTree || messagesTree.length === 0) &&
     (conversationId === Constants.NEW_CONVO || !conversationId);
+  const isProjectLandingPage = isLandingPage && project != null;
+  const chatFormPlaceholder =
+    isProjectLandingPage && project
+      ? localize('com_ui_new_chat_in_project', { name: project.name })
+      : undefined;
   const isNavigating = (!messagesTree || messagesTree.length === 0) && conversationId != null;
 
   if (isLoading && conversationId !== Constants.NEW_CONVO) {
@@ -116,7 +125,8 @@ function ChatView({
                       isLandingPage && 'max-w-3xl transition-all duration-200 xl:max-w-4xl',
                     )}
                   >
-                    <ChatForm index={index} />
+                    {isProjectLandingPage && project && <ProjectLandingChip project={project} />}
+                    <ChatForm index={index} placeholder={chatFormPlaceholder} />
                     {isLandingPage ? <ConversationStarters /> : <Footer />}
                   </div>
                 </div>

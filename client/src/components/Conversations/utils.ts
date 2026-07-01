@@ -30,6 +30,7 @@ export function areConversationListItemFieldsEqual(
     areConversationIconFieldsEqual(prevConversation, nextConversation) &&
     prevConversation.conversationId === nextConversation.conversationId &&
     prevConversation.title === nextConversation.title &&
+    prevConversation.chatProjectId === nextConversation.chatProjectId &&
     prevConversation.createdAt === nextConversation.createdAt &&
     prevConversation.updatedAt === nextConversation.updatedAt
   );
