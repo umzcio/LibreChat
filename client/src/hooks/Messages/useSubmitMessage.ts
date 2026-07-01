@@ -13,7 +13,7 @@ export default function useSubmitMessage() {
   const methods = useChatFormContext();
   const { conversation: addedConvo } = useAddedChatContext();
   const { ask, index, getMessages, setMessages } = useChatContext();
-  const latestMessage = useAtomValue(store.latestMessageFamily(index));
+  const latestMessage = useLatestMessage(index);
 
   const autoSendPrompts = useAtomValue(store.autoSendPrompts);
   const setActivePrompt = useSetAtom(store.activePromptByIndex(index));

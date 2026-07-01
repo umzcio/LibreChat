@@ -2,11 +2,10 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { QueryKeys, isAssistantsEndpoint } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAtom, useSetAtom } from 'jotai';
-import { RESET } from 'jotai/utils';
 import type { TMessage } from 'librechat-data-provider';
 import type { ActiveJobsResponse } from '~/data-provider';
 import useChatFunctions from '~/hooks/Chat/useChatFunctions';
-import { useLatestMessageId } from '~/hooks/Messages/useLatestMessage';
+import { useLatestMessage, useLatestMessageId } from '~/hooks/Messages/useLatestMessage';
 import { useAbortStreamMutation } from '~/data-provider';
 import useNewConvo from '~/hooks/useNewConvo';
 import { getMessageCacheIds } from './cache';
@@ -31,10 +30,8 @@ export default function useChatHelpers(index = 0, paramId?: string) {
   Falling back to conversationId (Jotai) only if paramId is not available */
   const queryParam = paramId === 'new' ? paramId : (paramId ?? conversationId ?? '');
 
-  const setResetLatestMessage = useSetAtom(store.latestMessageFamily(index));
-  const resetLatestMessage = () => setResetLatestMessage(RESET);
   const [isSubmitting, setIsSubmitting] = useAtom(store.isSubmittingFamily(index));
-  const [latestMessage, setLatestMessage] = useAtom(store.latestMessageFamily(index));
+  const latestMessage = useLatestMessage(index, queryParam);
 
   const latestMessageId = useLatestMessageId(index, queryParam) ?? undefined;
   const latestMessageDepth = latestMessage?.depth;

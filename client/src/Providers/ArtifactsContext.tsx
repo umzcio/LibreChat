@@ -2,6 +2,7 @@ import React, { createContext, useContext, useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 import type { TMessage } from 'librechat-data-provider';
 import { getLatestText } from '~/utils';
+import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import store from '~/store';
 
 export interface ArtifactsContextValue {
@@ -20,7 +21,7 @@ interface ArtifactsProviderProps {
 
 export function ArtifactsProvider({ children, value }: ArtifactsProviderProps) {
   const isSubmitting = useAtomValue(store.isSubmittingFamily(0));
-  const latestMessage = useAtomValue(store.latestMessageFamily(0));
+  const latestMessage = useLatestMessage(0);
   const conversationId = useAtomValue(store.conversationIdByIndex(0));
 
   const chatLatestMessageText = useMemo(() => {
