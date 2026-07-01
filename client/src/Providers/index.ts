@@ -21,6 +21,7 @@ export * from './SetConvoContext';
 export * from './SearchContext';
 export * from './BadgeRowContext';
 export * from './DragDropContext';
+export * from './UploadModalContext';
 export * from './ArtifactsContext';
 export * from './ArtifactContext';
 export * from './PromptGroupsContext';
