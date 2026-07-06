@@ -7,6 +7,7 @@ const {
   MCPTokenStorage,
   normalizeHttpError,
   extractWebSearchEnvVars,
+  deleteAgentCheckpoints,
   deleteAllSharedLinksWithCleanup,
 } = require('@librechat/api');
 const {
@@ -363,7 +364,20 @@ const deleteUserController = async (req, res) => {
       () => db.deleteUserKey({ userId: user.id, all: true }),
       () => db.deleteBalances({ user: user._id }),
       () => db.deletePresets(user.id),
-      () => db.deleteConvos(user.id),
+      async () => {
+        const convoDeletion = await db.deleteConvos(user.id);
+        const appConfig =
+          req.config ??
+          (await getAppConfig({
+            role: req.user?.role,
+            userId: req.user?.id,
+            tenantId: req.user?.tenantId,
+          }));
+        await deleteAgentCheckpoints(
+          convoDeletion?.conversationIds,
+          appConfig?.endpoints?.agents?.checkpointer,
+        );
+      },
       () => deleteUserPluginAuth(user.id, null, true),
       () => deleteAllSharedLinksWithCleanup(user.id),
       () => deleteUserFiles(req),

@@ -15,10 +15,10 @@ import type {
   AssistantsEndpoint,
 } from 'librechat-data-provider';
 import type { ActionAuthForm, ActionWithNullableMetadata } from '~/common';
-import type { Spec } from '../Shared';
+import type { Spec } from './ActionsTable';
 import ActionCallback from '~/components/SidePanel/Builder/ActionCallback';
 import { useAssistantsMapContext } from '~/Providers';
-import { ActionsTable, columns } from '../Shared';
+import { ActionsTable, columns } from './ActionsTable';
 import { useUpdateAction } from '~/data-provider';
 import { useLocalize } from '~/hooks';
 
@@ -221,6 +221,20 @@ export default function ActionsInput({
           >
             {localize('com_ui_schema')}
           </label>
+          {/* TODO: Implement examples functionality
+          <div className="flex items-center gap-2">
+            <select
+              id="example-schema"
+              onChange={(e) => console.log(e.target.value)}
+              className="border-token-border-medium h-8 min-w-[100px] rounded-lg border bg-transparent px-2 py-0 text-sm"
+            >
+              <option value="label">{localize('com_ui_examples')}</option>
+              <option value="0">Weather (JSON)</option>
+              <option value="1">Pet Store (YAML)</option>
+              <option value="2">Blank Template</option>
+            </select>
+          </div>
+          */}
         </div>
         <div className="border-token-border-medium bg-token-surface-primary hover:border-token-border-hover mb-4 w-full overflow-hidden rounded-lg border ring-0">
           <div className="relative">
