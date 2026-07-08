@@ -10,16 +10,20 @@ const {
   mergeQuotedTextForCount,
 } = require('@librechat/api');
 const { findAllArtifacts, replaceArtifactContent } = require('~/server/services/Artifacts/update');
-const { requireJwtAuth, validateMessageReq, configMiddleware } = require('~/server/middleware');
-const asyncHandler = require('~/server/middleware/asyncHandler');
+const {
+  requireJwtAuth,
+  validateMessageReq,
+  configMiddleware,
+  sendValidationResponse,
+  prepareMessageRequestValidation,
+} = require('~/server/middleware');
 const db = require('~/models');
 
 const router = express.Router();
 router.use(requireJwtAuth);
 
-router.get(
-  '/',
-  asyncHandler(async (req, res) => {
+router.get('/', async (req, res) => {
+  try {
     const user = req.user.id ?? '';
     const {
       cursor = null,
@@ -95,15 +99,24 @@ router.get(
     }
 
     res.status(200).json(response);
-  }),
-);
+  } catch (error) {
+    logger.error('Error fetching messages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 /**
  * Creates a new branch message from a specific agent's content within a parallel response message.
+ * Filters the original message's content to only include parts attributed to the specified agentId.
+ * Only available for non-user messages with content attributions.
+ *
+ * @route POST /branch
+ * @param {string} req.body.messageId - The ID of the source message
+ * @param {string} req.body.agentId - The agentId to filter content by
+ * @returns {TMessage} The newly created branch message
  */
-router.post(
-  '/branch',
-  asyncHandler(async (req, res) => {
+router.post('/branch', async (req, res) => {
+  try {
     const { messageId, agentId } = req.body;
     const userId = req.user.id;
 
@@ -177,12 +190,14 @@ router.post(
     }
 
     res.status(201).json(savedMessage);
-  }),
-);
+  } catch (error) {
+    logger.error('Error creating branch message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-router.post(
-  '/artifact/:messageId',
-  asyncHandler(async (req, res) => {
+router.post('/artifact/:messageId', async (req, res) => {
+  try {
     const { messageId } = req.params;
     const { index, original, updated } = req.body;
 
@@ -200,6 +215,8 @@ router.post(
       return res.status(400).json({ error: 'Artifact index out of bounds' });
     }
 
+    // Unescape LaTeX preprocessing done by the frontend
+    // The frontend escapes $ signs for display, but the database has unescaped versions
     const unescapedOriginal = unescapeLaTeX(original);
     const unescapedUpdated = unescapeLaTeX(updated);
 
@@ -254,24 +271,45 @@ router.post(
       content: savedMessage.content,
       text: savedMessage.text,
     });
-  }),
-);
+  } catch (error) {
+    logger.error('Error editing artifact:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-/* Note: It's necessary to add `validateMessageReq` within route definition for correct params */
-router.get(
-  '/:conversationId',
-  validateMessageReq,
-  asyncHandler(async (req, res) => {
+router.get('/:conversationId', prepareMessageRequestValidation, async (req, res) => {
+  try {
     const { conversationId } = req.params;
-    const messages = await db.getMessages({ conversationId, user: req.user.id }, '-_id -__v -user');
-    res.status(200).json(messages);
-  }),
-);
+    const validation = req.messageRequestValidation;
+    // This intentionally starts a user-scoped read before validation resolves;
+    // the response remains gated on validation success below.
+    const messagesPromise = validation.shouldFetchMessages
+      ? db.getMessages({ conversationId, user: req.user.id }, '-_id -__v -user').then(
+          (messages) => ({ messages }),
+          (error) => ({ error }),
+        )
+      : null;
 
-router.post(
-  '/:conversationId',
-  validateMessageReq,
-  asyncHandler(async (req, res) => {
+    const validationResult = await validation.promise;
+    if (!validationResult.ok) {
+      return sendValidationResponse(res, validationResult);
+    }
+
+    const messagesResult = await messagesPromise;
+    if (messagesResult?.error) {
+      throw messagesResult.error;
+    }
+
+    const messages = messagesResult?.messages ?? [];
+    res.status(200).json(messages);
+  } catch (error) {
+    logger.error('Error fetching messages:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/:conversationId', validateMessageReq, async (req, res) => {
+  try {
     const message = { ...req.body, conversationId: req.params.conversationId };
     const reqCtx = {
       userId: req?.user?.id,
@@ -288,13 +326,14 @@ router.post(
     }
     await db.saveConvo(reqCtx, savedMessage, { context: 'POST /api/messages/:conversationId' });
     res.status(201).json(savedMessage);
-  }),
-);
+  } catch (error) {
+    logger.error('Error saving message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-router.get(
-  '/:conversationId/:messageId',
-  validateMessageReq,
-  asyncHandler(async (req, res) => {
+router.get('/:conversationId/:messageId', validateMessageReq, async (req, res) => {
+  try {
     const { conversationId, messageId } = req.params;
     const message = await db.getMessages(
       { conversationId, messageId, user: req.user.id },
@@ -304,13 +343,14 @@ router.get(
       return res.status(404).json({ error: 'Message not found' });
     }
     res.status(200).json(message);
-  }),
-);
+  } catch (error) {
+    logger.error('Error fetching message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
-router.put(
-  '/:conversationId/:messageId',
-  validateMessageReq,
-  asyncHandler(async (req, res) => {
+router.put('/:conversationId/:messageId', validateMessageReq, async (req, res) => {
+  try {
     const { conversationId, messageId } = req.params;
     const { text, index, model } = req.body;
 
@@ -377,8 +417,11 @@ router.put(
       tokenCount,
     });
     return res.status(200).json(result);
-  }),
-);
+  } catch (error) {
+    logger.error('Error updating message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 router.put(
   '/:conversationId/:messageId/feedback',
@@ -397,7 +440,6 @@ router.put(
         },
         { context: 'updateFeedback' },
       );
-
 
       // Best-effort: Assistants messages do not have deterministic AgentRun traces.
       if (!isAssistantsEndpoint(updatedMessage.endpoint)) {
@@ -432,14 +474,15 @@ router.put(
   },
 );
 
-router.delete(
-  '/:conversationId/:messageId',
-  validateMessageReq,
-  asyncHandler(async (req, res) => {
+router.delete('/:conversationId/:messageId', validateMessageReq, async (req, res) => {
+  try {
     const { conversationId, messageId } = req.params;
     await db.deleteMessages({ messageId, conversationId, user: req.user.id });
     res.status(204).send();
-  }),
-);
+  } catch (error) {
+    logger.error('Error deleting message:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 module.exports = router;
