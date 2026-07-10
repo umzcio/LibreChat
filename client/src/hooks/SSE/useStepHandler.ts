@@ -18,22 +18,24 @@ import type {
   TMessageContentParts,
   SubagentUpdateEvent,
 } from 'librechat-data-provider';
-import type { AnnounceOptions, AtomSetter } from '~/common';
-import { MESSAGE_UPDATE_INTERVAL } from '~/common';
-import { logger } from '~/utils';
-import { subagentProgressByToolCallId } from '~/store';
+import type { SetterOrUpdater } from 'recoil';
+import type { AnnounceOptions } from '~/common';
 import {
   foldSubagentEvent,
   foldSubagentEventIntoTicker,
   initSubagentAggregatorState,
   initSubagentTickerState,
 } from '~/utils/subagentContent';
+import { isAskUserQuestionPart } from '~/utils/approval';
+import { subagentProgressByToolCallId } from '~/store';
+import { MESSAGE_UPDATE_INTERVAL } from '~/common';
+
 type TUseStepHandler = {
   announcePolite: (options: AnnounceOptions) => void;
   setMessages: (messages: TMessage[]) => void;
   getMessages: () => TMessage[] | undefined;
   /** @deprecated - isSubmitting should be derived from submission state */
-  setIsSubmitting?: AtomSetter<boolean>;
+  setIsSubmitting?: SetterOrUpdater<boolean>;
   lastAnnouncementTimeRef: React.MutableRefObject<number>;
   /**
    * Fired when a completed `create_file`/`edit_file` call targeted a
@@ -320,7 +322,7 @@ export default function useStepHandler({
   ) => {
     const contentType = contentPart.type ?? '';
     if (!contentType) {
-      logger.warn('StepHandler','No content type found in content part');
+      console.warn('No content type found in content part');
       return message;
     }
 
@@ -338,6 +340,19 @@ export default function useStepHandler({
       updatedContent = updatedContent.filter((part) => !isOAuthToolCallContent(part));
     }
 
+    /**
+     * The synthetic ask-user-question card is pause-scoped UI appended at the end
+     * of the content — exactly the ABSOLUTE index the resumed segment streams
+     * into. Once real content arrives for that slot the pause is over: displace
+     * the card (same displacement pattern as the OAuth prompt above) instead of
+     * dropping the incoming part as a type mismatch. Covers the streaming
+     * handler's own in-flight message copy, reconnecting tabs, and other devices
+     * — the store-level strip on answer submit can't reach those.
+     */
+    if (isAskUserQuestionPart(updatedContent[index])) {
+      updatedContent = updatedContent.filter((part) => !isAskUserQuestionPart(part));
+    }
+
     if (!updatedContent[index] && contentType !== ContentTypes.TOOL_CALL) {
       updatedContent[index] = { type: contentPart.type as AllContentTypes };
     }
@@ -350,7 +365,7 @@ export default function useStepHandler({
       !contentType.startsWith(existingType) &&
       !existingType.startsWith(contentType)
     ) {
-      logger.warn('StepHandler','Content type mismatch', { existingType, contentType, index });
+      console.warn('Content type mismatch', { existingType, contentType, index });
       return message;
     }
 
@@ -598,7 +613,7 @@ export default function useStepHandler({
           parentMessageId = submission?.initialResponse?.parentMessageId ?? '';
         }
         if (!responseMessageId) {
-          logger.warn('StepHandler','No message id found in run step event');
+          console.warn('No message id found in run step event');
           return;
         }
 
@@ -738,7 +753,7 @@ export default function useStepHandler({
           parentMessageId = submission?.initialResponse?.parentMessageId ?? '';
         }
         if (!responseMessageId) {
-          logger.warn('StepHandler','No message id found in agent update event');
+          console.warn('No message id found in agent update event');
           return;
         }
 
@@ -928,7 +943,7 @@ export default function useStepHandler({
         }
 
         if (!runStep || !responseMessageId) {
-          logger.warn('StepHandler','No run step or runId found for completed tool call event');
+          console.warn('No run step or runId found for completed tool call event');
           return;
         }
 
@@ -1056,7 +1071,7 @@ export default function useStepHandler({
         }
       } else {
         const _exhaustive: never = stepEvent;
-        logger.warn('StepHandler','Unhandled step event', (_exhaustive as TStepEvent).event);
+        console.warn('Unhandled step event', (_exhaustive as TStepEvent).event);
       }
     },
     [
