@@ -447,6 +447,78 @@ const messagesSiblingIdxFamily = atomFamily((_param: string | null | undefined) 
   return a;
 });
 
+/**
+ * A steer message submitted mid-run. Server truth: `sending` covers the POST
+ * in flight, `pending` means the server queued it (awaiting a tool-batch
+ * boundary), `failed` keeps the text recoverable after a rejected POST. The
+ * chip disappears when `on_steer_applied` lands.
+ */
+export type PendingSteer = {
+  steerId: string;
+  text: string;
+  status: 'sending' | 'pending' | 'failed';
+  createdAt: number;
+  files?: TMessage['files'];
+  quotes?: string[];
+  manualSkills?: string[];
+};
+
+const pendingSteersByConvoId = atomFamily((_param: string) => {
+  const a = atom<PendingSteer[]>([]);
+  a.debugLabel = 'pendingSteersByConvoId';
+  return a;
+});
+
+/** A message composed during a run, queued to send after it finishes. */
+export type QueuedMessage = {
+  id: string;
+  text: string;
+  createdAt: number;
+  files?: TMessage['files'];
+  quotes?: string[];
+  manualSkills?: string[];
+  priority?: boolean;
+};
+
+const queuedMessagesByConvoId = atomFamily((_param: string) => {
+  const a = atom<QueuedMessage[]>([]);
+  a.debugLabel = 'queuedMessagesByConvoId';
+  return a;
+});
+
+const pendingRunEndByConvoId = atomFamily((_param: string) => {
+  const a = atom<RunEnd | null>(null);
+  a.debugLabel = 'pendingRunEndByConvoId';
+  return a;
+});
+
+/** One-shot run-termination signal consumed by `useQueueDrain`. */
+export type RunEnd = {
+  conversationId: string | null;
+  outcome: 'completed' | 'aborted' | 'error';
+  startedAsNewConvo?: boolean;
+  endedAt: number;
+  interruptArmed?: boolean;
+};
+
+const runEndByIndex = atomFamily((_param: string | number) => {
+  const a = atom<RunEnd | null>(null);
+  a.debugLabel = 'runEndByIndex';
+  return a;
+});
+
+const drainAfterAbortByIndex = atomFamily((_param: string | number) => {
+  const a = atom<boolean>(false);
+  a.debugLabel = 'drainAfterAbortByIndex';
+  return a;
+});
+
+const appliedSteerIdsByConvoId = atomFamily((_param: string) => {
+  const a = atom<string[]>([]);
+  a.debugLabel = 'appliedSteerIdsByConvoId';
+  return a;
+});
+
 function useCreateConversationAtom(key: string | number) {
   const hasSetConversation = useSetConvoContext();
   const setKeys = useSetAtom(conversationKeysAtom);
@@ -621,5 +693,11 @@ export default {
   showSkillsPopoverFamily,
   pendingManualSkillsByConvoId,
   pendingQuotesByConvoId,
+  pendingSteersByConvoId,
+  queuedMessagesByConvoId,
+  runEndByIndex,
+  pendingRunEndByConvoId,
+  drainAfterAbortByIndex,
+  appliedSteerIdsByConvoId,
   updateConversationSelector,
 };
