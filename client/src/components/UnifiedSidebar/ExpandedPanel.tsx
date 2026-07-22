@@ -23,7 +23,7 @@ const NewChatButton = memo(function NewChatButton({
   const localize = useLocalize();
   const queryClient = useQueryClient();
   const { newConversation } = useNewConvo();
-  const conversation = useRecoilValue(store.conversationByIndex(0));
+  const conversationId = useRecoilValue(store.conversationIdByIndex(0));
   const switchToHistory = useRecoilValue(store.newChatSwitchToHistory);
   const tooltipDescription = useShortcutHint('newChat', localize('com_ui_new_chat'));
   const ariaKey = useShortcutAriaKey('newChat');
@@ -32,7 +32,7 @@ const NewChatButton = memo(function NewChatButton({
     (e: React.MouseEvent<HTMLAnchorElement>) => {
       if (e.button === 0 && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
-        clearMessagesCache(queryClient, conversation?.conversationId);
+        clearMessagesCache(queryClient, conversationId);
         queryClient.invalidateQueries([QueryKeys.messages]);
         newConversation();
         if (switchToHistory) {
@@ -40,7 +40,7 @@ const NewChatButton = memo(function NewChatButton({
         }
       }
     },
-    [queryClient, conversation?.conversationId, newConversation, switchToHistory, setActive],
+    [queryClient, conversationId, newConversation, switchToHistory, setActive],
   );
 
   return (

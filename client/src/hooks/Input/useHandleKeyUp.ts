@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useSetRecoilState, useRecoilValue } from 'recoil';
 import { PermissionTypes, Permissions, isAssistantsEndpoint } from 'librechat-data-provider';
+import { useGetLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import useAgentCapabilities from '~/hooks/Agents/useAgentCapabilities';
 import useGetAgentsConfig from '~/hooks/Agents/useGetAgentsConfig';
 import useHasAccess from '~/hooks/Roles/useHasAccess';
-import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import store from '~/store';
 
 /** Event keys that shouldn't trigger a command */
@@ -70,17 +70,17 @@ const useHandleKeyUp = ({
   });
   const { agentsConfig } = useGetAgentsConfig();
   const { skillsEnabled } = useAgentCapabilities(agentsConfig?.capabilities);
-  const latestParentMessageId = useAtomValue(store.latestMessageParentIdFamily(index));
-  const endpoint = useAtomValue(store.effectiveEndpointByIndex(index));
-  const setShowMentionPopover = useSetAtom(store.showMentionPopoverFamily(index));
-  const setShowPlusPopover = useSetAtom(store.showPlusPopoverFamily(index));
-  const setShowPromptsPopover = useSetAtom(store.showPromptsPopoverFamily(index));
-  const setShowSkillsPopover = useSetAtom(store.showSkillsPopoverFamily(index));
+  const getLatestMessage = useGetLatestMessage(index);
+  const endpoint = useRecoilValue(store.effectiveEndpointByIndex(index));
+  const setShowMentionPopover = useSetRecoilState(store.showMentionPopoverFamily(index));
+  const setShowPlusPopover = useSetRecoilState(store.showPlusPopoverFamily(index));
+  const setShowPromptsPopover = useSetRecoilState(store.showPromptsPopoverFamily(index));
+  const setShowSkillsPopover = useSetRecoilState(store.showSkillsPopoverFamily(index));
 
-  const atCommandEnabled = useAtomValue(store.atCommand);
-  const plusCommandEnabled = useAtomValue(store.plusCommand);
-  const slashCommandEnabled = useAtomValue(store.slashCommand);
-  const dollarCommandEnabled = useAtomValue(store.dollarCommand);
+  const atCommandEnabled = useRecoilValue(store.atCommand);
+  const plusCommandEnabled = useRecoilValue(store.plusCommand);
+  const slashCommandEnabled = useRecoilValue(store.slashCommand);
+  const dollarCommandEnabled = useRecoilValue(store.dollarCommand);
 
   useEffect(() => {
     if (isAssistantsEndpoint(endpoint)) {
@@ -146,18 +146,19 @@ const useHandleKeyUp = ({
 
   const handleUpArrow = useCallback(
     (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-      if (!latestParentMessageId) {
+      const latestMessage = getLatestMessage();
+      if (!latestMessage) {
         return;
       }
 
-      const element = document.getElementById(`edit-${latestParentMessageId}`);
+      const element = document.getElementById(`edit-${latestMessage.parentMessageId}`);
       if (!element) {
         return;
       }
       event.preventDefault();
       element.click();
     },
-    [latestParentMessageId],
+    [getLatestMessage],
   );
 
   /**

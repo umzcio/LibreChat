@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { useAtomValue } from 'jotai';
 import { QRCodeSVG } from 'qrcode.react';
 import { Copy, CopyCheck } from 'lucide-react';
 import { useGetSharedLinkQuery } from 'librechat-data-provider/react-query';
 import { OGDialogTemplate, Button, Spinner, OGDialog, Checkbox, Label } from '@librechat/client';
+import { useLatestMessageId } from '~/hooks/Messages/useLatestMessage';
 import { useLocalize, useCopyToClipboard } from '~/hooks';
 import { useGetStartupConfig } from '~/data-provider';
 import SharedLinkButton from './SharedLinkButton';
 import { buildShareLinkUrl, cn } from '~/utils';
-import store from '~/store';
 
 export default function ShareButton({
   conversationId,
@@ -39,7 +38,7 @@ export default function ShareButton({
       setAnnouncement('');
     }, 1000);
   };
-  const latestMessageId = useAtomValue(store.latestMessageIdFamily(0));
+  const latestMessageId = useLatestMessageId(0);
   const { data: share, isLoading } = useGetSharedLinkQuery(conversationId);
   const shareId = share?.shareId ?? '';
 

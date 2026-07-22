@@ -14,6 +14,7 @@ export * from './favorites';
 export * from './subagents';
 export * from './sandbox';
 export * from './usage';
+export * from './steer';
 
 export default {
   ...artifacts,

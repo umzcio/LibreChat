@@ -54,6 +54,8 @@ export interface AgentDeps {
     userObjectId: Types.ObjectId,
     resourceTypes: string | string[],
   ) => Promise<Types.ObjectId[]>;
+  /** Recognizes skill IDs supplied by an external, non-database registry. */
+  isExternalSkillId?: (id: string) => boolean;
 }
 
 /**
@@ -341,7 +343,7 @@ export function createAgentMethods(
     file_ids: string[];
   }) => Promise<{ matchedCount: number; modifiedCount: number }>;
 } {
-  const { removeAllPermissions, getActions, getSoleOwnedResourceIds } = deps;
+  const { removeAllPermissions, getActions, getSoleOwnedResourceIds, isExternalSkillId } = deps;
 
   /**
    * Create an agent with the provided data.
@@ -349,7 +351,11 @@ export function createAgentMethods(
   async function createAgent(agentData: Partial<IAgent> & { id: string }): Promise<IAgent> {
     const Agent = mongoose.models.Agent as Model<IAgent>;
     if (Array.isArray(agentData.skills) && agentData.skills.length > 0) {
-      const prunedSkills = await filterExistingSkillIds(mongoose, agentData.skills as string[]);
+      const prunedSkills = await filterExistingSkillIds(
+        mongoose,
+        agentData.skills as string[],
+        isExternalSkillId,
+      );
       agentData.skills = prunedSkills;
       /** Fail closed when pruning empties a non-empty allowlist — empty +
        *  enabled means the full catalog, and hygiene must never widen scope. */
@@ -499,7 +505,8 @@ export function createAgentMethods(
       } = currentAgent.toObject() as unknown as Record<string, unknown>;
       const { $push, $pull, $addToSet, ...directUpdates } = updateData;
 
-      /** Self-heal: drop allowlist ids whose skill doc no longer exists.
+      /** Self-heal: drop allowlist ids whose skill no longer exists in the
+       *  database or the external registry.
        *  A dangling id keeps the allowlist non-empty while scoping the
        *  runtime catalog to an empty intersection — silently disabling
        *  skills for the agent. When pruning empties a non-empty allowlist,
@@ -511,6 +518,7 @@ export function createAgentMethods(
         const prunedSkills = await filterExistingSkillIds(
           mongoose,
           directUpdates.skills as string[],
+          isExternalSkillId,
         );
         directUpdates.skills = prunedSkills;
         updateData.skills = prunedSkills;
@@ -1001,6 +1009,7 @@ export function createAgentMethods(
       const prunedSkills = await filterExistingSkillIds(
         mongoose,
         revertToVersion.skills as string[],
+        isExternalSkillId,
       );
       revertToVersion.skills = prunedSkills;
       if (prunedSkills.length === 0) {

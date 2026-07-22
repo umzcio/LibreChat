@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback, useMemo } from 'react';
 import debounce from 'lodash/debounce';
-import { useAtom, useAtomValue } from 'jotai';
 import { useToastContext } from '@librechat/client';
+import { useRecoilValue, useRecoilState } from 'recoil';
 import { EToolResources, isAssistantsEndpoint } from 'librechat-data-provider';
 import type { TEndpointOption } from 'librechat-data-provider';
 import type { KeyboardEvent } from 'react';
@@ -19,7 +19,7 @@ import {
   checkIfScrollable,
 } from '~/utils';
 import { useAssistantsMapContext } from '~/Providers/AssistantsMapContext';
-import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
+import { useLatestMessageMeta } from '~/hooks/Messages/useLatestMessage';
 import useFileUploadRouter from '~/hooks/Files/useFileUploadRouter';
 import { useAgentsMapContext } from '~/Providers/AgentsMapContext';
 import useGetSender from '~/hooks/Conversations/useGetSender';
@@ -63,8 +63,8 @@ export default function useTextarea({
   const { openModal } = useUploadModalContext();
   const assistantMap = useAssistantsMapContext();
   const checkHealth = useInteractionHealthCheck();
-  const enterToSend = useAtomValue(store.enterToSend);
-  const customShortcuts = useAtomValue(store.customShortcuts);
+  const enterToSend = useRecoilValue(store.enterToSend);
+  const customShortcuts = useRecoilValue(store.customShortcuts);
 
   /**
    * Effective `submitMessage` override: `undefined` when unset (default Ctrl/Cmd+Enter applies),
@@ -81,8 +81,8 @@ export default function useTextarea({
   }, [customShortcuts]);
 
   const { index, conversation, isSubmitting, filesLoading, setFilesLoading } = useChatContext();
-  const latestMessageError = useAtomValue(store.latestMessageErrorFamily(index));
-  const [activePrompt, setActivePrompt] = useAtom(store.activePromptByIndex(index));
+  const latestMessage = useLatestMessageMeta(index);
+  const [activePrompt, setActivePrompt] = useRecoilState(store.activePromptByIndex(index));
 
   const { endpoint = '' } = conversation || {};
   const { entity, isAgent, isAssistant } = getEntity({
@@ -94,7 +94,8 @@ export default function useTextarea({
   });
   const entityName = entity?.name ?? '';
 
-  const isNotAppendable = latestMessageError === true && !isAssistant;
+  const isNotAppendable =
+    latestMessage?.error === true && latestMessage.isCreatedByUser === true && !isAssistant;
   // && (conversationId?.length ?? 0) > 6; // also ensures that we don't show the wrong placeholder
 
   useEffect(() => {
@@ -176,7 +177,7 @@ export default function useTextarea({
     isAssistant,
     assistantMap,
     conversation,
-    latestMessageError,
+    latestMessage,
     isNotAppendable,
     placeholder,
   ]);

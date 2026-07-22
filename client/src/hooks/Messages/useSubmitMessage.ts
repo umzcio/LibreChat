@@ -3,7 +3,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { replaceSpecialVars } from 'librechat-data-provider';
 import type { TMessage } from 'librechat-data-provider';
 import { useChatContext, useChatFormContext, useAddedChatContext } from '~/Providers';
-import { useLatestMessage } from '~/hooks/Messages/useLatestMessage';
+import { useGetLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import { useAuthContext } from '~/hooks/AuthContext';
 import { mainTextareaId } from '~/common';
 import { logger } from '~/utils';
@@ -14,7 +14,7 @@ export default function useSubmitMessage() {
   const methods = useChatFormContext();
   const { conversation: addedConvo } = useAddedChatContext();
   const { ask, index, getMessages, setMessages } = useChatContext();
-  const latestMessage = useLatestMessage(index);
+  const getLatestMessage = useGetLatestMessage(index);
 
   const autoSendPrompts = useAtomValue(store.autoSendPrompts);
   const setActivePrompt = useSetAtom(store.activePromptByIndex(index));
@@ -30,6 +30,7 @@ export default function useSubmitMessage() {
         logger.warn('SubmitMessage', 'No data provided to submitMessage');
         return;
       }
+      const latestMessage = getLatestMessage();
       const rootMessages = getMessages();
       const isLatestInRootMessages = rootMessages?.some(
         (message) => message.messageId === latestMessage?.messageId,
@@ -56,7 +57,7 @@ export default function useSubmitMessage() {
       }
       methods.reset();
     },
-    [ask, methods, addedConvo, setMessages, getMessages, latestMessage],
+    [ask, methods, addedConvo, setMessages, getMessages, getLatestMessage],
   );
 
   const submitPrompt = useCallback(
