@@ -1,3 +1,5 @@
+import type { GraphEdge } from 'librechat-data-provider';
+
 export type VersionRecord = {
   name?: string | null;
   description?: string | null;
@@ -17,6 +19,7 @@ export type AgentState = {
   artifacts?: string | null;
   capabilities?: string[];
   tools?: string[];
+  edges?: GraphEdge[];
 } | null;
 
 export type VersionWithId = {
@@ -41,5 +44,6 @@ export interface AgentWithVersions {
   artifacts?: string | null;
   capabilities?: string[];
   tools?: string[];
+  edges?: GraphEdge[];
   versions?: Array<VersionRecord>;
 }
