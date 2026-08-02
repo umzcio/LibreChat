@@ -36,6 +36,7 @@ import { createSkillModel } from './skill';
 import { createUserModel } from './user';
 import { createFileModel } from './file';
 import { createKeyModel } from './key';
+import logger from '~/config/winston';
 
 /**
  * Creates all database models for all collections
@@ -78,7 +79,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
   Group: ReturnType<typeof createGroupModel>;
   Config: ReturnType<typeof createConfigModel>;
 } {
-  return {
+  const models = {
     User: createUserModel(mongoose),
     Token: createTokenModel(mongoose),
     Session: createSessionModel(mongoose),
@@ -118,4 +119,19 @@ export function createModels(mongoose: typeof import('mongoose')): {
     ChatProject: createChatProjectModel(mongoose),
     Config: createConfigModel(mongoose),
   };
+  /**
+   * Background index builds fail silently unless an 'index' listener is
+   * attached (e.g. Amazon DocumentDB <5.0 rejecting partialFilterExpression),
+   * leaving unique constraints unenforced with no trace in the logs.
+   */
+  for (const model of Object.values(models)) {
+    if (model.listenerCount('index') === 0) {
+      model.on('index', (error?: Error) => {
+        if (error) {
+          logger.error(`Index build failed for "${model.modelName}": ${error.message}`);
+        }
+      });
+    }
+  }
+  return models;
 }

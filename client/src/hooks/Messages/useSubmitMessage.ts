@@ -25,6 +25,10 @@ export default function useSubmitMessage() {
       overrideFiles?: TMessage['files'];
       overrideQuotes?: string[];
       overrideManualSkills?: string[];
+      overrideClientRequestId?: string;
+      overrideRecoverySteerId?: string;
+      overrideExpectedPredecessorCreatedAt?: number;
+      overrideQueuedMessageOrigin?: unknown;
     }) => {
       if (!data) {
         logger.warn('SubmitMessage', 'No data provided to submitMessage');
@@ -42,6 +46,9 @@ export default function useSubmitMessage() {
       const submitted = ask(
         {
           text: data.text,
+          ...(data.overrideRecoverySteerId != null && {
+            overrideUserMessageId: data.overrideRecoverySteerId,
+          }),
         },
         {
           addedConvo: addedConvo ?? undefined,
@@ -50,6 +57,10 @@ export default function useSubmitMessage() {
           overrideFiles: data.overrideFiles,
           overrideQuotes: data.overrideQuotes,
           overrideManualSkills: data.overrideManualSkills,
+          overrideClientRequestId: data.overrideClientRequestId,
+          overrideRecoverySteerId: data.overrideRecoverySteerId,
+          overrideExpectedPredecessorCreatedAt: data.overrideExpectedPredecessorCreatedAt,
+          overrideQueuedMessageOrigin: data.overrideQueuedMessageOrigin,
         },
       );
       if (submitted === false) {
