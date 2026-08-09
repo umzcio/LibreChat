@@ -375,14 +375,19 @@ router.get('/:serverName/oauth/callback', async (req, res) => {
       });
       return res.redirect(`${basePath}/oauth/success?serverName=${encodeURIComponent(serverName)}`);
     }
+    const isStalePendingFlow =
+      currentFlowState?.status === 'PENDING' &&
+      (!currentFlowState.createdAt || Date.now() - currentFlowState.createdAt >= PENDING_STALE_MS);
+    if (currentFlowState?.status === 'FAILED' || isStalePendingFlow) {
+      logger.warn('[MCP OAuth] Refusing token exchange for terminal flow', {
+        flowId,
+        serverName,
+        status: currentFlowState.status,
+      });
+      return res.redirect(`${basePath}/oauth/error?error=invalid_state`);
+    }
 
     logger.debug('[MCP OAuth] Completing OAuth flow');
-    if (!flowState.oauthHeaders) {
-      logger.warn(
-        '[MCP OAuth] oauthHeaders absent from flow state — config-source server oauth_headers will be empty',
-        { serverName, flowId },
-      );
-    }
     /**
      * Restore tenant context for the callback body. The callback is a cross-origin
      * redirect from the OAuth provider, so SameSite=Strict cookies (including the
@@ -718,6 +723,43 @@ router.post('/oauth/cancel/:serverName', requireJwtAuth, async (req, res) => {
   }
 });
 
+function createMCPStatusRuntimeContext(user, mcpConfig, serverNames) {
+  const customUserVarServers = serverNames.filter((serverName) => {
+    const customUserVars = mcpConfig[serverName]?.customUserVars;
+    return (
+      customUserVars && typeof customUserVars === 'object' && Object.keys(customUserVars).length > 0
+    );
+  });
+  let userMCPAuthMapPromise;
+  let mcpAllowlistsPromise;
+  const loadUserMCPAuthMap = () => {
+    if (!customUserVarServers.length) {
+      return Promise.resolve(undefined);
+    }
+    userMCPAuthMapPromise ??= getUserMCPAuthMap({
+      userId: user.id,
+      servers: customUserVarServers,
+      findPluginAuthsByKeys: db.findPluginAuthsByKeys,
+    });
+    return userMCPAuthMapPromise;
+  };
+  const loadMCPAllowlists = () => {
+    mcpAllowlistsPromise ??= getMCPServersRegistry().resolveAllowlists({
+      userId: user.id,
+      role: user.role,
+    });
+    return mcpAllowlistsPromise;
+  };
+  return { user: createSafeUser(user), loadUserMCPAuthMap, loadMCPAllowlists };
+}
+
+function getMCPReinitializeOAuthTimeout(oauthExpiresAt) {
+  if (typeof oauthExpiresAt !== 'number' || !Number.isFinite(oauthExpiresAt)) {
+    return mcpSettings.OAUTH_HANDLING_TIMEOUT;
+  }
+  return Math.max(0, oauthExpiresAt - Date.now());
+}
+
 /**
  * Reinitialize MCP server
  * This endpoint allows reinitializing a specific MCP server
@@ -783,13 +825,15 @@ router.post(
         message,
         oauthRequired,
         oauthUrl,
+        oauthExpiresAt,
         failureReason,
         missingUserVars,
         connectionDeferred,
       } = result;
 
+      let flowId;
       if (oauthRequired) {
-        const flowId = getOAuthFlowId(user.id, serverName);
+        flowId = getOAuthFlowId(user.id, serverName);
         setOAuthCsrfCookie(res, flowId, OAUTH_CSRF_COOKIE_PATH);
       }
 
@@ -797,6 +841,8 @@ router.post(
         success,
         message,
         oauthUrl,
+        flowId,
+        oauthTimeout: oauthRequired ? getMCPReinitializeOAuthTimeout(oauthExpiresAt) : undefined,
         serverName,
         oauthRequired,
         failureReason,
@@ -826,28 +872,37 @@ router.get('/connection/status', requireJwtAuth, async (req, res) => {
       user.id,
       { role: user.role, tenantId: getTenantId() },
     );
-    const connectionStatus = {};
-
-    for (const [serverName, config] of Object.entries(mcpConfig)) {
-      try {
-        connectionStatus[serverName] = await getServerConnectionStatus(
-          user.id,
-          serverName,
-          config,
-          appConnections,
-          userConnections,
-          oauthServers,
-        );
-      } catch (error) {
-        const message = `Failed to get status for server "${serverName}"`;
-        logger.error(`[MCP Connection Status] ${message},`, error);
-        connectionStatus[serverName] = {
-          connectionState: 'error',
-          requiresOAuth: oauthServers.has(serverName),
-          error: message,
-        };
-      }
-    }
+    const runtimeContext = createMCPStatusRuntimeContext(user, mcpConfig, Object.keys(mcpConfig));
+    const connectionStatus = Object.fromEntries(
+      await Promise.all(
+        Object.entries(mcpConfig).map(async ([serverName, config]) => {
+          try {
+            const status = await getServerConnectionStatus(
+              user.id,
+              serverName,
+              config,
+              appConnections,
+              userConnections,
+              oauthServers,
+              runtimeContext,
+            );
+            return [serverName, status];
+          } catch (error) {
+            const message = `Failed to get status for server "${serverName}"`;
+            logger.error(`[MCP Connection Status] ${message},`, error);
+            return [
+              serverName,
+              {
+                connectionState: 'error',
+                requiresOAuth: oauthServers.has(serverName),
+                authorizationState: oauthServers.has(serverName) ? 'error' : 'not_required',
+                error: message,
+              },
+            ];
+          }
+        }),
+      ),
+    );
 
     res.json({
       success: true,
@@ -884,6 +939,8 @@ router.get('/connection/status/:serverName', requireJwtAuth, async (req, res) =>
         .json({ error: `MCP server '${serverName}' not found in configuration` });
     }
 
+    const runtimeContext = createMCPStatusRuntimeContext(user, mcpConfig, [serverName]);
+
     const serverStatus = await getServerConnectionStatus(
       user.id,
       serverName,
@@ -891,6 +948,7 @@ router.get('/connection/status/:serverName', requireJwtAuth, async (req, res) =>
       appConnections,
       userConnections,
       oauthServers,
+      runtimeContext,
     );
 
     res.json({
@@ -898,6 +956,7 @@ router.get('/connection/status/:serverName', requireJwtAuth, async (req, res) =>
       serverName,
       connectionStatus: serverStatus.connectionState,
       requiresOAuth: serverStatus.requiresOAuth,
+      authorizationState: serverStatus.authorizationState,
     });
   } catch (error) {
     logger.error(

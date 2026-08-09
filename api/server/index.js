@@ -33,6 +33,7 @@ const {
   configureServerTimeouts,
   setupGracefulShutdown,
   updateInterfacePermissions,
+  configureMessageFilterRegexValidator,
 } = require('@librechat/api');
 const { connectDb, indexSync } = require('~/db');
 const {
@@ -56,6 +57,9 @@ const { getAppConfig } = require('./services/Config');
 const staticCache = require('./utils/staticCache');
 const noIndex = require('./middleware/noIndex');
 const routes = require('./routes');
+
+/** Reject messageFilter PII patterns the RE2 runtime engine cannot compile, at config load. */
+configureMessageFilterRegexValidator();
 
 const { PORT, HOST, ALLOW_SOCIAL_LOGIN, DISABLE_COMPRESSION, TRUST_PROXY } = process.env ?? {};
 
