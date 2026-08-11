@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Trans } from 'react-i18next';
 import {
   Label,
+  Button,
   Spinner,
   OGDialog,
   TrashIcon,
@@ -75,8 +76,9 @@ export default function MemoryCardActions({ memory }: MemoryCardActionsProps) {
         main={
           <Label className="text-left text-sm font-medium">
             <Trans
-              i18nKey="com_ui_delete_memory_confirm"
-              defaults="Are you sure you want to delete this memory?"
+              i18nKey="com_ui_delete_confirm_strong"
+              values={{ title: memory.key }}
+              components={{ strong: <strong /> }}
             />
           </Label>
         }

@@ -98,8 +98,33 @@ import type {
 import { createAgentMethods, type AgentMethods, type AgentDeps } from './agent';
 /* Config */
 import { createConfigMethods, type ConfigMethods } from './config';
+import {
+  createMCPAuthorityMethods,
+  MCPAuthorityProofError,
+  MAX_MCP_AUTHORITY_TARGETS,
+  createMCPAuthorityBootRevision,
+  createMCPAuthorityConfigSourceRevision,
+  createMCPAuthorityCredentialRevision,
+  createMCPAuthorityDatabaseSourceRevision,
+  digestMCPAuthorityValue,
+  type MCPAuthorityMethods,
+  type MCPAuthorityMethodHooks,
+  type MCPAuthorityConfigSourceDocument,
+  type MCPAuthorityCredentialSourceDocument,
+} from './mcpAuthority';
 
-export { RoleConflictError, DEFAULT_REFRESH_TOKEN_EXPIRY, DEFAULT_SESSION_EXPIRY };
+export {
+  RoleConflictError,
+  MCPAuthorityProofError,
+  MAX_MCP_AUTHORITY_TARGETS,
+  DEFAULT_REFRESH_TOKEN_EXPIRY,
+  DEFAULT_SESSION_EXPIRY,
+  createMCPAuthorityBootRevision,
+  createMCPAuthorityConfigSourceRevision,
+  createMCPAuthorityCredentialRevision,
+  createMCPAuthorityDatabaseSourceRevision,
+  digestMCPAuthorityValue,
+};
 export { tokenValues, cacheTokenValues, premiumTokenValues, defaultRate, createTxMethods };
 export { permissionBitSupersets };
 export {
@@ -151,7 +176,8 @@ export type AllMethods = UserMethods &
   SkillSyncMethods &
   AgentMethods &
   ChatProjectMethods &
-  ConfigMethods;
+  ConfigMethods &
+  MCPAuthorityMethods;
 
 /** Dependencies injected from the api layer into createMethods */
 export interface CreateMethodsDeps {
@@ -292,6 +318,8 @@ export function createMethods(
     ...agentMethods,
     /* Config */
     ...createConfigMethods(mongoose),
+    /* MCP authority proofs */
+    ...createMCPAuthorityMethods(mongoose),
   };
 }
 
@@ -346,4 +374,8 @@ export type {
   AgentMethods,
   ChatProjectMethods,
   ConfigMethods,
+  MCPAuthorityMethods,
+  MCPAuthorityMethodHooks,
+  MCPAuthorityConfigSourceDocument,
+  MCPAuthorityCredentialSourceDocument,
 };
