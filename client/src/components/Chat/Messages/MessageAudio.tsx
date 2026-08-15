@@ -7,6 +7,11 @@ import store from '~/store';
 
 function MessageAudio(props: TMessageAudio) {
   const engineTTS = useAtomValue(store.engineTTS);
+  const speechSettingsInitialized = useAtomValue(store.speechSettingsInitialized);
+
+  if (!speechSettingsInitialized) {
+    return null;
+  }
 
   const TTSComponents = {
     [TTSEndpoints.browser]: BrowserTTS,

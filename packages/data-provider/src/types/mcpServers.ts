@@ -46,6 +46,8 @@ export type MCPServerDBObjectResponse = {
   consumeOnly?: boolean;
   /** Origin of this server definition — yaml, config, or user */
   source?: 'yaml' | 'config' | 'user';
+  /** True when chat request fields are required before the server can connect. */
+  requestScoped?: boolean;
 } & MCPOptions;
 
 export type MCPServersListResponse = Record<string, MCPServerDBObjectResponse>;
