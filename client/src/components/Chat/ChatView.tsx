@@ -19,7 +19,6 @@ import ConversationStarters from './Input/ConversationStarters';
 import { useGetMessagesByConvoId } from '~/data-provider';
 import MessagesView from './Messages/MessagesView';
 import Presentation from './Presentation';
-import ProjectLandingChip from './ProjectLandingChip';
 import ChatForm from './Input/ChatForm';
 import Landing from './Landing';
 import Header from './Header';
@@ -146,12 +145,17 @@ function ChatView({
                   <div
                     className={cn(
                       'w-full',
+                      !isLandingPage && 'scrollbar-gutter-spacer',
                       isLandingPage && 'max-w-3xl transition-all duration-200 xl:max-w-4xl',
                     )}
                   >
-                    {isProjectLandingPage && project && <ProjectLandingChip project={project} />}
-                    <ChatForm index={index} placeholder={chatFormPlaceholder} />
-                    {isLandingPage ? <ConversationStarters /> : <Footer />}
+                    {isLandingPage && <ConversationStarters />}
+                    <ChatForm
+                      index={index}
+                      placeholder={chatFormPlaceholder}
+                      project={isProjectLandingPage ? project : undefined}
+                    />
+                    {!isLandingPage && <Footer />}
                   </div>
                 </div>
                 {isLandingPage && <Footer />}

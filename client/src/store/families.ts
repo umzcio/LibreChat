@@ -147,7 +147,11 @@ const conversationByIndex = atomFamily((index: string | number) =>
         }
         const searchParams = createSearchParams(newParams);
         const url = `${window.location.pathname}?${searchParams.toString()}`;
-        window.history.pushState({}, '', url);
+        /** Mirror, not navigation: Back-worthy entries are minted by real
+         * `navigate()` calls (useNewConvo), and in-place writers like
+         * ProjectLandingChip deliberately replace. Pushing here buried the
+         * Back target under one inert entry per draft edit. */
+        window.history.replaceState({}, '', url);
       }
     },
   ),

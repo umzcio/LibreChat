@@ -1,18 +1,23 @@
 import React from 'react';
+import { RecoilRoot } from 'recoil';
 import { render, screen } from '@testing-library/react';
-import { MCPUIResource } from '../MCPUIResource';
 import {
   useMessageContext,
   useOptionalMessagesConversation,
   useOptionalMessagesOperations,
 } from '~/Providers';
-import { useLocalize } from '~/hooks';
+import { MCPUIResource } from '../MCPUIResource';
 import { handleUIAction } from '~/utils';
+import { useLocalize } from '~/hooks';
 
 // Mock dependencies
-jest.mock('~/Providers');
-jest.mock('~/hooks');
-jest.mock('~/utils');
+jest.mock('~/Providers', () => ({
+  useMessageContext: jest.fn(),
+  useOptionalMessagesConversation: jest.fn(),
+  useOptionalMessagesOperations: jest.fn(),
+}));
+jest.mock('~/hooks', () => ({ useLocalize: jest.fn() }));
+jest.mock('~/utils', () => ({ handleUIAction: jest.fn() }));
 
 jest.mock('@mcp-ui/client', () => ({
   UIResourceRenderer: ({ resource, onUIAction }: any) => (
@@ -45,7 +50,7 @@ describe('MCPUIResource', () => {
 
   const mockAskFn = jest.fn();
 
-  const renderComponent = (ui: React.ReactNode) => render(<>{ui}</>);
+  const renderWithRecoil = (ui: React.ReactNode) => render(<RecoilRoot>{ui}</RecoilRoot>);
 
   // Store the current test's messages so getMessages can return them
   let currentTestMessages: any[] = [];
@@ -89,7 +94,7 @@ describe('MCPUIResource', () => {
         },
       ];
 
-      renderComponent(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
+      renderWithRecoil(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
 
       const renderer = screen.getByTestId('ui-resource-renderer');
       expect(renderer).toBeInTheDocument();
@@ -116,7 +121,7 @@ describe('MCPUIResource', () => {
         },
       ];
 
-      renderComponent(<MCPUIResource node={{ properties: { resourceId: 'nonexistent-id' } }} />);
+      renderWithRecoil(<MCPUIResource node={{ properties: { resourceId: 'nonexistent-id' } }} />);
 
       expect(screen.getByText('UI resource nonexistent-id not found')).toBeInTheDocument();
       expect(screen.queryByTestId('ui-resource-renderer')).not.toBeInTheDocument();
@@ -135,9 +140,37 @@ describe('MCPUIResource', () => {
         },
       ];
 
-      renderComponent(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
+      renderWithRecoil(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
 
       expect(screen.getByText('UI resource resource-1 not found')).toBeInTheDocument();
+    });
+
+    it('should omit a referenced resource with an unsupported MIME type', () => {
+      currentTestMessages = [
+        {
+          messageId: 'msg123',
+          attachments: [
+            {
+              type: 'ui_resources',
+              ui_resources: [
+                {
+                  resourceId: 'blocked-resource',
+                  uri: 'ui://test/blocked',
+                  mimeType: 'application/vnd.mcp-ui.remote-dom+javascript',
+                  text: 'malicious script',
+                },
+              ],
+            },
+          ],
+        },
+      ];
+
+      const { container } = renderWithRecoil(
+        <MCPUIResource node={{ properties: { resourceId: 'blocked-resource' } }} />,
+      );
+
+      expect(container.firstChild).toBeNull();
+      expect(screen.queryByTestId('ui-resource-renderer')).not.toBeInTheDocument();
     });
 
     it('should resolve resources by resourceId across conversation messages', () => {
@@ -165,7 +198,7 @@ describe('MCPUIResource', () => {
         },
       ];
 
-      renderComponent(<MCPUIResource node={{ properties: { resourceId: 'abc123' } }} />);
+      renderWithRecoil(<MCPUIResource node={{ properties: { resourceId: 'abc123' } }} />);
 
       const renderer = screen.getByTestId('ui-resource-renderer');
       expect(renderer).toBeInTheDocument();
@@ -194,7 +227,7 @@ describe('MCPUIResource', () => {
         },
       ];
 
-      renderComponent(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
+      renderWithRecoil(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
 
       const renderer = screen.getByTestId('ui-resource-renderer');
       renderer.click();
@@ -207,7 +240,7 @@ describe('MCPUIResource', () => {
     it('should handle empty messages array', () => {
       currentTestMessages = [];
 
-      renderComponent(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
+      renderWithRecoil(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
 
       expect(screen.getByText('UI resource resource-1 not found')).toBeInTheDocument();
     });
@@ -215,7 +248,7 @@ describe('MCPUIResource', () => {
     it('should handle null messages data', () => {
       currentTestMessages = [];
 
-      renderComponent(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
+      renderWithRecoil(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
 
       expect(screen.getByText('UI resource resource-1 not found')).toBeInTheDocument();
     });
@@ -227,7 +260,7 @@ describe('MCPUIResource', () => {
         conversationId: null,
       } as any);
 
-      renderComponent(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
+      renderWithRecoil(<MCPUIResource node={{ properties: { resourceId: 'resource-1' } }} />);
 
       expect(screen.getByText('UI resource resource-1 not found')).toBeInTheDocument();
     });
@@ -269,7 +302,7 @@ describe('MCPUIResource', () => {
         },
       ];
 
-      renderComponent(<MCPUIResource node={{ properties: { resourceId: 'resource-2' } }} />);
+      renderWithRecoil(<MCPUIResource node={{ properties: { resourceId: 'resource-2' } }} />);
 
       const renderer = screen.getByTestId('ui-resource-renderer');
       expect(renderer).toBeInTheDocument();

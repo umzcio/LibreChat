@@ -49,7 +49,7 @@ import { createCategoriesMethods, type CategoriesMethods } from './categories';
 import { createPresetMethods, type PresetMethods } from './preset';
 /* Tier 2 — Moderate (service deps injected) */
 import { createConversationTagMethods, type ConversationTagMethods } from './conversationTag';
-import { createMessageMethods, type MessageMethods } from './message';
+import { createMessageMethods, CLIENT_MESSAGE_SELECT, type MessageMethods } from './message';
 import { createConversationMethods, type ConversationMethods } from './conversation';
 /* Tier 3 — Complex (heavier injection) */
 import {
@@ -129,6 +129,7 @@ export {
 };
 export { tokenValues, cacheTokenValues, premiumTokenValues, defaultRate, createTxMethods };
 export { permissionBitSupersets };
+export { CLIENT_MESSAGE_SELECT };
 export {
   partitionIssues,
   validateSkillName,
