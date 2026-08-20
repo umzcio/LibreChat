@@ -3,6 +3,7 @@ const { logger, getTenantId, webSearchKeys } = require('@librechat/data-schemas'
 const {
   getNewS3URL,
   needsRefresh,
+  GenerationJobManager,
   MCPOAuthHandler,
   MCPTokenStorage,
   getAppConfigOptionsFromUser,
@@ -25,6 +26,13 @@ const { verifyEmail, resendVerificationEmail } = require('~/server/services/Auth
 const { getMCPManager, getFlowStateManager, getMCPServersRegistry } = require('~/config');
 const { invalidateCachedTools } = require('~/server/services/Config/getCachedTools');
 const { processDeleteRequest } = require('~/server/services/Files/process');
+const subagentThreadTaskStore = require('~/server/services/Endpoints/agents/subagentThreadStore');
+const {
+  drainAgentTriggerDeliveriesForUser,
+  prepareAgentTriggerUserPurge,
+  cancelAgentTriggerUserPurge,
+  purgeAgentTriggerDeliveriesForUser,
+} = require('~/server/services/Agents/triggers');
 const { getAppConfig } = require('~/server/services/Config');
 const { getLogStores } = require('~/cache');
 const db = require('~/models');
@@ -354,6 +362,8 @@ const updateUserPluginsController = async (req, res) => {
 
 const deleteUserController = async (req, res) => {
   const { user } = req;
+  let triggerDeletionFence;
+  let userDeleted = false;
 
   try {
     const existingUser = await db.getUserById(
@@ -372,56 +382,97 @@ const deleteUserController = async (req, res) => {
       }
     }
 
-    const ops = [
-      () => db.deleteMessages({ user: user.id }),
-      () => db.deleteAllUserSessions({ userId: user.id }),
-      () => db.deleteTransactions({ user: user.id }),
-      () => db.deleteUserKey({ userId: user.id, all: true }),
-      () => db.deleteBalances({ user: user._id }),
-      () => db.deletePresets(user.id),
-      async () => {
-        const convoDeletion = await db.deleteConvos(user.id);
-        const appConfig =
-          req.config ??
-          (await getAppConfig({
-            role: req.user?.role,
-            userId: req.user?.id,
-            tenantId: req.user?.tenantId,
-          }));
-        await deleteAgentCheckpoints(
-          convoDeletion?.conversationIds,
-          appConfig?.endpoints?.agents?.checkpointer,
-        );
-      },
-      () => deleteUserPluginAuth(user.id, null, true),
-      () => deleteAllSharedLinksWithCleanup(user.id),
-      () => deleteUserFiles(req),
-      () => db.deleteFiles(null, user.id),
-      () => db.deleteToolCalls(user.id),
-      () => db.deleteUserAgents(user.id),
-      () => db.deleteAllAgentApiKeys(user._id),
-      () => db.deleteAssistants({ user: user.id }),
-      () => db.deleteConversationTags({ user: user.id }),
-      () => db.deleteAllUserMemories(user.id),
-      () => db.deleteUserPrompts(user.id),
-      () => db.deleteUserSkills(user.id),
-      () => deleteUserMcpServers(user.id),
-      () => db.deleteActions({ user: user.id }),
-      () => db.deleteTokens({ userId: user.id }),
-      () => db.removeUserFromAllGroups(user.id),
-      () => db.deleteConfig(PrincipalType.USER, user.id),
-      () => db.deleteAclEntries({ principalType: PrincipalType.USER, principalId: user._id }),
-    ];
-    const results = await Promise.allSettled(ops.map((op) => op()));
-    for (const r of results) {
-      if (r.status === 'rejected') {
-        logger.warn('[deleteUserController] cleanup step failed:', r.reason);
-      }
+    // Block new trigger admissions across replicas while preserving the user
+    // principal so a transient cleanup failure remains retryable.
+    triggerDeletionFence = new Date();
+    const fenceState = await db.beginAgentTriggerUserDeletion(user.id, triggerDeletionFence);
+    if (fenceState === 'in_progress') {
+      triggerDeletionFence = undefined;
+      throw new Error('Agent trigger account deletion is already in progress');
     }
-    await db.deleteUserById(user.id);
+    if (fenceState === 'missing') {
+      triggerDeletionFence = undefined;
+    }
+    if (triggerDeletionFence != null) {
+      await prepareAgentTriggerUserPurge(user.id, triggerDeletionFence, user.tenantId);
+    }
+    await drainAgentTriggerDeliveriesForUser(user.id);
+    await subagentThreadTaskStore.cancelAndDrainForOwner(user.id, user.tenantId);
+    const activeAgentRuns = await GenerationJobManager.getCleanupBlockingJobIdsForUser(
+      user.id,
+      user.tenantId,
+    );
+    await Promise.all(
+      activeAgentRuns.map((streamId) =>
+        GenerationJobManager.abortJob(streamId, { awaitProviderDrain: true }),
+      ),
+    );
+
+    await db.deleteMessages({ user: user.id });
+    await db.deleteAllUserSessions({ userId: user.id });
+    await db.deleteTransactions({ user: user.id });
+    await db.deleteUserKey({ userId: user.id, all: true });
+    await db.deleteBalances({ user: user._id });
+    await db.deletePresets(user.id);
+    try {
+      const convoDeletion = await db.deleteConvos(user.id);
+      // HITL: prune the deleted conversations' durable checkpoints — a paused run's
+      // checkpoint would otherwise persist until the Mongo TTL. Never throws.
+      const appConfig =
+        req.config ??
+        (await getAppConfig({
+          role: req.user?.role,
+          userId: req.user?.id,
+          tenantId: req.user?.tenantId,
+        }));
+      await deleteAgentCheckpoints(
+        convoDeletion?.conversationIds,
+        appConfig?.endpoints?.agents?.checkpointer,
+      );
+    } catch (error) {
+      logger.error('[deleteUserController] Error deleting user convos, likely no convos', error);
+    }
+    await deleteUserPluginAuth(user.id, null, true);
+    await deleteAllSharedLinksWithCleanup(user.id);
+    await deleteUserFiles(req);
+    await db.deleteFiles(null, user.id);
+    await db.deleteToolCalls(user.id);
+    await db.deleteUserAgents(user.id);
+    await db.deleteAllAgentApiKeys(user._id);
+    await db.deleteAssistants({ user: user.id });
+    await db.deleteConversationTags({ user: user.id });
+    await db.deleteAllUserMemories(user.id);
+    await db.deleteUserPrompts(user.id);
+    await db.deleteUserSkills(user.id);
+    await deleteUserMcpServers(user.id);
+    await db.deleteActions({ user: user.id });
+    await db.deleteTokens({ userId: user.id });
+    await db.removeUserFromAllGroups(user.id);
+    await db.deleteAclEntries({ principalId: user._id });
+    const deleteResult = await db.deleteUserById(user.id);
+    if (deleteResult.deletedCount !== 1) {
+      throw new Error('User disappeared before account deletion could commit');
+    }
+    userDeleted = true;
+    await purgeAgentTriggerDeliveriesForUser(user.id);
     logger.info(`User deleted account. Email: ${user.email} ID: ${user.id}`);
     res.status(200).send({ message: 'User deleted' });
   } catch (err) {
+    if (triggerDeletionFence != null && !userDeleted) {
+      try {
+        await cancelAgentTriggerUserPurge(user.id, triggerDeletionFence);
+      } catch (purgeFenceError) {
+        logger.error(
+          '[deleteUserController] Failed to disarm trigger purge recovery',
+          purgeFenceError,
+        );
+      }
+      try {
+        await db.cancelAgentTriggerUserDeletion(user.id, triggerDeletionFence);
+      } catch (fenceError) {
+        logger.error('[deleteUserController] Failed to release trigger deletion fence', fenceError);
+      }
+    }
     logger.error('[deleteUserController]', err);
     return res.status(500).json({ message: 'Something went wrong.' });
   }

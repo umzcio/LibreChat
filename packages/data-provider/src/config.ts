@@ -9,6 +9,7 @@ import {
   eReasoningResponseKeySchema,
 } from './schemas';
 import { ComponentTypes, SettingTypes, OptionTypes } from './generate';
+import { STATEFUL_CODE_ENVIRONMENTS } from './stateful-code';
 import { specsConfigSchema, TSpecsConfig } from './models';
 import { REFILL_INTERVAL_UNITS } from './balance';
 import { fileConfigSchema } from './file-config';
@@ -17,6 +18,7 @@ import { FileSources } from './types/files';
 import { MCPServersSchema } from './mcp';
 export {
   MAX_SUBAGENTS,
+  MAX_GRAPH_SUBAGENT_MEMBERS,
   MAX_CHAT_PROJECT_NAME_LENGTH,
   MAX_CHAT_PROJECT_DESCRIPTION_LENGTH,
 } from './limits';
@@ -54,6 +56,7 @@ export const defaultRetrievalModels = [
 export const excludedKeys = new Set([
   'chatProjectId',
   'conversationId',
+  'subagentThread',
   'title',
   'iconURL',
   'greeting',
@@ -1004,6 +1007,13 @@ export const agentsEndpointSchema = baseEndpointSchema
         .array(z.nativeEnum(AgentCapabilities))
         .optional()
         .default(defaultAgentCapabilities),
+      /** Controls which workspace-sharing scopes users may select for stateful code sessions.
+       *  Omit this block to preserve the legacy behavior of allowing every scope. */
+      statefulCodeSessions: z
+        .object({
+          allowedEnvironments: z.array(z.enum(STATEFUL_CODE_ENVIRONMENTS)).min(1),
+        })
+        .optional(),
       skills: z
         .object({
           maxCatalogSkills: z.number().int().min(1).max(100).optional(),
@@ -1645,6 +1655,7 @@ export type TStartupConfig = {
   socialLogins?: string[];
   langfuseFanoutEnabled?: boolean;
   langfuseConnectionAccess?: boolean;
+  insightsEnabled?: boolean;
   interface?: TInterfaceConfig;
   turnstile?: TTurnstileConfig;
   balance?: TBalanceConfig;
@@ -2036,6 +2047,27 @@ export const langfuseConfigSchema = z.object({
   secretKeyPreview: z.string().optional(),
   /** Routing key for one of the deployment-configured tenant Langfuse destinations. */
   destination: z.string().optional(),
+  /**
+   * Custom request headers sent on every outbound Langfuse request — trace and
+   * media export, feedback scores, and credential verification — for
+   * self-hosted instances behind an authenticating proxy or gateway. Values
+   * support `${ENV_VAR}` interpolation.
+   *
+   * Deployment-level only. Trace export batches spans from every user through
+   * one exporter, so unlike endpoint headers these cannot carry per-user
+   * placeholders. Headers referencing an unset variable, naming an
+   * infrastructure secret, or carrying an invalid HTTP field name are dropped
+   * with a warning rather than sent.
+   *
+   * Sent only when the deployment configures exactly one Langfuse origin, and
+   * only to that origin. The map cannot say which endpoint it authenticates
+   * to, so with several configured origins any choice of recipient would risk
+   * disclosing a gateway credential to the others; a warning is logged instead.
+   * Multi-destination deployments need per-destination headers, which this
+   * schema does not yet express — and note the fanout collector forwards only
+   * `Authorization` upstream regardless.
+   */
+  headers: z.record(z.string()).optional(),
 });
 
 export type LangfuseConfig = z.infer<typeof langfuseConfigSchema>;
@@ -2734,6 +2766,10 @@ export enum ErrorTypes {
    * Required CodeAPI resources could not be restored before model invocation.
    */
   RESOURCE_RECOVERY_REQUIRED = 'resource_recovery_required',
+  /**
+   * Agent selected a stateful Code API workspace scope disabled by the deployment.
+   */
+  STATEFUL_CODE_ENVIRONMENT_NOT_ALLOWED = 'stateful_code_environment_not_allowed',
   /**
    * Invalid Agent Provider (excluded by Admin)
    */

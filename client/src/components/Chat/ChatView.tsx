@@ -83,6 +83,12 @@ function ChatView({
   const chatHelpers = useChatHelpers(index, conversationId);
   const addedChatHelpers = useAddedResponse();
 
+  const activeConversation =
+    chatHelpers.conversation?.conversationId === conversationId
+      ? chatHelpers.conversation
+      : undefined;
+  const activeSubagentThread = activeConversation?.subagentThread;
+
   useAdaptiveSSE(rootSubmission, chatHelpers, false, index);
 
   // Auto-resume if navigating back to conversation with active job.
@@ -123,6 +129,11 @@ function ChatView({
       : undefined;
   const pageHeading =
     isLandingPage || !conversationTitle ? localize('com_ui_new_chat') : conversationTitle;
+  const parentConversationId = activeSubagentThread?.parentConversationId;
+  /** Durable child threads are an execution record owned by their parent agent.
+   * Human continuation is a separate future fork/promotion flow, never an
+   * in-place mutation of this canonical child transcript. */
+  const isSubagentThreadReadOnly = activeSubagentThread != null;
 
   return (
     <ChatFormProvider {...methods}>
@@ -131,7 +142,10 @@ function ChatView({
           <Presentation showArtifactsPanel={showArtifactsPanel}>
             <div className="relative flex h-full w-full flex-col">
               <h1 className="sr-only">{pageHeading}</h1>
-              <Header />
+              <Header
+                parentConversationId={parentConversationId}
+                readOnly={isSubagentThreadReadOnly}
+              />
               <>
                 <div
                   className={cn(
@@ -150,11 +164,20 @@ function ChatView({
                     )}
                   >
                     {isLandingPage && <ConversationStarters />}
-                    <ChatForm
-                      index={index}
-                      placeholder={chatFormPlaceholder}
-                      project={isProjectLandingPage ? project : undefined}
-                    />
+                    {isSubagentThreadReadOnly ? (
+                      <div
+                        className="mx-auto w-full max-w-3xl px-4 py-3 text-center text-sm text-text-secondary xl:max-w-4xl"
+                        role="note"
+                      >
+                        {localize('com_ui_subagent_thread_read_only')}
+                      </div>
+                    ) : (
+                      <ChatForm
+                        index={index}
+                        placeholder={chatFormPlaceholder}
+                        project={isProjectLandingPage ? project : undefined}
+                      />
+                    )}
                     {!isLandingPage && <Footer />}
                   </div>
                 </div>

@@ -6,6 +6,12 @@ const { requireCapability } = require('~/server/middleware/roles/capabilities');
 const { deleteUserMcpServers } = require('~/server/controllers/UserController');
 const { deleteUserPluginAuth } = require('~/server/services/PluginService');
 const { requireJwtAuth } = require('~/server/middleware');
+const {
+  drainAgentTriggerDeliveriesForUser,
+  prepareAgentTriggerUserPurge,
+  cancelAgentTriggerUserPurge,
+  purgeAgentTriggerDeliveriesForUser,
+} = require('~/server/services/Agents/triggers');
 const db = require('~/models');
 
 const router = express.Router();
@@ -51,6 +57,12 @@ async function deleteUserCascade(userId, userObjectId) {
 const handlers = createAdminUsersHandlers({
   findUsers: db.findUsers,
   countUsers: db.countUsers,
+  beginAgentTriggerUserDeletion: db.beginAgentTriggerUserDeletion,
+  cancelAgentTriggerUserDeletion: db.cancelAgentTriggerUserDeletion,
+  drainAgentTriggerDeliveriesForUser,
+  prepareAgentTriggerUserPurge,
+  cancelAgentTriggerUserPurge,
+  purgeAgentTriggerDeliveriesForUser,
   deleteUserById: db.deleteUserById,
   deleteConfig: db.deleteConfig,
   deleteAclEntries: db.deleteAclEntries,

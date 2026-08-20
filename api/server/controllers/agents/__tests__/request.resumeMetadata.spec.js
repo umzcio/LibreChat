@@ -17,6 +17,8 @@ const mockGenerationJobManager = {
   publishTerminalClaim: jest.fn(),
   finishTerminalJob: jest.fn(),
   completeJob: jest.fn(),
+  beginProviderExecution: jest.fn(),
+  markProviderExecutionDrained: jest.fn(),
   failPausePersistence: jest.fn(),
   getResumeState: jest.fn(),
   updateMetadata: jest.fn(),
@@ -61,6 +63,7 @@ const mockFilterPersistableAbortContent = jest.fn((content) =>
 const mockGetConvo = jest.fn();
 const mockGetMessages = jest.fn();
 const mockSaveMessage = jest.fn();
+const mockIsAgentTriggerPrincipalActive = jest.fn();
 const mockDeleteAgentCheckpoint = jest.fn();
 const mockStartupTelemetry = {
   mark: jest.fn(),
@@ -208,6 +211,7 @@ jest.mock('~/models', () => ({
   saveMessage: (...args) => mockSaveMessage(...args),
   getMessages: (...args) => mockGetMessages(...args),
   getConvo: (...args) => mockGetConvo(...args),
+  isAgentTriggerPrincipalActive: (...args) => mockIsAgentTriggerPrincipalActive(...args),
 }));
 
 const AgentController = require('../request');
@@ -245,9 +249,14 @@ describe('ResumableAgentController resume metadata', () => {
     mockDecrementPendingRequest.mockResolvedValue(undefined);
     mockGetConvo.mockResolvedValue({ createdAt: '2026-06-07T00:00:00.000Z' });
     mockGetMessages.mockResolvedValue([]);
+    mockIsAgentTriggerPrincipalActive.mockResolvedValue(true);
     mockGenerationJobManager.createJob.mockResolvedValue({
       createdAt: 1000,
-      metadata: { checkpointNamespace: '1000' },
+      metadata: {
+        checkpointNamespace: '1000',
+        providerExecutionId: 'provider-segment-1',
+        providerDrained: true,
+      },
       readyPromise: Promise.resolve(),
       abortController: new AbortController(),
       emitter: { on: jest.fn() },
@@ -278,6 +287,8 @@ describe('ResumableAgentController resume metadata', () => {
     );
     mockGenerationJobManager.finishTerminalJob.mockResolvedValue(undefined);
     mockGenerationJobManager.completeJob.mockResolvedValue(undefined);
+    mockGenerationJobManager.beginProviderExecution.mockResolvedValue(true);
+    mockGenerationJobManager.markProviderExecutionDrained.mockResolvedValue(true);
     mockGenerationJobManager.failPausePersistence.mockResolvedValue(true);
     mockGenerationJobManager.claimGeneration.mockResolvedValue(wonGenerationClaim());
     mockGenerationJobManager.resumeClaimedGeneration.mockResolvedValue(null);
@@ -508,6 +519,120 @@ describe('ResumableAgentController resume metadata', () => {
     );
   });
 
+  it('defers a trusted trigger resume while its parent generation is still active', async () => {
+    const conversationId = 'conversation-123';
+    mockGetMessages.mockResolvedValue([{ _id: 'persisted-parent' }]);
+    mockGenerationJobManager.getJob.mockResolvedValue({
+      status: 'running',
+      metadata: { userId: 'user-123' },
+    });
+    const initializeClient = jest.fn();
+    const req = {
+      _isAgentTrigger: true,
+      user: { id: 'user-123' },
+      body: {
+        text: 'Collect the completed child.',
+        messageId: 'wakeup-user-message',
+        parentMessageId: 'persisted-response_',
+        conversationId,
+        clientRequestId: 'trigger_resume_1',
+        endpointOption: { endpoint: 'agents', modelOptions: { model: 'gpt-4.1' } },
+      },
+      config: {},
+    };
+    const res = createResumableResponse();
+
+    await AgentController(req, res, jest.fn(), initializeClient, null);
+
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ code: 'PARENT_NOT_READY' }));
+    expect(mockGenerationJobManager.claimGeneration).not.toHaveBeenCalled();
+    expect(mockCheckAndIncrementPendingRequest).not.toHaveBeenCalled();
+    expect(initializeClient).not.toHaveBeenCalled();
+  });
+
+  it('labels a trigger parent-state lookup failure as provably pre-admission', async () => {
+    const conversationId = 'conversation-123';
+    mockGetMessages.mockResolvedValue([{ _id: 'persisted-parent' }]);
+    mockGenerationJobManager.getJob.mockRejectedValue(new Error('redis unavailable'));
+    const initializeClient = jest.fn();
+    const req = {
+      _isAgentTrigger: true,
+      user: { id: 'user-123' },
+      body: {
+        text: 'Collect the completed child.',
+        messageId: 'wakeup-user-message',
+        parentMessageId: 'persisted-response_',
+        conversationId,
+        clientRequestId: 'trigger_resume_1',
+        endpointOption: { endpoint: 'agents', modelOptions: { model: 'gpt-4.1' } },
+      },
+      config: {},
+    };
+    const res = createResumableResponse();
+
+    await AgentController(req, res, jest.fn(), initializeClient, null);
+
+    expect(res.set).toHaveBeenCalledWith('Retry-After', '1');
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'PARENT_STATE_UNAVAILABLE' }),
+    );
+    expect(mockGenerationJobManager.claimGeneration).not.toHaveBeenCalled();
+    expect(mockCheckAndIncrementPendingRequest).not.toHaveBeenCalled();
+    expect(initializeClient).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates the active continuation whose admission response was lost', async () => {
+    const conversationId = 'conversation-123';
+    mockGetMessages.mockResolvedValue([{ _id: 'persisted-parent' }]);
+    mockGenerationJobManager.getJob.mockResolvedValue({
+      createdAt: 1000,
+      status: 'requires_action',
+      metadata: {
+        userId: 'user-123',
+        idempotencyClientRequestId: 'trigger_resume_1',
+      },
+    });
+    mockGenerationJobManager.claimGeneration.mockResolvedValue({
+      claimed: false,
+      existing: {
+        streamId: conversationId,
+        conversationId,
+        claimedAt: 100,
+        claimToken: 'existing-token',
+        startedAt: 1000,
+      },
+    });
+    const req = {
+      _isAgentTrigger: true,
+      user: { id: 'user-123' },
+      body: {
+        text: 'Collect the completed child.',
+        messageId: 'wakeup-user-message',
+        parentMessageId: 'persisted-response_',
+        conversationId,
+        clientRequestId: 'trigger_resume_1',
+        endpointOption: { endpoint: 'agents', modelOptions: { model: 'gpt-4.1' } },
+      },
+      config: {},
+    };
+    const res = createResumableResponse();
+
+    await AgentController(req, res, jest.fn(), jest.fn(), null);
+
+    expect(res.status).not.toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      streamId: conversationId,
+      conversationId,
+      generationCreatedAt: 1000,
+      status: 'resumed',
+      generationProtocolVersion: 1,
+    });
+    expect(mockGenerationJobManager.createJob).not.toHaveBeenCalled();
+    expect(mockCheckAndIncrementPendingRequest).not.toHaveBeenCalled();
+  });
+
   it('creates the job with the in-flight turn before MCP initialization can emit OAuth', async () => {
     const conversationId = 'conversation-123';
     const initializeClient = jest.fn().mockRejectedValue(new Error('stop before tool loading'));
@@ -619,6 +744,91 @@ describe('ResumableAgentController resume metadata', () => {
       status: 'started',
       generationProtocolVersion: 2,
     });
+  });
+
+  it('rejects any session fenced after authentication before generation execution starts', async () => {
+    mockIsAgentTriggerPrincipalActive.mockResolvedValue(false);
+    const req = {
+      user: { id: 'user-123' },
+      body: {
+        text: 'Run after a slow trigger admission.',
+        messageId: 'user-message',
+        clientRequestId: 'trigger-request',
+        conversationId: 'conversation-123',
+        endpointOption: { endpoint: 'agents', modelOptions: { model: 'gpt-4.1' } },
+      },
+      config: {},
+    };
+    const res = createResumableResponse();
+    const initializeClient = jest.fn();
+
+    await AgentController(req, res, jest.fn(), initializeClient, null);
+
+    expect(mockGenerationJobManager.createJob).toHaveBeenCalledTimes(1);
+    expect(mockIsAgentTriggerPrincipalActive).toHaveBeenCalledWith('user-123');
+    expect(mockGenerationJobManager.createJob.mock.invocationCallOrder[0]).toBeLessThan(
+      mockIsAgentTriggerPrincipalActive.mock.invocationCallOrder[0],
+    );
+    expect(mockGenerationJobManager.beginProviderExecution).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(409);
+    expect(res.json).toHaveBeenCalledWith({
+      status: 409,
+      code: 'ACCOUNT_DELETION_IN_PROGRESS',
+      error: 'Account deletion is in progress',
+      generationProtocolVersion: 1,
+    });
+    expect(initializeClient).not.toHaveBeenCalled();
+    expect(mockAcceptAgentStartupTelemetry).not.toHaveBeenCalled();
+    expect(mockGenerationJobManager.completeJob).toHaveBeenCalledWith(
+      'conversation-123',
+      JSON.stringify({
+        status: 409,
+        code: 'ACCOUNT_DELETION_IN_PROGRESS',
+        error: 'Account deletion is in progress',
+      }),
+      1000,
+    );
+    expect(mockGenerationJobManager.releaseGeneration).toHaveBeenCalledWith(
+      'user-123',
+      'trigger-request',
+      'conversation-123',
+      DEFAULT_OWNED_CLAIM,
+    );
+    expect(mockDecrementPendingRequest).toHaveBeenCalledWith('user-123');
+  });
+
+  it('does not start a provider when account deletion or replacement wins the startup CAS', async () => {
+    mockGenerationJobManager.beginProviderExecution.mockResolvedValue(false);
+    const req = {
+      user: { id: 'user-123' },
+      body: {
+        text: 'Race destructive cleanup.',
+        messageId: 'user-message',
+        conversationId: 'conversation-123',
+        endpointOption: { endpoint: 'agents', modelOptions: { model: 'gpt-4.1' } },
+      },
+      config: {},
+    };
+    const res = createResumableResponse();
+    const initializeClient = jest.fn();
+
+    await AgentController(req, res, jest.fn(), initializeClient, null);
+
+    expect(mockIsAgentTriggerPrincipalActive).toHaveBeenCalledWith('user-123');
+    expect(mockIsAgentTriggerPrincipalActive.mock.invocationCallOrder[0]).toBeLessThan(
+      mockGenerationJobManager.beginProviderExecution.mock.invocationCallOrder[0],
+    );
+    expect(initializeClient).not.toHaveBeenCalled();
+    expect(mockGenerationJobManager.completeJob).toHaveBeenCalledWith(
+      'conversation-123',
+      expect.stringContaining('Generation stopped before provider startup'),
+      1000,
+    );
+    expect(mockGenerationJobManager.markProviderExecutionDrained).toHaveBeenCalledWith(
+      'conversation-123',
+      1000,
+      'provider-segment-1',
+    );
   });
 
   it('prefetches conversation state before admission and joins it with job metadata', async () => {
@@ -1812,6 +2022,43 @@ describe('ResumableAgentController resume metadata', () => {
         status: 409,
         code: ErrorTypes.RESOURCE_RECOVERY_REQUIRED,
         error: 'Attached resources could not be restored',
+      }),
+      1000,
+    );
+  });
+
+  it('preserves a stateful scope policy denial in the durable initialization error', async () => {
+    const policyError = Object.assign(
+      new Error('Stateful code environment is not allowed by this deployment: conversation'),
+      {
+        code: ErrorTypes.STATEFUL_CODE_ENVIRONMENT_NOT_ALLOWED,
+        status: 403,
+        statusCode: 403,
+      },
+    );
+    const initializeClient = jest.fn().mockRejectedValue(policyError);
+    const req = {
+      user: { id: 'user-123' },
+      body: {
+        text: 'Run code.',
+        messageId: 'user-msg',
+        clientRequestId: 'req-abc',
+        conversationId: 'conversation-123',
+        endpointOption: { endpoint: 'agents', modelOptions: { model: 'gpt-4.1' } },
+      },
+      config: {},
+    };
+    const res = createResumableResponse();
+
+    await AgentController(req, res, jest.fn(), initializeClient, null);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(mockGenerationJobManager.completeJob).toHaveBeenCalledWith(
+      'conversation-123',
+      JSON.stringify({
+        status: 403,
+        code: ErrorTypes.STATEFUL_CODE_ENVIRONMENT_NOT_ALLOWED,
+        error: 'Stateful code environment is not allowed by this deployment: conversation',
       }),
       1000,
     );
@@ -3171,7 +3418,7 @@ describe('ResumableAgentController resume metadata', () => {
       getHaltReason: () => 'preempt_incomplete',
     };
 
-    const runFirstTurn = async ({ run } = {}) => {
+    const runFirstTurn = async ({ run, addTitle: suppliedAddTitle } = {}) => {
       let signalFinished;
       const finished = new Promise((resolve) => {
         signalFinished = resolve;
@@ -3179,9 +3426,11 @@ describe('ResumableAgentController resume metadata', () => {
       mockGenerationJobManager.finishTerminalJob.mockImplementation(async () => signalFinished());
 
       let titleSignal;
-      const addTitle = jest.fn(async (_req, options) => {
-        titleSignal = options?.signal;
-      });
+      const addTitle =
+        suppliedAddTitle ??
+        jest.fn(async (_req, options) => {
+          titleSignal = options?.signal;
+        });
 
       const client = {
         options: {},
@@ -3250,6 +3499,30 @@ describe('ResumableAgentController resume metadata', () => {
       expect(addTitle).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({ response: expect.anything() }),
+      );
+    });
+
+    it('does not acknowledge provider drain until deferred title persistence settles', async () => {
+      resolveTitleTiming.mockReturnValueOnce('final');
+      let resolveTitle;
+      const titlePending = new Promise((resolve) => {
+        resolveTitle = resolve;
+      });
+      const addTitle = jest.fn(() => titlePending);
+
+      await runFirstTurn({ addTitle });
+
+      expect(addTitle).toHaveBeenCalledTimes(1);
+      expect(mockGenerationJobManager.markProviderExecutionDrained).not.toHaveBeenCalled();
+
+      resolveTitle();
+      await nextTick();
+      await nextTick();
+
+      expect(mockGenerationJobManager.markProviderExecutionDrained).toHaveBeenCalledWith(
+        expect.any(String),
+        1000,
+        'provider-segment-1',
       );
     });
 

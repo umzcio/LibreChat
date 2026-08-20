@@ -57,11 +57,13 @@ const initializeOAuthReconnectManager = require('./services/initializeOAuthRecon
 const { capabilityContextMiddleware } = require('./middleware/roles/capabilities');
 const createValidateImageRequest = require('./middleware/validateImageRequest');
 const { initializeGitHubSkillSync } = require('./services/Skills/sync');
+const { initializeAgentTriggerService } = require('./services/Agents/triggers');
 const { jwtLogin, ldapLogin, passportLogin } = require('~/strategies');
 const { startExpiredFileSweep } = require('./services/Files/process');
 const { checkMigrations } = require('./services/start/migration');
 const optionalJwtAuth = require('./middleware/optionalJwtAuth');
 const initializeMCPs = require('./services/initializeMCPs');
+const { configureSubagentTaskRouting } = require('./services/Endpoints/agents/subagentThreadStore');
 const configureSocialLogins = require('./socialLogins');
 const createSpaFallback = require('./utils/fallback');
 const { getAppConfig } = require('./services/Config');
@@ -124,6 +126,7 @@ const configureGenerationStreams = () => {
 
 const startServer = async () => {
   await waitForKeyvRedisClient();
+  await configureSubagentTaskRouting();
   const { metricsMiddleware, metricsRouter } = createMetrics();
   if (!process.env.METRICS_SECRET) {
     logger.warn('[metrics] METRICS_SECRET is not set - /metrics will return 401 for all requests');
@@ -142,10 +145,15 @@ const startServer = async () => {
   app.disable('x-powered-by');
   app.set('trust proxy', trusted_proxy);
 
-  if (isEnabled(process.env.TENANT_ISOLATION_STRICT)) {
+  if (isEnabled(process.env.TRUST_TENANT_HEADER)) {
     logger.warn(
-      '[Security] TENANT_ISOLATION_STRICT is active. Ensure your reverse proxy strips or sets ' +
-        'the X-Tenant-Id header — untrusted clients must not be able to set it directly.',
+      '[Security] TRUST_TENANT_HEADER is active. Ensure your reverse proxy strips and sets ' +
+        'X-Tenant-Id — untrusted clients must not be able to supply it directly.',
+    );
+  } else if (isEnabled(process.env.TENANT_ISOLATION_STRICT)) {
+    logger.warn(
+      '[Security] TENANT_ISOLATION_STRICT is active while TRUST_TENANT_HEADER is disabled. ' +
+        'Pre-authentication tenant headers will be ignored.',
     );
   }
 
@@ -318,6 +326,7 @@ const startServer = async () => {
   app.use('/oauth', preAuthTenantMiddleware, routes.oauth);
   /* API Endpoints */
   app.use('/api/auth', preAuthTenantMiddleware, routes.auth);
+  app.use('/api/admin/insights', routes.insights);
   app.use('/api/admin', routes.adminAuth);
   app.use('/api/admin/config', routes.adminConfig);
   app.use('/api/admin/langfuse', routes.adminLangfuse);
@@ -408,6 +417,7 @@ const startServer = async () => {
       if (inspectFlags || isEnabled(process.env.MEM_DIAG)) {
         memoryDiagnostics.start();
       }
+      await initializeAgentTriggerService({ address: server.address() });
       serverReady = true;
       logger.info('Server readiness checks passing.');
     } catch (initErr) {

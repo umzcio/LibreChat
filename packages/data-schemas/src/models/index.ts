@@ -1,4 +1,7 @@
+import { createAgentTriggerLaneSequenceModel } from './triggerLaneSequence';
 import { createSkillSyncCredentialModel } from './skillSyncCredential';
+import { createAgentTriggerUserPurgeModel } from './triggerUserPurge';
+import { createAgentTriggerDeliveryModel } from './triggerDelivery';
 import { createSkillSyncStatusModel } from './skillSyncStatus';
 import { createConversationTagModel } from './conversationTag';
 import { createAgentCategoryModel } from './agentCategory';
@@ -78,6 +81,9 @@ export function createModels(mongoose: typeof import('mongoose')): {
   AuditLog: ReturnType<typeof createAuditLogModel>;
   Group: ReturnType<typeof createGroupModel>;
   Config: ReturnType<typeof createConfigModel>;
+  AgentTriggerDelivery: ReturnType<typeof createAgentTriggerDeliveryModel>;
+  AgentTriggerLaneSequence: ReturnType<typeof createAgentTriggerLaneSequenceModel>;
+  AgentTriggerUserPurge: ReturnType<typeof createAgentTriggerUserPurgeModel>;
 } {
   const models = {
     User: createUserModel(mongoose),
@@ -118,6 +124,9 @@ export function createModels(mongoose: typeof import('mongoose')): {
     Group: createGroupModel(mongoose),
     ChatProject: createChatProjectModel(mongoose),
     Config: createConfigModel(mongoose),
+    AgentTriggerDelivery: createAgentTriggerDeliveryModel(mongoose),
+    AgentTriggerLaneSequence: createAgentTriggerLaneSequenceModel(mongoose),
+    AgentTriggerUserPurge: createAgentTriggerUserPurgeModel(mongoose),
   };
   /**
    * Background index builds fail silently unless an 'index' listener is

@@ -13,10 +13,39 @@ describe('Experimental server configuration', () => {
     expect(listenIndex).toBeLessThan(timeoutConfigIndex);
   });
 
+  it('lets each worker drain registered services before cluster shutdown', () => {
+    const listenIndex = source.indexOf('const server = app.listen');
+    const gracefulShutdownIndex = source.indexOf('setupGracefulShutdown(server);');
+
+    expect(gracefulShutdownIndex).toBeGreaterThan(-1);
+    expect(listenIndex).toBeLessThan(gracefulShutdownIndex);
+    expect(source).toContain('if (shuttingDown) {');
+    expect(source).toMatch(/if \(shuttingDown\) \{[\s\S]*?return;[\s\S]*?Starting a new worker/);
+  });
+
   it('runs cross-tenant startup work in the system context', () => {
     expect(source).toContain('await runAsSystem(seedDatabase);');
     expect(source).toMatch(
       /await runAsSystem\(async \(\) => \{\s+await performStartupChecks\(appConfig\);\s+await updateInterfacePerms/,
     );
+  });
+
+  it('configures routed subagent controls before a worker accepts requests', () => {
+    const redisReadyIndex = source.indexOf('await waitForKeyvRedisClient();');
+    const routingIndex = source.indexOf('await configureSubagentTaskRouting();');
+    const listenIndex = source.indexOf('const server = app.listen');
+
+    expect(redisReadyIndex).toBeGreaterThan(-1);
+    expect(routingIndex).toBeGreaterThan(redisReadyIndex);
+    expect(listenIndex).toBeGreaterThan(routingIndex);
+  });
+
+  it('matches the standard server pre-authentication tenant routes', () => {
+    expect(source).toContain("app.use('/oauth', preAuthTenantMiddleware, routes.oauth);");
+    expect(source).toContain("app.use('/api/auth', preAuthTenantMiddleware, routes.auth);");
+    expect(source).toContain(
+      "app.use('/api/config', preAuthTenantMiddleware, optionalJwtAuth, routes.config);",
+    );
+    expect(source).toContain("app.use('/api/share', preAuthTenantMiddleware, routes.share);");
   });
 });

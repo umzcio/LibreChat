@@ -1,5 +1,6 @@
-import { useCallback, useState, useEffect, useRef, memo, startTransition } from 'react';
+import { useCallback, useState, useEffect, useRef, memo } from 'react';
 import { useForm } from 'react-hook-form';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import type { ChatFormValues } from '~/common';
 import {
@@ -14,6 +15,7 @@ import {
 import { ChatContext, ChatFormProvider, ActivePanelProvider } from '~/Providers';
 import { MobileHeader, MobileBottomBar, MobileShortcutTargets } from './mobile';
 import useUnifiedSidebarLinks from '~/hooks/Nav/useUnifiedSidebarLinks';
+import useSidebarToggle from '~/hooks/Nav/useSidebarToggle';
 import useSidebarState from '~/hooks/Nav/useSidebarState';
 import { useChatHelpers, useLocalize } from '~/hooks';
 import SidePanelNav from '~/components/SidePanel/Nav';
@@ -43,24 +45,39 @@ function SidebarChatProvider({ children }: { children: ReactNode }) {
 
 function UnifiedSidebar() {
   const localize = useLocalize();
-  const { isSmallScreen, expanded, setExpanded } = useSidebarState();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { isSmallScreen, expanded } = useSidebarState();
+  const { setSidebarOpen } = useSidebarToggle();
   const [sidebarWidth, setSidebarWidth] = useState(getInitialWidth);
   const [isResizing, setIsResizing] = useState(false);
   const resizeHandlers = useRef<{ move: (e: MouseEvent) => void; up: () => void } | null>(null);
 
   const links = useUnifiedSidebarLinks();
+  const isInsightsRoute = location.pathname.startsWith('/insights');
+  const panelExpanded = expanded && !isInsightsRoute;
 
-  const handleCollapse = useCallback(() => {
-    startTransition(() => {
-      setExpanded(false);
-    });
-  }, [setExpanded]);
+  const handleCollapse = useCallback(
+    (afterSlide?: () => void) => {
+      setSidebarOpen(false, afterSlide);
+    },
+    [setSidebarOpen],
+  );
 
   const handleExpand = useCallback(() => {
-    startTransition(() => {
-      setExpanded(true);
-    });
-  }, [setExpanded]);
+    setSidebarOpen(true);
+  }, [setSidebarOpen]);
+
+  const handleLeaveInsights = useCallback(() => {
+    navigate('/c/new');
+  }, [navigate]);
+
+  const handlePanelExpand = useCallback(() => {
+    if (isInsightsRoute) {
+      handleLeaveInsights();
+    }
+    handleExpand();
+  }, [handleExpand, handleLeaveInsights, isInsightsRoute]);
 
   const handleResizeStart = useCallback(() => {
     setIsResizing(true);
@@ -162,14 +179,24 @@ function UnifiedSidebar() {
       >
         <SidebarChatProvider>
           <ActivePanelProvider>
-            <MobileHeader links={links} expanded={expanded} onClose={handleCollapse} />
+            <MobileHeader
+              links={links}
+              expanded={expanded}
+              onClose={handleCollapse}
+              onLeaveInsights={handleLeaveInsights}
+              routeActiveId={isInsightsRoute ? 'insights' : undefined}
+            />
             <nav
               id="chat-history-nav"
               className="min-h-0 flex-1 overflow-hidden bg-surface-primary-alt"
             >
               <SidePanelNav links={links} />
             </nav>
-            <MobileShortcutTargets links={links} />
+            <MobileShortcutTargets
+              links={links}
+              onLeaveInsights={handleLeaveInsights}
+              routeActiveId={isInsightsRoute ? 'insights' : undefined}
+            />
             <MobileBottomBar links={links} onNewChat={handleCollapse} />
           </ActivePanelProvider>
         </SidebarChatProvider>
@@ -183,9 +210,9 @@ function UnifiedSidebar() {
         <aside
           className="relative flex h-full flex-shrink-0 overflow-hidden"
           style={{
-            width: expanded ? sidebarWidth : COLLAPSED_WIDTH,
-            minWidth: expanded ? EXPANDED_MIN : COLLAPSED_WIDTH,
-            maxWidth: expanded ? '40%' : COLLAPSED_WIDTH,
+            width: panelExpanded ? sidebarWidth : COLLAPSED_WIDTH,
+            minWidth: panelExpanded ? EXPANDED_MIN : COLLAPSED_WIDTH,
+            maxWidth: panelExpanded ? '40%' : COLLAPSED_WIDTH,
             transition: isResizing
               ? 'none'
               : `width ${TRANSITION_MS}ms ${EASING}, min-width ${TRANSITION_MS}ms ${EASING}, max-width ${TRANSITION_MS}ms ${EASING}`,
@@ -194,9 +221,10 @@ function UnifiedSidebar() {
         >
           <Sidebar
             links={links}
-            expanded={expanded}
+            expanded={panelExpanded}
             onCollapse={handleCollapse}
-            onExpand={handleExpand}
+            onExpand={handlePanelExpand}
+            onLeaveInsights={handleLeaveInsights}
             onResizeStart={handleResizeStart}
             onResizeKeyboard={handleResizeKeyboard}
           />

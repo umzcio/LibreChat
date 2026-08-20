@@ -264,6 +264,7 @@ export class InMemoryJobStore implements IJobStoreV2 {
     recoveredSteerPayload?: RecoveredSteerPayload,
     creationAttemptId?: string,
     expectedPredecessorCreatedAt?: number,
+    rejectActivePredecessor?: boolean,
   ): Promise<CreatedJobData> {
     if (typeof userId !== 'string' || userId.length === 0) {
       throw new Error('Generation job requires a non-empty user id');
@@ -285,6 +286,18 @@ export class InMemoryJobStore implements IJobStoreV2 {
     ) {
       throw new Error('Invalid expected generation predecessor');
     }
+    if (rejectActivePredecessor != null && typeof rejectActivePredecessor !== 'boolean') {
+      throw new Error('Invalid active generation predecessor policy');
+    }
+    const providerExecutionId = initialMetadata.providerExecutionId;
+    if (
+      providerExecutionId != null &&
+      (providerExecutionId.length === 0 || providerExecutionId.length > 128)
+    ) {
+      throw new Error('Invalid provider execution id');
+    }
+    const safeInitialMetadata = { ...initialMetadata };
+    delete safeInitialMetadata.providerDrained;
     const assertOwnerCompatible = (): void => {
       const existingJob = this.jobs.get(streamId);
       if (
@@ -332,6 +345,20 @@ export class InMemoryJobStore implements IJobStoreV2 {
     const assertExpectedPredecessorCompatible = (): void => {
       const current = this.jobs.get(streamId);
       const currentCreatedAt = current?.createdAt ?? this.getRetainedGenerationEpoch(streamId);
+      if (
+        rejectActivePredecessor === true &&
+        (current?.status === 'running' ||
+          current?.status === 'requires_action' ||
+          current?.terminalPersistencePending === true)
+      ) {
+        throw new JobPredecessorMismatchError({
+          createdAt: current.createdAt,
+          active: true,
+          verified: true,
+          status: current.status,
+          ...(current.conversationId !== undefined && { conversationId: current.conversationId }),
+        });
+      }
       if (
         expectedPredecessorCreatedAt == null ||
         currentCreatedAt === expectedPredecessorCreatedAt
@@ -467,11 +494,23 @@ export class InMemoryJobStore implements IJobStoreV2 {
           enumerable: false,
         });
       }
+      if (previousJob.providerExecutionId != null) {
+        Object.defineProperty(replaced, 'providerExecutionId', {
+          value: previousJob.providerExecutionId,
+          enumerable: false,
+        });
+      }
+      if (previousJob.providerDrained != null) {
+        Object.defineProperty(replaced, 'providerDrained', {
+          value: previousJob.providerDrained,
+          enumerable: false,
+        });
+      }
       addReplacedJob(replaced);
     }
     this.lastGenerationEpoch = createdAt;
     const job: CreatedJobData = {
-      ...initialMetadata,
+      ...safeInitialMetadata,
       streamId,
       userId,
       ...(tenantId && { tenantId }),
@@ -485,6 +524,7 @@ export class InMemoryJobStore implements IJobStoreV2 {
       ...(idempotencyClientRequestId !== undefined && { idempotencyClientRequestId }),
       ...(recoveredSteerId !== undefined && { recoveredSteerId }),
       providerAbortReady: false,
+      ...(providerExecutionId != null && { providerDrained: true }),
       syncSent: false,
     };
     if (creationAttemptId != null) {
@@ -659,6 +699,37 @@ export class InMemoryJobStore implements IJobStoreV2 {
     // Plain field writer. Membership-aware status transitions
     // (running ⇄ requires_action) go solely through transitionStatus.
     Object.assign(job, updates);
+  }
+
+  async markProviderExecutionDrained(
+    streamId: string,
+    expectedCreatedAt: number,
+    providerExecutionId: string,
+  ): Promise<boolean> {
+    const job = this.jobs.get(streamId);
+    if (job?.createdAt !== expectedCreatedAt || job.providerExecutionId !== providerExecutionId) {
+      return false;
+    }
+    job.providerDrained = true;
+    return true;
+  }
+
+  async beginProviderExecution(
+    streamId: string,
+    expectedCreatedAt: number,
+    providerExecutionId: string,
+  ): Promise<boolean> {
+    const job = this.jobs.get(streamId);
+    if (
+      job?.createdAt !== expectedCreatedAt ||
+      job.providerExecutionId !== providerExecutionId ||
+      job.status !== 'running' ||
+      job.providerDrained !== true
+    ) {
+      return false;
+    }
+    job.providerDrained = false;
+    return true;
   }
 
   async finalizeTerminalPersistence(
@@ -1174,6 +1245,18 @@ export class InMemoryJobStore implements IJobStoreV2 {
    * Also performs self-healing cleanup: removes stale entries for jobs that no longer exist.
    */
   async getActiveJobIdsByUser(userId: string, tenantId?: string): Promise<string[]> {
+    return this.getJobIdsByUser(userId, tenantId, false);
+  }
+
+  async getCleanupBlockingJobIdsByUser(userId: string, tenantId?: string): Promise<string[]> {
+    return this.getJobIdsByUser(userId, tenantId, true);
+  }
+
+  private getJobIdsByUser(
+    userId: string,
+    tenantId: string | undefined,
+    includeUndrained: boolean,
+  ): string[] {
     const userKey = tenantId ? `${tenantId}:${userId}` : userId;
     const trackedIds = this.userJobMap.get(userKey);
     if (!trackedIds || trackedIds.size === 0) {
@@ -1196,12 +1279,20 @@ export class InMemoryJobStore implements IJobStoreV2 {
       // A pending-approval job still occupies the user's conversation slot — but
       // only while its prompt is live: a past-`expiresAt` approval no longer
       // counts as active (cleanup/expiry will finalize it).
-      if (job.status === 'running' || job.status === 'requires_action') {
-        if (job.status === 'requires_action' && isPendingActionStale(job)) {
+      if (
+        job.status === 'running' ||
+        job.status === 'requires_action' ||
+        (includeUndrained && job.providerDrained === false)
+      ) {
+        if (
+          job.status === 'requires_action' &&
+          isPendingActionStale(job) &&
+          !(includeUndrained && job.providerDrained === false)
+        ) {
           continue;
         }
         activeIds.push(streamId);
-      } else {
+      } else if (job.providerDrained !== false) {
         // Self-healing: job completed/deleted but mapping wasn't cleaned - fix it now
         trackedIds.delete(streamId);
       }

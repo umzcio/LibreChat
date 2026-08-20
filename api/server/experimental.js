@@ -25,8 +25,10 @@ const {
   preAuthTenantMiddleware,
   requestContextMiddleware,
   configureServerTimeouts,
+  setupGracefulShutdown,
   configureMessageFilterRegexValidator,
   configureFileConfigRegexEngine,
+  waitForKeyvRedisClient,
 } = require('@librechat/api');
 const { connectDb, indexSync } = require('~/db');
 const initializeOAuthReconnectManager = require('./services/initializeOAuthReconnectManager');
@@ -34,6 +36,8 @@ const { capabilityContextMiddleware } = require('./middleware/roles/capabilities
 const createValidateImageRequest = require('./middleware/validateImageRequest');
 const { startExpiredFileSweep } = require('./services/Files/process');
 const { initializeGitHubSkillSync } = require('./services/Skills/sync');
+const { initializeAgentTriggerService } = require('./services/Agents/triggers');
+const { configureSubagentTaskRouting } = require('./services/Endpoints/agents/subagentThreadStore');
 const { jwtLogin, ldapLogin, passportLogin } = require('~/strategies');
 const { updateInterfacePermissions: updateInterfacePerms } = require('@librechat/api');
 const {
@@ -159,6 +163,8 @@ if (cluster.isMaster) {
   const listeningWorkers = new Set();
   let retentionSweepWorkerId = null;
   const startTime = Date.now();
+  let shuttingDown = false;
+  let remainingShutdownWorkers = 0;
 
   const assignRetentionSweepWorker = () => {
     if (retentionSweepWorkerId && cluster.workers[retentionSweepWorkerId]) {
@@ -229,15 +235,32 @@ if (cluster.isMaster) {
     logger.error(
       `Worker ${worker.process.pid} died (${activeWorkers}/${workers}). Code: ${code}, Signal: ${signal}`,
     );
+    if (shuttingDown) {
+      remainingShutdownWorkers = Math.max(0, remainingShutdownWorkers - 1);
+      if (remainingShutdownWorkers === 0) {
+        process.exit(0);
+      }
+      return;
+    }
     logger.info('Starting a new worker to replace it...');
     cluster.fork();
   });
 
   /** Graceful shutdown on SIGTERM/SIGINT */
   const shutdown = () => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
     logger.info('Master received shutdown signal, terminating workers...');
-    for (const id in cluster.workers) {
-      cluster.workers[id].kill();
+    const liveWorkers = Object.values(cluster.workers).filter(Boolean);
+    remainingShutdownWorkers = liveWorkers.length;
+    if (remainingShutdownWorkers === 0) {
+      process.exit(0);
+      return;
+    }
+    for (const worker of liveWorkers) {
+      worker.kill();
     }
     setTimeout(() => {
       logger.info('Forcing shutdown after timeout');
@@ -283,6 +306,9 @@ if (cluster.isMaster) {
   const startServer = async () => {
     logger.info(`Worker ${process.pid} initializing...`);
 
+    await waitForKeyvRedisClient();
+    await configureSubagentTaskRouting();
+
     if (typeof Bun !== 'undefined') {
       axios.defaults.headers.common['Accept-Encoding'] = 'gzip';
     }
@@ -298,6 +324,18 @@ if (cluster.isMaster) {
 
     app.disable('x-powered-by');
     app.set('trust proxy', trusted_proxy);
+
+    if (isEnabled(process.env.TRUST_TENANT_HEADER)) {
+      logger.warn(
+        '[Security] TRUST_TENANT_HEADER is active. Ensure your reverse proxy strips and sets ' +
+          'X-Tenant-Id — untrusted clients must not be able to supply it directly.',
+      );
+    } else if (isEnabled(process.env.TENANT_ISOLATION_STRICT)) {
+      logger.warn(
+        '[Security] TENANT_ISOLATION_STRICT is active while TRUST_TENANT_HEADER is disabled. ' +
+          'Pre-authentication tenant headers will be ignored.',
+      );
+    }
 
     /** Seed database (idempotent) */
     await runAsSystem(seedDatabase);
@@ -421,8 +459,9 @@ if (cluster.isMaster) {
     app.use(capabilityContextMiddleware);
 
     /** Routes */
-    app.use('/oauth', routes.oauth);
-    app.use('/api/auth', routes.auth);
+    app.use('/oauth', preAuthTenantMiddleware, routes.oauth);
+    app.use('/api/auth', preAuthTenantMiddleware, routes.auth);
+    app.use('/api/admin/insights', routes.insights);
     app.use('/api/admin', routes.adminAuth);
     app.use('/api/admin/skills', routes.adminSkills);
     app.use('/api/actions', routes.actions);
@@ -444,7 +483,7 @@ if (cluster.isMaster) {
     app.use('/api/assistants', routes.assistants);
     app.use('/api/files', await routes.files.initialize());
     app.use('/images/', createValidateImageRequest(appConfig.secureImageLinks), routes.staticRoute);
-    app.use('/api/share', routes.share);
+    app.use('/api/share', preAuthTenantMiddleware, routes.share);
     app.use('/api/roles', routes.roles);
     app.use('/api/agents', routes.agents);
     app.use('/api/banner', routes.banner);
@@ -487,6 +526,7 @@ if (cluster.isMaster) {
         await initializeMCPs();
         await initializeOAuthReconnectManager();
         await checkMigrations();
+        await initializeAgentTriggerService({ address: server.address() });
       } catch (initErr) {
         logger.error(`Worker ${process.pid} post-listen initialization failed:`, initErr);
         process.exit(1);
@@ -500,6 +540,7 @@ if (cluster.isMaster) {
       headersTimeout: server.headersTimeout,
       requestTimeout: server.requestTimeout,
     });
+    setupGracefulShutdown(server);
   };
 
   startServer().catch((err) => {

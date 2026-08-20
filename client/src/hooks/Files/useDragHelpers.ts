@@ -1,12 +1,10 @@
 import { useState, useRef, useMemo, useCallback } from 'react';
 import { useDrop } from 'react-dnd';
-import { useRecoilValue } from 'recoil';
 import { useToastContext } from '@librechat/client';
 import { NativeTypes } from 'react-dnd-html5-backend';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAtomValue, useSetAtom } from 'jotai';
+import { useAtomValue } from 'jotai';
 import {
-  Constants,
   QueryKeys,
   mergeFileConfig,
   resolveEndpointType,
@@ -19,7 +17,7 @@ import useFileUploadRouter from './useFileUploadRouter';
 import { useUploadModalContext } from '~/Providers';
 import useUploadOptions from './useUploadOptions';
 import useLocalize from '../useLocalize';
-import store, { ephemeralAgentByConvoId } from '~/store';
+import store from '~/store';
 
 export default function useDragHelpers() {
   const queryClient = useQueryClient();
@@ -28,9 +26,6 @@ export default function useDragHelpers() {
   const [showModal, setShowModal] = useState(false);
   const [draggedFiles, setDraggedFiles] = useState<File[]>([]);
   const conversation = useAtomValue(store.conversationByIndex(0)) || undefined;
-  const setEphemeralAgent = useSetAtom(
-    ephemeralAgentByConvoId(conversation?.conversationId ?? Constants.NEW_CONVO),
-  );
 
   const isAssistants = useMemo(
     () => isAssistantsEndpoint(conversation?.endpoint),

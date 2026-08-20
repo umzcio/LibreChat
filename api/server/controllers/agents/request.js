@@ -33,7 +33,7 @@ const {
   cleanupMCPRequestContextForReq,
 } = require('~/server/services/MCPRequestContext');
 const { logViolation } = require('~/cache');
-const { saveMessage, getMessages, getConvo } = require('~/models');
+const { saveMessage, getMessages, getConvo, isAgentTriggerPrincipalActive } = require('~/models');
 const {
   GENERATION_PROTOCOL_HEADER,
   GENERATION_PROTOCOL_V2,
@@ -50,22 +50,31 @@ function sendGenerationJson(res, status, body, generationProtocolVersion) {
   return res.status(status).json({ ...body, generationProtocolVersion });
 }
 
-function getResourceRecoveryFailure(error) {
-  if (error?.code !== ErrorTypes.RESOURCE_RECOVERY_REQUIRED) {
-    return null;
+function getInitializationFailure(error) {
+  if (error?.code === ErrorTypes.RESOURCE_RECOVERY_REQUIRED) {
+    return {
+      status: 409,
+      code: ErrorTypes.RESOURCE_RECOVERY_REQUIRED,
+      error: error.message || 'Attached resources must be restored before retrying.',
+    };
   }
 
+  const candidateStatus = error?.status ?? error?.statusCode;
+  if (!Number.isInteger(candidateStatus) || candidateStatus < 400 || candidateStatus >= 600) {
+    return null;
+  }
   return {
-    status: 409,
-    code: ErrorTypes.RESOURCE_RECOVERY_REQUIRED,
-    error: error.message || 'Attached resources must be restored before retrying.',
+    status: candidateStatus,
+    ...(typeof error?.code === 'string' ? { code: error.code } : {}),
+    error: error?.message || 'Failed to start generation',
   };
 }
 
-function resolveConversationCreatedAt({ userId, conversationId, isNewConvo }) {
+function resolveConversationCreatedAt({ userId, conversationId, isNewConvo, conversation }) {
   return resolveConversationAnchor({
     isNewConversation: isNewConvo,
-    loadConversation: () => getConvo(userId, conversationId),
+    loadConversation: () =>
+      conversation !== undefined ? Promise.resolve(conversation) : getConvo(userId, conversationId),
     onLoadError: (error) => {
       logger.warn('[AgentController] Failed to resolve conversation timestamp anchor', {
         conversationId,
@@ -292,8 +301,21 @@ function rejectPreliminaryParentMessageId(res, generationProtocolVersion) {
     res,
     409,
     {
+      code: 'PARENT_NOT_READY',
       error:
         'Cannot submit a follow-up while the selected parent response is still being saved. Please wait and try again.',
+    },
+    generationProtocolVersion,
+  );
+}
+
+function rejectMissingTriggerParentMessageId(res, generationProtocolVersion) {
+  return sendGenerationJson(
+    res,
+    404,
+    {
+      code: 'PARENT_NOT_FOUND',
+      error: 'The selected parent response is no longer available.',
     },
     generationProtocolVersion,
   );
@@ -435,7 +457,13 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     userId,
     conversationId,
     isNewConvo,
+    conversation: Object.prototype.hasOwnProperty.call(req, 'resolvedConversation')
+      ? req.resolvedConversation
+      : undefined,
   });
+
+  const isTriggerContinuation =
+    req._isAgentTrigger === true && !isNewConvo && parentMessageId !== Constants.NO_PARENT;
 
   if (
     await isUnpersistedPreliminaryParent({
@@ -445,6 +473,38 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       getMessages,
     })
   ) {
+    if (isTriggerContinuation) {
+      let parentJob;
+      try {
+        parentJob = await GenerationJobManager.getJob(conversationId);
+      } catch (error) {
+        logger.warn('[ResumableAgentController] Trigger parent lookup failed', error);
+        res.set('Retry-After', '1');
+        startupTelemetry?.end('rejected');
+        return sendGenerationJson(
+          res,
+          503,
+          { code: 'PARENT_STATE_UNAVAILABLE', error: 'Parent generation state is unavailable.' },
+          generationProtocolVersion,
+        );
+      }
+      if (
+        parentJob != null &&
+        liveJobBelongsToRequester(parentJob, req.user) &&
+        (parentJob.status === 'running' ||
+          parentJob.status === 'requires_action' ||
+          parentJob.metadata?.terminalPersistencePending === true) &&
+        !(
+          typeof clientRequestId === 'string' &&
+          parentJob.metadata?.idempotencyClientRequestId === clientRequestId
+        )
+      ) {
+        startupTelemetry?.end('rejected');
+        return rejectPreliminaryParentMessageId(res, generationProtocolVersion);
+      }
+      startupTelemetry?.end('rejected');
+      return rejectMissingTriggerParentMessageId(res, generationProtocolVersion);
+    }
     startupTelemetry?.end('rejected');
     return rejectPreliminaryParentMessageId(res, generationProtocolVersion);
   }
@@ -459,6 +519,51 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
   // Treat "new" as a placeholder that needs a real UUID (frontend may send "new" for new convos)
   const streamId = conversationId;
   req.body.conversationId = conversationId;
+
+  /** A durable continuation trigger appends below a completed parent response. If
+   * that response belongs to a still-running or paused generation, admitting
+   * another generation on the same conversation stream would replace it.
+   * Defer without claiming the continuation idempotency key so the delivery engine
+   * can retry after the parent reaches a terminal state. */
+  if (isTriggerContinuation) {
+    let parentJob;
+    try {
+      parentJob = await GenerationJobManager.getJob(streamId);
+    } catch (error) {
+      logger.warn('[ResumableAgentController] Trigger continuation parent lookup failed', error);
+      res.set('Retry-After', '1');
+      startupTelemetry?.end('rejected');
+      return sendGenerationJson(
+        res,
+        503,
+        {
+          code: 'PARENT_STATE_UNAVAILABLE',
+          error: 'Parent generation state is temporarily unavailable.',
+        },
+        generationProtocolVersion,
+      );
+    }
+    if (
+      parentJob != null &&
+      liveJobBelongsToRequester(parentJob, req.user) &&
+      (parentJob.status === 'running' ||
+        parentJob.status === 'requires_action' ||
+        parentJob.metadata?.terminalPersistencePending === true) &&
+      !(
+        typeof clientRequestId === 'string' &&
+        parentJob.metadata?.idempotencyClientRequestId === clientRequestId
+      )
+    ) {
+      res.set('Retry-After', '1');
+      startupTelemetry?.end('rejected');
+      return sendGenerationJson(
+        res,
+        409,
+        { code: 'PARENT_NOT_READY', error: 'The parent generation has not settled yet.' },
+        generationProtocolVersion,
+      );
+    }
+  }
 
   // Idempotency: a lost/reset start-generation response makes the client re-POST the
   // identical payload, which would otherwise start a second fully-billed generation.
@@ -850,6 +955,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
   let client = null;
   let jobCreatedAt;
+  let providerExecutionId;
 
   try {
     logger.debug(`[ResumableAgentController] Creating job`, {
@@ -868,6 +974,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       ...(recoveredSteerId && { recoveredSteerId }),
       ...(recoveredSteerPayload && { recoveredSteerPayload }),
       ...(expectedPredecessorCreatedAt != null && { expectedPredecessorCreatedAt }),
+      ...(isTriggerContinuation && { rejectActivePredecessor: true }),
       ...(ownedIdempotencyClaim?.claimToken && {
         idempotencyClientRequestId: clientRequestId,
         idempotencyClaimToken: ownedIdempotencyClaim.claimToken,
@@ -893,10 +1000,38 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       },
     });
     startupTelemetry?.mark('job_created');
-    acceptAgentStartupTelemetry(req, streamId);
-    startupTelemetry?.mark('metadata_persisted');
     generationProtocolVersion = negotiateExistingGenerationProtocol(req, job);
     jobCreatedAt = job.createdAt; // Capture creation time to detect job replacement
+    providerExecutionId = job.metadata?.providerExecutionId;
+
+    /** Authentication can precede a slow admission path. Recheck the durable
+     * account-deletion fence after the job is committed but before execution
+     * starts. This ordering closes both sides of the race for ordinary and
+     * trigger-scoped sessions: a fence that wins first rejects this run; a
+     * fence that starts after this read must observe the already-created job
+     * in account deletion's active-generation drain. */
+    if (!(await isAgentTriggerPrincipalActive(userId))) {
+      throw Object.assign(new Error('Account deletion is in progress'), {
+        code: 'ACCOUNT_DELETION_IN_PROGRESS',
+        status: 409,
+      });
+    }
+    if (
+      providerExecutionId &&
+      !(await GenerationJobManager.beginProviderExecution(
+        streamId,
+        jobCreatedAt,
+        providerExecutionId,
+      ))
+    ) {
+      throw Object.assign(new Error('Generation stopped before provider startup'), {
+        code: 'RUN_REPLACED',
+        status: 409,
+      });
+    }
+
+    acceptAgentStartupTelemetry(req, streamId);
+    startupTelemetry?.mark('metadata_persisted');
     req._resumableStreamId = streamId;
     getMCPRequestContext(req, undefined, { cleanupOnResponse: false });
     let recoveredSteerCommitted = false;
@@ -1060,6 +1195,18 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           disposeClient(client);
         }
         client = null;
+        if (providerExecutionId) {
+          await GenerationJobManager.markProviderExecutionDrained?.(
+            streamId,
+            jobCreatedAt,
+            providerExecutionId,
+          ).catch((drainError) => {
+            logger.warn(
+              '[ResumableAgentController] Failed to record initialization-abort provider drain',
+              drainError,
+            );
+          });
+        }
       }
       return;
     }
@@ -1101,6 +1248,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     };
 
     let immediateTitlePromise = null;
+    let trailingWritePromise = null;
     let backgroundClientCleanupScheduled = false;
     let terminalClaim = null;
     let terminalClaimFinished = false;
@@ -1712,7 +1860,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
             disposeClient(client);
           }
         } else if (shouldGenerateTitle) {
-          addTitle(req, {
+          trailingWritePromise = addTitle(req, {
             text: text || getAttachmentTitleText(req.body.files),
             response: { ...response },
             client,
@@ -1808,60 +1956,90 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     };
 
     // Start generation and handle any unhandled errors
-    startGeneration().catch(async (err) => {
-      logger.error(
-        `[ResumableAgentController] Unhandled error in background generation: ${err.message}`,
-      );
-      startupTelemetry?.end('error', err);
-      if (!pausePersistenceFailed) {
-        await GenerationJobManager.completeJob(streamId, err.message, jobCreatedAt).catch(
-          (completeErr) => {
-            logger.warn(
-              '[ResumableAgentController] completeJob failed during background-error cleanup',
-              completeErr,
-            );
-          },
+    void startGeneration()
+      .catch(async (err) => {
+        logger.error(
+          `[ResumableAgentController] Unhandled error in background generation: ${err.message}`,
         );
-      }
-      try {
-        await finishResumableRequest(req, userId);
-      } finally {
-        disposeBackgroundClient();
-      }
-    });
+        startupTelemetry?.end('error', err);
+        if (!pausePersistenceFailed) {
+          await GenerationJobManager.completeJob(streamId, err.message, jobCreatedAt).catch(
+            (completeErr) => {
+              logger.warn(
+                '[ResumableAgentController] completeJob failed during background-error cleanup',
+                completeErr,
+              );
+            },
+          );
+        }
+        try {
+          await finishResumableRequest(req, userId);
+        } finally {
+          disposeBackgroundClient();
+        }
+      })
+      .finally(async () => {
+        await Promise.allSettled([immediateTitlePromise, trailingWritePromise].filter(Boolean));
+        if (providerExecutionId) {
+          await GenerationJobManager.markProviderExecutionDrained?.(
+            streamId,
+            jobCreatedAt,
+            providerExecutionId,
+          );
+        }
+      })
+      .catch((drainError) => {
+        logger.warn(
+          '[ResumableAgentController] Failed to record completed provider drain',
+          drainError,
+        );
+      });
   } catch (error) {
     logger.error('[ResumableAgentController] Initialization error:', error);
-    const resourceRecoveryFailure = getResourceRecoveryFailure(error);
+    const initializationFailure = getInitializationFailure(error);
     try {
       if (!res.headersSent) {
         if (error?.code === 'GENERATION_PREDECESSOR_MISMATCH') {
           const currentJob = error.currentJob;
           const currentStatus = currentJob?.status;
-          const predecessorVerified =
-            currentJob != null &&
-            Number.isSafeInteger(currentJob.createdAt) &&
-            currentJob.createdAt >= 0 &&
-            currentJob.verified !== false;
-          sendGenerationJson(
-            res,
-            409,
-            {
-              status: 'predecessor_mismatch',
-              code: 'GENERATION_PREDECESSOR_MISMATCH',
-              error: predecessorVerified
-                ? 'A newer generation became current before this request could start.'
-                : 'The prior generation could not be verified. Please retry.',
-              streamId,
-              conversationId: currentJob?.conversationId ?? conversationId,
-              generationCreatedAt: currentJob?.createdAt,
-              predecessorVerified,
-              active:
-                typeof currentJob?.active === 'boolean'
-                  ? currentJob.active
-                  : currentStatus === 'running' || currentStatus === 'requires_action',
-            },
-            generationProtocolVersion,
-          );
+          if (isTriggerContinuation && currentJob?.active === true) {
+            res.set('Retry-After', '1');
+            sendGenerationJson(
+              res,
+              409,
+              {
+                code: 'PARENT_NOT_READY',
+                error: 'Another generation became active before the continuation could start.',
+              },
+              generationProtocolVersion,
+            );
+          } else {
+            const predecessorVerified =
+              currentJob != null &&
+              Number.isSafeInteger(currentJob.createdAt) &&
+              currentJob.createdAt >= 0 &&
+              currentJob.verified !== false;
+            sendGenerationJson(
+              res,
+              409,
+              {
+                status: 'predecessor_mismatch',
+                code: 'GENERATION_PREDECESSOR_MISMATCH',
+                error: predecessorVerified
+                  ? 'A newer generation became current before this request could start.'
+                  : 'The prior generation could not be verified. Please retry.',
+                streamId,
+                conversationId: currentJob?.conversationId ?? conversationId,
+                generationCreatedAt: currentJob?.createdAt,
+                predecessorVerified,
+                active:
+                  typeof currentJob?.active === 'boolean'
+                    ? currentJob.active
+                    : currentStatus === 'running' || currentStatus === 'requires_action',
+              },
+              generationProtocolVersion,
+            );
+          }
         } else if (error?.code === 'RECOVERY_PAYLOAD_MISMATCH') {
           sendGenerationJson(
             res,
@@ -1872,11 +2050,11 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
             },
             generationProtocolVersion,
           );
-        } else if (resourceRecoveryFailure) {
+        } else if (initializationFailure) {
           sendGenerationJson(
             res,
-            resourceRecoveryFailure.status,
-            resourceRecoveryFailure,
+            initializationFailure.status,
+            initializationFailure,
             generationProtocolVersion,
           );
         } else {
@@ -1907,8 +2085,8 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     // and the concurrency slot leaks — so swallow its error. (A failed completeJob did not
     // finalize anything, so releasing afterward can't let it abort a later replacement.)
     if (jobCreatedAt != null) {
-      const initializationError = resourceRecoveryFailure
-        ? JSON.stringify(resourceRecoveryFailure)
+      const initializationError = initializationFailure
+        ? JSON.stringify(initializationFailure)
         : error.message || 'Failed to start generation';
       await GenerationJobManager.completeJob(streamId, initializationError, jobCreatedAt).catch(
         (completeErr) => {
@@ -1930,6 +2108,18 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     await finishResumableRequest(req, userId);
     if (client) {
       disposeClient(client);
+    }
+    if (jobCreatedAt != null && providerExecutionId) {
+      await GenerationJobManager.markProviderExecutionDrained?.(
+        streamId,
+        jobCreatedAt,
+        providerExecutionId,
+      ).catch((drainError) => {
+        logger.warn(
+          '[ResumableAgentController] Failed to record initialization-error provider drain',
+          drainError,
+        );
+      });
     }
   }
 };

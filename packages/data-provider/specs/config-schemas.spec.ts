@@ -405,6 +405,27 @@ describe('endpointSchema addParams validation', () => {
 });
 
 describe('agentsEndpointSchema', () => {
+  it('accepts a non-empty stateful code environment allowlist', () => {
+    const result = agentsEndpointSchema.safeParse({
+      statefulCodeSessions: { allowedEnvironments: ['user', 'agent-user'] },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty or unknown stateful code environment allowlists', () => {
+    expect(
+      agentsEndpointSchema.safeParse({
+        statefulCodeSessions: { allowedEnvironments: [] },
+      }).success,
+    ).toBe(false);
+    expect(
+      agentsEndpointSchema.safeParse({
+        statefulCodeSessions: { allowedEnvironments: ['agent'] },
+      }).success,
+    ).toBe(false);
+  });
+
   it('does not accept baseURL', () => {
     const result = agentsEndpointSchema.safeParse({
       baseURL: 'https://example.com',
@@ -1327,5 +1348,31 @@ describe('configSchema langfuse', () => {
     });
 
     expect(result.success).toBe(true);
+  });
+
+  it('accepts custom Langfuse request headers', () => {
+    const result = configSchema.safeParse({
+      version: '1.3.7',
+      langfuse: {
+        enabled: true,
+        headers: {
+          'CF-Access-Client-Id': 'proxy-client',
+          'X-Proxy-Token': '${LANGFUSE_PROXY_TOKEN}',
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects non-string Langfuse header values', () => {
+    const result = configSchema.safeParse({
+      version: '1.3.7',
+      langfuse: {
+        headers: { 'X-Proxy-Token': 42 },
+      },
+    });
+
+    expect(result.success).toBe(false);
   });
 });
