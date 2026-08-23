@@ -45,7 +45,7 @@ export default function MCPServerCard({
   } = statusIconProps;
 
   const canEditThisServer = hasPermissions(server.effectivePermissions, PermissionBits.EDIT);
-  const serverSource = server.config?.source;
+  const serverSource = server.source;
   const isYamlOrConfig = serverSource === 'yaml' || serverSource === 'config';
   const isAdmin = user?.role === SystemRoles.ADMIN;
   const cosmeticOnly = isYamlOrConfig && isAdmin && !canEditThisServer;
