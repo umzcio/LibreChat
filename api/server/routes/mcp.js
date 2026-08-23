@@ -23,6 +23,7 @@ const {
   OAUTH_SESSION_COOKIE,
   mcpConfig: mcpSettings,
   getServerCustomUserVars,
+  hasCustomUserVars,
   requiresEphemeralUserConnection,
 } = require('@librechat/api');
 const {
@@ -928,6 +929,9 @@ router.get('/connection/status', requireJwtAuth, async (req, res) => {
               {
                 connectionState: 'error',
                 requiresOAuth: oauthServers.has(serverName),
+                ...(requiresEphemeralUserConnection(config) && { requestScoped: true }),
+                ...(requiresEphemeralUserConnection(config) &&
+                  hasCustomUserVars(config) && { configurationState: 'needs_configuration' }),
                 authorizationState: oauthServers.has(serverName) ? 'error' : 'not_required',
                 error: message,
               },
@@ -989,6 +993,8 @@ router.get('/connection/status/:serverName', requireJwtAuth, async (req, res) =>
       serverName,
       connectionStatus: serverStatus.connectionState,
       requiresOAuth: serverStatus.requiresOAuth,
+      requestScoped: serverStatus.requestScoped,
+      configurationState: serverStatus.configurationState,
       authorizationState: serverStatus.authorizationState,
     });
   } catch (error) {

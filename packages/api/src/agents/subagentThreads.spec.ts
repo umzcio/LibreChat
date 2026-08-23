@@ -34,6 +34,7 @@ import {
   SubagentThreadTaskStore,
 } from './subagentThreads';
 import { SubagentTaskOwnerUnavailableError } from './subagentTaskRouting';
+import { SUBAGENT_COMPLETION_DELIVERY } from './subagentDelivery';
 import { createSubagentAttemptKey } from './subagentThreadIds';
 import { createSubagentUsageSink } from './usage';
 
@@ -253,6 +254,16 @@ beforeEach(async () => {
 });
 
 describe('SubagentThreadTaskStore', () => {
+  it('records the host-selected automatic delivery contract only when wakeups are enabled', () => {
+    const store = new SubagentThreadTaskStore(methods);
+    const scope = { userId: 'delivery-user', parentConversationId: randomUUID() };
+
+    expect(buildSubagentThreadTaskConfig(store, scope).completionDelivery).toBeUndefined();
+    expect(
+      buildSubagentThreadTaskConfig(store, scope, { completionWakeups: true }).completionDelivery,
+    ).toBe(SUBAGENT_COMPLETION_DELIVERY);
+  });
+
   it('maps one logical SDK thread to a durable, view-only LibreChat conversation', async () => {
     const userId = 'user-1';
     const parentConversationId = randomUUID();
@@ -877,6 +888,10 @@ describe('SubagentThreadTaskStore', () => {
     await waitForSettled(firstWorker, config.scopeId, initial);
     slowThreadId = requireThreadId(initial);
     blockNextRead = true;
+    const intervalSpy = jest.spyOn(global, 'setInterval');
+    const timeoutSpy = jest.spyOn(global, 'setTimeout');
+    const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
+    const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
 
     const firstRun = jest.fn(taskRequest(config.scopeId).run);
     const first = firstWorker.start(
@@ -887,6 +902,15 @@ describe('SubagentThreadTaskStore', () => {
       }),
     );
     await preparing;
+    const heartbeatCall = intervalSpy.mock.calls.find(([, delay]) => delay === 50);
+    const heartbeatIndex =
+      heartbeatCall == null ? -1 : intervalSpy.mock.calls.indexOf(heartbeatCall);
+    const heartbeat = intervalSpy.mock.results[heartbeatIndex]?.value as NodeJS.Timeout | undefined;
+    const warningIndex = timeoutSpy.mock.calls.length - 1;
+    expect(timeoutSpy.mock.calls[warningIndex]?.[1]).toBe(5_000);
+    const warning = timeoutSpy.mock.results[warningIndex]?.value as NodeJS.Timeout | undefined;
+    expect(heartbeat?.hasRef()).toBe(true);
+    expect(warning?.hasRef()).toBe(true);
     /** Wait for evidence rather than a fixed delay: a renewal that succeeds after the
      * acquired lease's own deadline proves the heartbeat carried it past expiry. */
     await waitUntil(() => renewedPastDeadline, 'the shared lease to outlive its original deadline');
@@ -905,6 +929,12 @@ describe('SubagentThreadTaskStore', () => {
     releasePreparation();
     await waitForSettled(firstWorker, config.scopeId, first);
     expect(firstRun).toHaveBeenCalledTimes(1);
+    expect(clearIntervalSpy).toHaveBeenCalledWith(heartbeat);
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(warning);
+    intervalSpy.mockRestore();
+    timeoutSpy.mockRestore();
+    clearIntervalSpy.mockRestore();
+    clearTimeoutSpy.mockRestore();
   });
 
   it('cancels a child when its lease renewal only commits after expiry', async () => {

@@ -270,6 +270,28 @@ function isRecoverableTakeoverSplit(
   );
 }
 
+/**
+ * Name the reason a terminal-state CAS was lost, off the job that now holds the
+ * conversation. Losing to natural completion IS a stop; losing to a replacement, or to
+ * deletion, is not — and callers settle durable state on that distinction.
+ */
+function classifyLostAbortRace(
+  jobStillActive: boolean,
+  currentJob: SerializableJobData | null,
+  abortedCreatedAt: number,
+): NonNullable<AbortResult['failureReason']> {
+  if (jobStillActive) {
+    return 'job_still_active';
+  }
+  if (currentJob == null) {
+    return 'job_not_found';
+  }
+  if (currentJob.createdAt !== abortedCreatedAt) {
+    return 'generation_replaced';
+  }
+  return 'already_settled';
+}
+
 function buildTerminalPersistenceReconcile(
   job: Pick<SerializableJobData, 'createdAt' | 'conversationId' | 'status'>,
 ): t.FinalEvent {
@@ -448,6 +470,13 @@ export interface GenerationJobManagerOptions {
    */
   cleanupOnComplete?: boolean;
 }
+
+/** Host-owned lifecycle seam for durable work layered on agent generations.
+ * Delivery is at-least-once: implementations must be idempotent by generation. */
+export type ApprovalExpiredHandler = (
+  streamId: string,
+  job: SerializableJobData,
+) => void | Promise<void>;
 
 export interface CreateGenerationJobOptions {
   startupTelemetry?: AgentStartupTelemetry;
@@ -695,6 +724,10 @@ class GenerationJobManagerClass {
   /** Whether to cleanup event transport immediately on job completion */
   private _cleanupOnComplete = true;
 
+  /** Optional host hook; the generic stream runtime does not know what external
+   * durable work (scheduled chats, webhooks, etc.) a generation represents. */
+  private approvalExpiredHandler: ApprovalExpiredHandler | undefined;
+
   constructor(options?: GenerationJobManagerOptions) {
     const jobStore =
       options?.jobStore ?? new InMemoryJobStore({ ttlAfterComplete: 0, maxJobs: 1000 });
@@ -821,6 +854,12 @@ class GenerationJobManagerClass {
    */
   get isRedis(): boolean {
     return this._isRedis;
+  }
+
+  /** Installs the application-owned approval-expiry hook without coupling the
+   * stream package to any particular trigger/scheduler implementation. */
+  setApprovalExpiredHandler(handler?: ApprovalExpiredHandler): void {
+    this.approvalExpiredHandler = handler;
   }
 
   private get storeLabel(): GenerationJobStore {
@@ -2489,6 +2528,8 @@ class GenerationJobManagerClass {
         generationProtocolVersion: jobData.generationProtocolVersion,
         userMessage: jobData.userMessage,
         responseMessageId: jobData.responseMessageId,
+        isRegenerate: jobData.isRegenerate,
+        mcpRequestBody: jobData.mcpRequestBody,
         sender: jobData.sender,
         endpoint: jobData.endpoint,
         iconURL: jobData.iconURL,
@@ -2499,6 +2540,13 @@ class GenerationJobManagerClass {
         agent_id: jobData.agent_id,
         // Surface whether the turn was temporary so a resume keeps it non-persisted.
         isTemporary: jobData.isTemporary,
+        scheduleId: jobData.scheduleId,
+        scheduledFor: jobData.scheduledFor,
+        scheduleConfigRevision: jobData.scheduleConfigRevision,
+        scheduleManual: jobData.scheduleManual,
+        scheduleOutcome: jobData.scheduleOutcome,
+        scheduleOutcomeError: jobData.scheduleOutcomeError,
+        preserveForScheduleReconcile: jobData.preserveForScheduleReconcile,
         // Surface deferred tools discovered before the pause so the resume route can
         // replay them into createRun (the rebuilt graph passes `messages: []`).
         discoveredTools: jobData.discoveredTools,
@@ -3503,6 +3551,7 @@ class GenerationJobManagerClass {
         if (
           !retainForTerminalReplay &&
           terminalJob?.providerDrained !== false &&
+          terminalJob?.preserveForScheduleReconcile !== true &&
           (terminalJob?.createdAt !== createdAt || terminalJob.terminalPersistencePending !== true)
         ) {
           // A same-stream replacement created after the claim makes this a safe
@@ -3684,6 +3733,10 @@ class GenerationJobManagerClass {
         content: [],
         jobData: null,
         success: false,
+        /** The job vanished between the caller's read and this one. No transition
+         * was made and no provider drain was awaited, so this says nothing about
+         * whether trailing owner work is still in flight. */
+        failureReason: 'job_not_found',
         finalEvent: null,
         collectedUsage: [],
       };
@@ -3701,6 +3754,10 @@ class GenerationJobManagerClass {
           content: [],
           jobData: unlockedJob,
           success: false,
+          /** The pause never unlocked for THIS generation: the job was either deleted
+           * outright or a replacement took the conversation. A replacement is another
+           * run's state — settling or pruning on it would destroy the successor. */
+          failureReason: unlockedJob == null ? 'job_not_found' : 'generation_replaced',
           finalEvent: null,
           collectedUsage: [],
         };
@@ -3723,6 +3780,10 @@ class GenerationJobManagerClass {
         content: [],
         jobData,
         success: false,
+        /** No transition was needed: the generation is already terminal, and the
+         * drain above (when requested) proves its provider segment can no longer
+         * persist. This is a stop, just not one this call made. */
+        failureReason: 'already_settled',
         finalEvent: null,
         collectedUsage: [],
       };
@@ -3820,13 +3881,9 @@ class GenerationJobManagerClass {
       }
       return {
         success: false,
-        ...(jobStillActive
-          ? { failureReason: 'job_still_active' as const }
-          : options?.expectedCreatedAt != null &&
-            currentJob != null &&
-            currentJob?.createdAt !== options.expectedCreatedAt && {
-              failureReason: 'generation_replaced' as const,
-            }),
+        /** The drain above already ran when the caller required one, so an
+         * `already_settled` verdict here is a fully drained generation. */
+        failureReason: classifyLostAbortRace(jobStillActive, currentJob, jobData.createdAt),
         jobData,
         content: abortContent,
         finalEvent: null,
@@ -6359,6 +6416,7 @@ class GenerationJobManagerClass {
       job?.createdAt === expectedCreatedAt &&
       job.providerExecutionId === providerExecutionId &&
       job.providerDrained === true &&
+      job.preserveForScheduleReconcile !== true &&
       job.terminalPersistencePending !== true &&
       (job.status === 'complete' || job.status === 'aborted')
     ) {
@@ -6872,6 +6930,7 @@ class GenerationJobManagerClass {
       aggregatedContent,
       userMessage: jobData.userMessage,
       responseMessageId: jobData.responseMessageId,
+      isRegenerate: jobData.isRegenerate,
       conversationId: jobData.conversationId,
       sender: jobData.sender,
       iconURL: jobData.iconURL,
@@ -7004,17 +7063,40 @@ class GenerationJobManagerClass {
         );
       }
     }
-    const expiredCreatedAt = await this._approvals.expireWithIdentity(
+    const expiredJob = await this._approvals.expireWithIdentity(
       streamId,
       actionId,
       expectedCreatedAt ?? observedJob?.createdAt,
+      // Only retain a durable host-action marker when a host adapter is installed to
+      // consume it — a store with no handler owes no action and accumulates nothing.
+      { markHostActionPending: this.approvalExpiredHandler != null },
     );
-    if (expiredCreatedAt == null) {
+    if (expiredJob == null) {
       return false;
     }
 
-    await this.notifyApprovalExpiredRuntime(streamId, expiredCreatedAt, observedRuntime);
+    await this.runApprovalExpiredHandler(streamId, expiredJob);
+    await this.notifyApprovalExpiredRuntime(streamId, expiredJob.createdAt, observedRuntime);
     return true;
+  }
+
+  private async runApprovalExpiredHandler(
+    streamId: string,
+    job: SerializableJobData,
+  ): Promise<void> {
+    try {
+      await this.approvalExpiredHandler?.(streamId, job);
+      // Success: the durable host action is settled. Clear its pending marker, fenced to
+      // this exact generation so a replacement at the same streamId keeps its own state.
+      // A no-op handler (or none) clears harmlessly, so non-scheduled jobs never linger.
+      await this.jobStore.clearTerminalHostAction?.(streamId, job.createdAt);
+    } catch (err) {
+      // Expiry itself already won its exact CAS. Keep terminal notification moving; the
+      // `terminalHostActionPending` marker stays set so a later cleanup pass (this or
+      // another replica, across restarts) re-enumerates the job and retries this
+      // idempotent hook until it acknowledges.
+      logger.error(`[GenerationJobManager] Approval-expiry host hook failed: ${streamId}`, err);
+    }
   }
 
   private async notifyApprovalExpiredRuntime(
@@ -7058,10 +7140,37 @@ class GenerationJobManagerClass {
 
   private async expireStaleApprovals(): Promise<void> {
     let changed = false;
-    for (const streamId of this.runtimeState.keys()) {
+    // Scan durable pauses as well as local runtimes. A process can restart while an
+    // approval waits; if expiry were limited to runtimeState, store cleanup would
+    // terminalize that ownerless job without crossing the host lifecycle hook.
+    const candidates = new Map<string, SerializableJobData>();
+    if (this.jobStore.getRequiresActionJobs) {
+      try {
+        for (const job of await this.jobStore.getRequiresActionJobs()) {
+          candidates.set(job.streamId, job);
+        }
+      } catch (err) {
+        logger.error('[GenerationJobManager] Failed to enumerate pending approvals', err);
+      }
+    }
+    // Also scan terminal jobs that still owe a host lifecycle hook. An expired approval is
+    // no longer in the requires_action index, so without this a failed host hook (e.g. the
+    // schedule outcome write) would never be retried on a replica or after a restart that
+    // has no local runtime — the exact clustered-entrypoint gap, which runs no reconciler.
+    if (this.jobStore.getTerminalHostActionJobs) {
+      try {
+        for (const job of await this.jobStore.getTerminalHostActionJobs()) {
+          candidates.set(job.streamId, job);
+        }
+      } catch (err) {
+        logger.error('[GenerationJobManager] Failed to enumerate pending host actions', err);
+      }
+    }
+    const streamIds = new Set([...this.runtimeState.keys(), ...candidates.keys()]);
+    for (const streamId of streamIds) {
       let job: SerializableJobData | null;
       try {
-        job = await this.jobStore.getJob(streamId);
+        job = candidates.get(streamId) ?? (await this.jobStore.getJob(streamId));
       } catch (err) {
         logger.error(
           `[GenerationJobManager] Failed to read job during approval expiry sweep: ${streamId}`,
@@ -7078,6 +7187,13 @@ class GenerationJobManagerClass {
       // The `errorEvent` flag (set by emitError) keeps this idempotent vs the win path.
       const runtime = this.runtimeState.get(streamId);
       if (job?.status === 'aborted' && job.error === APPROVAL_EXPIRED_ERROR) {
+        // Retry the durable host hook ONLY while its marker is unacknowledged, so a
+        // successful ack prevents duplicate work. The terminal SSE relay below is
+        // separately idempotent (emitError's errorEvent flag) and always runs so a
+        // loser-replica subscriber still gets a terminal event.
+        if (job.terminalHostActionPending === true) {
+          await this.runApprovalExpiredHandler(streamId, job);
+        }
         await this.notifyApprovalExpiredRuntime(streamId, job.createdAt, runtime);
         changed = this.releaseJobOwnership(streamId, job.createdAt) || changed;
         continue;

@@ -20,6 +20,7 @@ import {
   TooltipAnchor,
   useToastContext,
 } from '@librechat/client';
+import SharedSubagentActivityDialog from '~/components/Chat/Subagents/SharedSubagentActivityDialog';
 import { cn, DEFAULT_APP_TITLE, getResponseStatus, selectActiveBranchTail } from '~/utils';
 import { ThemeSelector, LangSelector } from '~/components/Appearance';
 import { ShareMessagesProvider } from './ShareMessagesProvider';
@@ -240,6 +241,7 @@ function SharedView() {
           {artifactsContainer}
         </main>
       </div>
+      <SharedSubagentActivityDialog shareId={shareId} />
     </ShareContext.Provider>
   );
 }

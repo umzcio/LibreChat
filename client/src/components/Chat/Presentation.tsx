@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect, useMemo } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef } from 'react';
 import { useAtomValue } from 'jotai';
+import { useResetAtom } from 'jotai/utils';
 import { FileSources, LocalStorageKeys } from 'librechat-data-provider';
 import type { ExtendedFile } from '~/common';
 import useResetArtifactsOnConversationChange from '~/hooks/Artifacts/useResetArtifactsOnConversationChange';
@@ -7,10 +8,12 @@ import DragDropWrapper from '~/components/Chat/Input/Files/DragDropWrapper';
 import { EditorProvider, ArtifactsProvider } from '~/Providers';
 import { useDeleteFilesMutation } from '~/data-provider';
 import { SidePanelGroup } from '~/components/SidePanel';
+import { activeSubagentPanel } from '~/store/subagents';
 import { useSetFilesToDelete } from '~/hooks';
 import store from '~/store';
 
 const Artifacts = lazy(() => import('~/components/Artifacts/Artifacts'));
+const SubagentThreadPanel = lazy(() => import('~/components/Chat/Subagents/SubagentThreadPanel'));
 
 export default function Presentation({
   children,
@@ -29,8 +32,19 @@ export default function Presentation({
   // arriving via SSE auto-focus through `ToolArtifactCard`'s mount effect
   // (gated on `isSubmitting`), restoring the legacy streaming UX.
   const currentArtifactId = useAtomValue(store.currentArtifactId);
+  const conversationId = useAtomValue(store.conversationIdByIndex(0));
+  const selectedSubagent = useAtomValue(activeSubagentPanel);
+  const resetSelectedSubagent = useResetAtom(activeSubagentPanel);
+  const previousConversationIdRef = useRef<string | null>(null);
 
   useResetArtifactsOnConversationChange();
+
+  useEffect(() => {
+    const previous = previousConversationIdRef.current;
+    const next = conversationId ?? null;
+    previousConversationIdRef.current = next;
+    if (previous != null && previous !== next) resetSelectedSubagent();
+  }, [conversationId, resetSelectedSubagent]);
 
   const setFilesToDelete = useSetFilesToDelete();
 
@@ -88,9 +102,30 @@ export default function Presentation({
     return null;
   }, [showArtifactsPanel, artifactsVisibility, artifacts, currentArtifactId]);
 
+  useEffect(() => {
+    if (artifactsElement != null && selectedSubagent != null) resetSelectedSubagent();
+  }, [artifactsElement, resetSelectedSubagent, selectedSubagent]);
+
+  const subagentElement = useMemo(() => {
+    if (
+      selectedSubagent == null ||
+      selectedSubagent.host !== 'conversation' ||
+      selectedSubagent.parentConversationId !== conversationId
+    ) {
+      return null;
+    }
+    return (
+      <Suspense fallback={null}>
+        <SubagentThreadPanel selection={selectedSubagent} />
+      </Suspense>
+    );
+  }, [conversationId, selectedSubagent]);
+
+  const panelElement = artifactsElement ?? subagentElement;
+
   return (
     <DragDropWrapper className="relative flex w-full grow overflow-hidden bg-presentation">
-      <SidePanelGroup artifacts={artifactsElement}>
+      <SidePanelGroup panel={panelElement}>
         <main className="flex h-full flex-col overflow-y-auto" role="main">
           {children}
         </main>

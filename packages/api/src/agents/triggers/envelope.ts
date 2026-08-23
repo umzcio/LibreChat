@@ -31,6 +31,23 @@ interface AgentTriggerTarget {
 }
 
 /**
+ * Trusted host controls for a new fire. These values shape LibreChat's own
+ * generation request; they are never sourced directly from model output.
+ * `metadata` is opaque to the trigger core and lets an authenticated adapter
+ * identify its delivery to host-side lifecycle hooks without widening the
+ * public chat request surface.
+ */
+export interface AgentFireRunContext {
+  conversationId?: string;
+  timezone?: string;
+  /** Chat project the new conversation is filed under. Host-controlled like the
+   *  rest of this context — never sourced from the event payload. */
+  chatProjectId?: string;
+  files?: JsonValue[];
+  metadata?: JsonValue;
+}
+
+/**
  * One fire delivery represents one new conversation for this agent; retries
  * reuse the delivery id instead of starting another conversation.
  */
@@ -68,6 +85,7 @@ interface AgentTriggerEnvelopeBase {
 export interface AgentFireTriggerEnvelope extends AgentTriggerEnvelopeBase {
   mode: 'fire';
   target: AgentFireTarget;
+  run?: AgentFireRunContext;
 }
 
 export interface AgentContinueTriggerEnvelope extends AgentTriggerEnvelopeBase {
@@ -98,6 +116,7 @@ export type CreateAgentTriggerEnvelopeInput =
   | (CreateAgentTriggerEnvelopeBase & {
       mode: 'fire';
       target: AgentFireTarget;
+      run?: AgentFireRunContext;
     })
   | (CreateAgentTriggerEnvelopeBase & {
       mode: 'continue';
@@ -168,6 +187,35 @@ function createEvent(input: AgentTriggerEvent | null | undefined): AgentTriggerE
   };
 }
 
+function createFireRunContext(
+  input: AgentFireRunContext | null | undefined,
+): AgentFireRunContext | undefined {
+  if (input == null) {
+    return undefined;
+  }
+  const run = requireRecord(input, 'run');
+  const context: AgentFireRunContext = {};
+  if (run.conversationId != null) {
+    context.conversationId = requireString(run.conversationId, 'run.conversationId');
+  }
+  if (run.timezone != null) {
+    context.timezone = requireString(run.timezone, 'run.timezone');
+  }
+  if (run.chatProjectId != null) {
+    context.chatProjectId = requireString(run.chatProjectId, 'run.chatProjectId');
+  }
+  if (run.files != null) {
+    if (!Array.isArray(run.files)) {
+      throw error('run.files must be an array');
+    }
+    context.files = cloneJsonValue(run.files, 'run.files', error) as JsonValue[];
+  }
+  if (run.metadata !== undefined) {
+    context.metadata = cloneJsonValue(run.metadata, 'run.metadata', error) as JsonValue;
+  }
+  return context;
+}
+
 export function createAgentTriggerEnvelope(
   input: CreateAgentTriggerEnvelopeInput,
 ): AgentTriggerEnvelope {
@@ -183,10 +231,12 @@ export function createAgentTriggerEnvelope(
   };
 
   if (input.mode === 'fire') {
+    const run = createFireRunContext(input.run);
     return {
       ...base,
       mode: input.mode,
       target: { agentId: requireString(input.target?.agentId, 'target.agentId') },
+      ...(run != null && { run }),
     };
   }
 
@@ -276,10 +326,14 @@ export function parseAgentTriggerEnvelope(input: unknown): AgentTriggerEnvelope 
   const target = requireRecord(envelope.target, 'target');
 
   if (mode === 'fire') {
+    const run = createFireRunContext(
+      envelope.run == null ? undefined : (envelope.run as AgentFireRunContext),
+    );
     return {
       ...base,
       mode,
       target: { agentId: requireString(target.agentId, 'target.agentId') },
+      ...(run != null && { run }),
     };
   }
 

@@ -44,6 +44,7 @@ const {
   updateInterfacePermissions,
   configureMessageFilterRegexValidator,
   configureFileConfigRegexEngine,
+  createScheduleWriteGate,
   waitForKeyvRedisClient,
 } = require('@librechat/api');
 const { connectDb, indexSync } = require('~/db');
@@ -58,6 +59,7 @@ const { capabilityContextMiddleware } = require('./middleware/roles/capabilities
 const createValidateImageRequest = require('./middleware/validateImageRequest');
 const { initializeGitHubSkillSync } = require('./services/Skills/sync');
 const { initializeAgentTriggerService } = require('./services/Agents/triggers');
+const { initializeScheduleEngine, recordExpiredScheduleApproval } = require('./services/Schedules');
 const { jwtLogin, ldapLogin, passportLogin } = require('~/strategies');
 const { startExpiredFileSweep } = require('./services/Files/process');
 const { checkMigrations } = require('./services/start/migration');
@@ -86,6 +88,8 @@ const trusted_proxy = Number(TRUST_PROXY) || 1; /* trust first proxy by default 
 
 const app = express();
 let serverReady = false;
+/** @type {import('@librechat/api').ScheduleEngineState} */
+let scheduleEngineState = 'starting';
 
 const SERVER_NOT_READY_CODE = 'SERVER_NOT_READY';
 const CHAT_START_RETRY_AFTER_SECONDS = '1';
@@ -102,12 +106,18 @@ const rejectChatStartsUntilReady = (req, res, next) => {
   });
 };
 
+const rejectScheduleWritesUntilReady = createScheduleWriteGate({
+  getState: () => scheduleEngineState,
+  retryAfterSeconds: CHAT_START_RETRY_AFTER_SECONDS,
+});
+
 const configureGenerationStreams = () => {
   const streamServices = createStreamServices();
   GenerationJobManager.configure({
     ...streamServices,
     cleanupOnComplete: !isEnabled(process.env.STREAM_KEEP_COMPLETED_JOBS),
   });
+  GenerationJobManager.setApprovalExpiredHandler(recordExpiredScheduleApproval);
   GenerationJobManager.initialize();
   // Stop active generations and close their SSE streams while the HTTP server drains.
   registerShutdownTask(
@@ -361,6 +371,7 @@ const startServer = async () => {
   app.use('/api/agents', routes.agents);
   app.use('/api/banner', routes.banner);
   app.use('/api/memories', routes.memories);
+  app.use('/api/schedules', rejectScheduleWritesUntilReady, routes.schedules);
   app.use('/api/permissions', routes.accessPermissions);
 
   app.use('/api/tags', routes.tags);
@@ -418,6 +429,17 @@ const startServer = async () => {
         memoryDiagnostics.start();
       }
       await initializeAgentTriggerService({ address: server.address() });
+      const scheduleEngineArmed = (await initializeScheduleEngine()) != null;
+      scheduleEngineState = scheduleEngineArmed ? 'armed' : 'unavailable';
+      if (!scheduleEngineArmed) {
+        // Terminal, not transient: arming is attempted once, so schedule writes are refused
+        // for the life of this process. Logged at error level because the only other signal
+        // an operator gets is a 503 on every write — every other health signal stays green.
+        logger.error(
+          '[schedules] write routes are PERMANENTLY unavailable in this process: the engine did not arm. ' +
+            'Resolve the cause logged above and restart.',
+        );
+      }
       serverReady = true;
       logger.info('Server readiness checks passing.');
     } catch (initErr) {

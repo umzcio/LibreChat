@@ -18,6 +18,8 @@ const {
   decrementPendingRequest,
   sanitizeMessageForTransmit,
   checkAndIncrementPendingRequest,
+  exemptFromConcurrencyLimiter,
+  isScheduleFireRequest,
   isUnpersistedPreliminaryParent,
   resolveConversationAnchor,
   getAgentStartupTelemetry,
@@ -26,6 +28,7 @@ const {
   buildRecoveredSteerPayload,
   deleteAgentCheckpoint,
   getAttachmentTitleText,
+  createMCPRuntimeRequestBody,
 } = require('@librechat/api');
 const { disposeClient } = require('~/server/cleanup');
 const {
@@ -33,6 +36,7 @@ const {
   cleanupMCPRequestContextForReq,
 } = require('~/server/services/MCPRequestContext');
 const { logViolation } = require('~/cache');
+const { recordScheduleOutcome, isScheduleLive } = require('~/server/services/Schedules');
 const { saveMessage, getMessages, getConvo, isAgentTriggerPrincipalActive } = require('~/models');
 const {
   GENERATION_PROTOCOL_HEADER,
@@ -91,18 +95,6 @@ async function attachConversationCreatedAt(req, conversationId, conversationAnch
   if (resolved.conversation !== undefined) {
     req.resolvedConversation = resolved.conversation ?? null;
   }
-}
-
-function getPreliminaryResponseMessageId({ messageId, responseMessageId }) {
-  if (typeof responseMessageId === 'string' && responseMessageId.length > 0) {
-    return responseMessageId;
-  }
-
-  if (typeof messageId !== 'string' || messageId.length === 0) {
-    return null;
-  }
-
-  return `${messageId.replace(/_+$/, '')}_`;
 }
 
 function getPreliminaryUserMessage(
@@ -182,8 +174,20 @@ async function finishResumableRequest(req, userId) {
   try {
     await cleanupMCPRequestContextForReq(req);
   } finally {
-    await decrementPendingRequest(userId);
+    if (req._scheduleConcurrencyExempt !== true) {
+      await decrementPendingRequest(userId);
+    }
   }
+}
+
+function classifyScheduledFailure(error, aborted = false) {
+  if (aborted || error?.code === 'SCHEDULE_NO_LONGER_ACTIVE') {
+    return { status: 'interrupted', error: error?.message };
+  }
+  if (error?.message?.includes(ViolationTypes.TOKEN_BALANCE)) {
+    return { status: 'skipped_balance' };
+  }
+  return { status: 'error', error: error?.message || 'Generation failed' };
 }
 
 const JOB_RECORD_WAIT_ATTEMPTS = 5;
@@ -338,7 +342,15 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     parentMessageId = null,
     overrideParentMessageId = null,
     responseMessageId: editedResponseMessageId = null,
+    scheduleId: bodyScheduleId = null,
+    scheduledFor: bodyScheduledFor = null,
+    scheduleConfigRevision: bodyScheduleConfigRevision = null,
   } = req.body;
+
+  const isScheduledFire = isScheduleFireRequest(req);
+  const scheduleId = isScheduledFire ? bodyScheduleId : null;
+  const scheduledFor = isScheduledFire ? bodyScheduledFor : null;
+  const scheduleConfigRevision = isScheduledFire ? bodyScheduleConfigRevision : undefined;
 
   const userId = req.user.id;
   const tenantId = req.user.tenantId;
@@ -359,6 +371,23 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     );
   }
   const clientRequestId = rawClientRequestId;
+  const rawOverrideUserMessageId = req.body?.overrideUserMessageId;
+  const rawOverrideConversationId = req.body?.overrideConvoId;
+  if (
+    (rawOverrideUserMessageId != null && typeof rawOverrideUserMessageId !== 'string') ||
+    (rawOverrideConversationId != null && typeof rawOverrideConversationId !== 'string')
+  ) {
+    startupTelemetry?.end('rejected');
+    return sendGenerationJson(
+      res,
+      400,
+      {
+        code: 'INVALID_OVERRIDE_ID',
+        error: 'overrideUserMessageId and overrideConvoId must be strings.',
+      },
+      generationProtocolVersion,
+    );
+  }
   const rawExpectedPredecessorCreatedAt = req.body?.expectedPredecessorCreatedAt;
   if (
     rawExpectedPredecessorCreatedAt != null &&
@@ -403,7 +432,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
   }
   const recoveredSteerId = explicitRecoveredSteerId ?? legacyRecoveredSteerId;
   const isRecoveredSteerRequest = recoveredSteerId != null;
-  const recoveryUserMessageId = req.body?.overrideUserMessageId;
+  const recoveryUserMessageId = rawOverrideUserMessageId;
   const recoveredSteerPayload = isRecoveredSteerRequest
     ? buildRecoveredSteerPayload(text, req.body?.files)
     : undefined;
@@ -446,12 +475,17 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     req.body.overrideUserMessageId = `${recoveredSteerId}${Constants.COMMON_DIVIDER}0`;
   }
   const isNewConvo = !reqConversationId || reqConversationId === 'new';
+  const scheduledNewConversationId =
+    isScheduledFire && typeof req.body?.newConversationId === 'string'
+      ? req.body.newConversationId
+      : null;
   let conversationId = reqConversationId;
   if (isNewConvo) {
     conversationId =
-      typeof clientRequestId === 'string' && clientRequestId.length > 0
+      scheduledNewConversationId ??
+      (typeof clientRequestId === 'string' && clientRequestId.length > 0
         ? uuidv5(`${userId}:${clientRequestId}`, NEW_CONVERSATION_IDEMPOTENCY_NAMESPACE)
-        : crypto.randomUUID();
+        : crypto.randomUUID());
   }
   const conversationAnchorPromise = resolveConversationCreatedAt({
     userId,
@@ -936,26 +970,81 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     }
   }
 
-  const { allowed, pendingRequests, limit } = await checkAndIncrementPendingRequest(userId);
-  if (!allowed) {
-    if (ownedIdempotencyClaim) {
-      await GenerationJobManager.releaseGeneration(
-        userId,
-        clientRequestId,
-        streamId,
-        ownedIdempotencyClaim,
-      ).catch(() => {});
+  const scheduleConcurrencyExempt = exemptFromConcurrencyLimiter(req);
+  req._scheduleConcurrencyExempt = scheduleConcurrencyExempt;
+  if (!scheduleConcurrencyExempt) {
+    const { allowed, pendingRequests, limit } = await checkAndIncrementPendingRequest(userId);
+    if (!allowed) {
+      if (ownedIdempotencyClaim) {
+        await GenerationJobManager.releaseGeneration(
+          userId,
+          clientRequestId,
+          streamId,
+          ownedIdempotencyClaim,
+        ).catch(() => {});
+      }
+      const violationInfo = getViolationInfo(pendingRequests, limit);
+      await logViolation(req, res, ViolationTypes.CONCURRENT, violationInfo, violationInfo.score);
+      startupTelemetry?.end('rejected');
+      return sendGenerationJson(res, 429, violationInfo, generationProtocolVersion);
     }
-    const violationInfo = getViolationInfo(pendingRequests, limit);
-    await logViolation(req, res, ViolationTypes.CONCURRENT, violationInfo, violationInfo.score);
-    startupTelemetry?.end('rejected');
-    return sendGenerationJson(res, 429, violationInfo, generationProtocolVersion);
   }
   startupTelemetry?.mark('request_admitted');
+
+  /** Allocate the turn identities before Agent initialization. Request-scoped
+   * MCP transports resolve BODY placeholders while tools are discovered, so
+   * discovery and graph execution must receive the same response-scoped body.
+   * BaseClient otherwise allocates these IDs later in `sendMessage`, after MCP
+   * connections already exist. */
+  const overrideUserMessageId = rawOverrideUserMessageId
+    ? rawOverrideUserMessageId.split(Constants.COMMON_DIVIDER)[0]
+    : undefined;
+  const preallocatedUserMessageId =
+    overrideUserMessageId ?? overrideParentMessageId ?? crypto.randomUUID();
+  const overrideConversationId = rawOverrideConversationId
+    ? rawOverrideConversationId.split(Constants.COMMON_DIVIDER)[0]
+    : undefined;
+  const effectiveConversationId = overrideConversationId ?? conversationId;
+  let preallocatedResponseMessageId = editedResponseMessageId ?? crypto.randomUUID();
+  if (
+    (editedContent != null && !isContinued) ||
+    (isRegenerate && preallocatedResponseMessageId.endsWith('_'))
+  ) {
+    preallocatedResponseMessageId = crypto.randomUUID();
+  }
+  const mcpRequestBody = createMCPRuntimeRequestBody({
+    messageId: preallocatedResponseMessageId,
+    conversationId: effectiveConversationId,
+    parentMessageId:
+      editedContent != null ? preallocatedResponseMessageId : preallocatedUserMessageId,
+  });
 
   let client = null;
   let jobCreatedAt;
   let providerExecutionId;
+  let scheduleTerminalOutcomeRecorded = false;
+  const settleScheduledRun = async ({ status, error, clearConversationId = false }) => {
+    if (!scheduleId) {
+      return true;
+    }
+    if (status !== 'requires_action' && scheduleTerminalOutcomeRecorded) {
+      return true;
+    }
+    const recorded = await recordScheduleOutcome({
+      scheduleId,
+      scheduledFor,
+      streamId,
+      jobCreatedAt,
+      status,
+      conversationId,
+      clearConversationId,
+      error,
+    });
+    if (recorded && status !== 'requires_action') {
+      scheduleTerminalOutcomeRecorded = true;
+    }
+    return recorded;
+  };
 
   try {
     logger.debug(`[ResumableAgentController] Creating job`, {
@@ -967,8 +1056,10 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
 
     const endpointIconURL = getEndpointIconURL(req, endpointOption);
     const responseModel = getAgentResponseModel(req, endpointOption);
-    const preliminaryUserMessage = getPreliminaryUserMessage(req.body, conversationId);
-    const preliminaryResponseMessageId = getPreliminaryResponseMessageId(req.body);
+    const preliminaryUserMessage = getPreliminaryUserMessage(
+      { ...req.body, messageId: preallocatedUserMessageId },
+      conversationId,
+    );
     const job = await GenerationJobManager.createJob(streamId, userId, conversationId, {
       startupTelemetry,
       ...(recoveredSteerId && { recoveredSteerId }),
@@ -995,7 +1086,20 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         // Persist temporary-chat state so a HITL resume keeps the resumed response
         // non-persisted instead of trusting the resume request to re-send the flag.
         isTemporary: req.body?.isTemporary,
-        responseMessageId: preliminaryResponseMessageId,
+        ...(isRegenerate && { isRegenerate: true }),
+        ...(scheduleId
+          ? {
+              scheduleId,
+              scheduledFor,
+              preserveForScheduleReconcile: true,
+              ...(Number.isSafeInteger(scheduleConfigRevision) && {
+                scheduleConfigRevision,
+              }),
+              ...(req._isManualScheduledFire === true && { scheduleManual: true }),
+            }
+          : {}),
+        responseMessageId: preallocatedResponseMessageId,
+        mcpRequestBody,
         userMessage: preliminaryUserMessage,
       },
     });
@@ -1013,6 +1117,23 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     if (!(await isAgentTriggerPrincipalActive(userId))) {
       throw Object.assign(new Error('Account deletion is in progress'), {
         code: 'ACCOUNT_DELETION_IN_PROGRESS',
+        status: 409,
+      });
+    }
+    if (
+      scheduleId &&
+      !(await isScheduleLive(scheduleId, scheduleConfigRevision, {
+        automatic: req._isManualScheduledFire !== true,
+        policy: true,
+        // The occurrence's OWN recorded scope, exactly as the resume path passes it.
+        // The run row is reserved before this loopback request is dispatched, so a pin
+        // introduced while the request sat queued must not be validated in place of the
+        // destination this occurrence's envelope was already built with.
+        scheduledFor,
+      }))
+    ) {
+      throw Object.assign(new Error('This scheduled occurrence is no longer active'), {
+        code: 'SCHEDULE_NO_LONGER_ACTIVE',
         status: 409,
       });
     }
@@ -1162,6 +1283,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
       signal: job.abortController.signal,
       jobCreatedAt,
       checkpointNamespace: job.metadata?.checkpointNamespace,
+      requestBody: mcpRequestBody,
     });
     startupTelemetry?.mark('client_initialized');
     client = result.client;
@@ -1186,6 +1308,11 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           '[ResumableAgentController] completeJob failed after initialization abort',
           completeErr,
         );
+      });
+      await settleScheduledRun({
+        status: 'interrupted',
+        error: 'Request aborted during initialization',
+        clearConversationId: job.createdEventEmitted !== true,
       });
       startupTelemetry?.end('aborted');
       try {
@@ -1260,6 +1387,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
      * may call completeJob: the pause may already have been replaced by a newer
      * action or generation by the time the persistence failure is observed. */
     let pausePersistenceFailed = false;
+    let pausePersistenceFailureFinalized = false;
     const finishOwnedTerminalClaim = async () => {
       if (!terminalClaim || terminalClaimFinished) {
         return;
@@ -1460,6 +1588,8 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           beforeResponsePersistence: claimBeforeResponsePersistence,
           userMCPAuthMap: result.userMCPAuthMap,
           responseMessageId: editedResponseMessageId,
+          preallocatedUserMessageId,
+          preallocatedResponseMessageId,
           progressOptions: {
             res: {
               write: () => true,
@@ -1586,21 +1716,21 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
               await commitRecoveredSteer();
             } catch (pausePersistenceError) {
               pausePersistenceFailed = true;
-              let failed;
               try {
-                failed = await GenerationJobManager.failPausePersistence(
-                  streamId,
-                  pauseActionId,
-                  pausePersistenceError?.message ?? 'Pause persistence failed',
-                  pauseCreatedAt,
-                );
+                pausePersistenceFailureFinalized =
+                  (await GenerationJobManager.failPausePersistence(
+                    streamId,
+                    pauseActionId,
+                    pausePersistenceError?.message ?? 'Pause persistence failed',
+                    pauseCreatedAt,
+                  )) === true;
               } catch (failError) {
                 logger.error(
                   `[ResumableAgentController] Failed to terminalize pause persistence error for ${streamId}`,
                   failError,
                 );
               }
-              if (failed === true) {
+              if (pausePersistenceFailureFinalized) {
                 /** Namespaced checkpoints belong exclusively to this epoch,
                  * so the exact pause-failure CAS winner can safely remove the
                  * now-unresumable graph state. Legacy shared namespaces are
@@ -1621,7 +1751,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
                     );
                   }
                 }
-              } else if (failed === false) {
+              } else if (pausePersistenceFailureFinalized === false) {
                 logger.warn(
                   `[ResumableAgentController] Skipping stale pause persistence failure — ${streamId} no longer owns its barrier`,
                 );
@@ -1638,6 +1768,17 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
                 `[ResumableAgentController] Pause persistence barrier changed before release: ${streamId}`,
               );
             }
+            // The pause projection is what moves the run row off `started` and frees its
+            // GLOBAL capacity slot. recordScheduleOutcome already retried it; a `false`
+            // here means every attempt failed, leaving the row `started` while the job
+            // sits `requires_action`. Surface it — the armed engine's reconciler replays
+            // this state, and the clustered sweep now converges it too, but a silent drop
+            // gave neither a reason to look.
+            if (!(await settleScheduledRun({ status: 'requires_action' }))) {
+              logger.error(
+                `[ResumableAgentController] Failed to project the scheduled pause for ${streamId}; run stays active until reconciliation replays it`,
+              );
+            }
           } else {
             logger.debug(
               `[ResumableAgentController] Skipping stale pause persistence — ${streamId} no longer owns its barrier`,
@@ -1650,7 +1791,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           // (so a fast /resume isn't 429'd); only release here if that didn't happen.
           // Always run the MCP request-context cleanup.
           await cleanupMCPRequestContextForReq(req);
-          if (!client?.pendingRequestReleased) {
+          if (!client?.pendingRequestReleased && req._scheduleConcurrencyExempt !== true) {
             await decrementPendingRequest(userId);
           }
           if (client) {
@@ -1781,6 +1922,17 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           await titleEventPromise;
         }
 
+        let scheduleCompletionError;
+        if (terminalWasAborted) {
+          scheduleCompletionError = 'Scheduled run was stopped';
+        } else if (preemptIncomplete) {
+          scheduleCompletionError = 'Scheduled run was interrupted before completion';
+        }
+        await settleScheduledRun({
+          status: terminalWasAborted || preemptIncomplete ? 'interrupted' : 'success',
+          ...(scheduleCompletionError != null && { error: scheduleCompletionError }),
+        });
+
         let terminalPublicationStarted = false;
         try {
           const pendingSteers = terminalClaim.drainedSteers.map(toPendingSteer);
@@ -1893,7 +2045,9 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
         // transition can win. Settle its pending marker with conservative
         // reconciliation on any required-write/final-construction failure,
         // then release exactly that claim.
+        let ownsScheduledFailure = false;
         if (terminalClaim && !terminalClaimFinished) {
+          ownsScheduledFailure = true;
           try {
             await GenerationJobManager.publishTerminalClaim(terminalClaim, null);
           } catch (publishError) {
@@ -1915,6 +2069,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           );
           startupTelemetry?.end('error', error);
         } else if (pausePersistenceFailed) {
+          ownsScheduledFailure = pausePersistenceFailureFinalized;
           // failPausePersistence owns the only legal requires_action -> error
           // transition for this exact action/epoch. Never fall through to
           // completeJob, which could race a newer action or replacement job.
@@ -1924,6 +2079,7 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           );
           startupTelemetry?.end('error', error);
         } else if (job.abortController.signal.aborted || error.message?.includes('abort')) {
+          ownsScheduledFailure = true;
           logger.debug(`[ResumableAgentController] Generation aborted for ${streamId}`);
           startupTelemetry?.end('aborted');
           // abortJob already handled emitDone and completeJob
@@ -1933,7 +2089,9 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           try {
             // completeJob first wins running -> error and atomically parks
             // steers, then publishes. A competing abort/pause emits nothing.
-            await GenerationJobManager.completeJob(streamId, generationError, jobCreatedAt);
+            ownsScheduledFailure =
+              (await GenerationJobManager.completeJob(streamId, generationError, jobCreatedAt)) ===
+              true;
           } catch (completeErr) {
             logger.warn(
               '[ResumableAgentController] completeJob failed during generation-error cleanup',
@@ -1942,6 +2100,14 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           } finally {
             startupTelemetry?.end('error', error);
           }
+        }
+
+        if (ownsScheduledFailure && !scheduleTerminalOutcomeRecorded) {
+          const scheduledFailure = classifyScheduledFailure(
+            error,
+            job.abortController.signal.aborted,
+          );
+          await settleScheduledRun(scheduledFailure);
         }
 
         try {
@@ -1962,15 +2128,24 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
           `[ResumableAgentController] Unhandled error in background generation: ${err.message}`,
         );
         startupTelemetry?.end('error', err);
+        let errorFinalized = false;
         if (!pausePersistenceFailed) {
-          await GenerationJobManager.completeJob(streamId, err.message, jobCreatedAt).catch(
-            (completeErr) => {
-              logger.warn(
-                '[ResumableAgentController] completeJob failed during background-error cleanup',
-                completeErr,
-              );
-            },
-          );
+          errorFinalized =
+            (await GenerationJobManager.completeJob(streamId, err.message, jobCreatedAt).catch(
+              (completeErr) => {
+                logger.warn(
+                  '[ResumableAgentController] completeJob failed during background-error cleanup',
+                  completeErr,
+                );
+                return false;
+              },
+            )) === true;
+        }
+        if (
+          (errorFinalized || (pausePersistenceFailed && pausePersistenceFailureFinalized)) &&
+          !scheduleTerminalOutcomeRecorded
+        ) {
+          await settleScheduledRun(classifyScheduledFailure(err));
         }
         try {
           await finishResumableRequest(req, userId);
@@ -2084,18 +2259,24 @@ const ResumableAgentController = async (req, res, next, initializeClient, addTit
     // release + pending-request decrement below, or the retry stays wedged behind the claim
     // and the concurrency slot leaks — so swallow its error. (A failed completeJob did not
     // finalize anything, so releasing afterward can't let it abort a later replacement.)
+    let initializationFinalized = jobCreatedAt == null;
     if (jobCreatedAt != null) {
       const initializationError = initializationFailure
         ? JSON.stringify(initializationFailure)
         : error.message || 'Failed to start generation';
-      await GenerationJobManager.completeJob(streamId, initializationError, jobCreatedAt).catch(
-        (completeErr) => {
-          logger.warn(
-            '[ResumableAgentController] completeJob failed during init-error cleanup',
-            completeErr,
-          );
-        },
-      );
+      initializationFinalized =
+        (await GenerationJobManager.completeJob(streamId, initializationError, jobCreatedAt).catch(
+          (completeErr) => {
+            logger.warn(
+              '[ResumableAgentController] completeJob failed during init-error cleanup',
+              completeErr,
+            );
+            return false;
+          },
+        )) === true;
+    }
+    if (initializationFinalized && !scheduleTerminalOutcomeRecorded) {
+      await settleScheduledRun(classifyScheduledFailure(error));
     }
     if (ownedIdempotencyClaim) {
       await GenerationJobManager.releaseGeneration(
