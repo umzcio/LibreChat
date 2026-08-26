@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect, useMemo, useRef } from 'react';
 import { useAtomValue } from 'jotai';
 import { useResetAtom } from 'jotai/utils';
-import { FileSources, LocalStorageKeys } from 'librechat-data-provider';
+import { EModelEndpoint, FileSources, LocalStorageKeys } from 'librechat-data-provider';
 import type { ExtendedFile } from '~/common';
 import useResetArtifactsOnConversationChange from '~/hooks/Artifacts/useResetArtifactsOnConversationChange';
+import { ParentSubagentsProvider } from '~/components/Chat/Subagents/ParentSubagentsProvider';
 import DragDropWrapper from '~/components/Chat/Input/Files/DragDropWrapper';
 import { EditorProvider, ArtifactsProvider } from '~/Providers';
 import { useDeleteFilesMutation } from '~/data-provider';
@@ -33,6 +34,8 @@ export default function Presentation({
   // (gated on `isSubmitting`), restoring the legacy streaming UX.
   const currentArtifactId = useAtomValue(store.currentArtifactId);
   const conversationId = useAtomValue(store.conversationIdByIndex(0));
+  const conversationEndpoint = useAtomValue(store.effectiveEndpointByIndex(0));
+  const conversationAgentId = useAtomValue(store.conversationAgentIdByIndex(0));
   const selectedSubagent = useAtomValue(activeSubagentPanel);
   const resetSelectedSubagent = useResetAtom(activeSubagentPanel);
   const previousConversationIdRef = useRef<string | null>(null);
@@ -125,11 +128,16 @@ export default function Presentation({
 
   return (
     <DragDropWrapper className="relative flex w-full grow overflow-hidden bg-presentation">
-      <SidePanelGroup panel={panelElement}>
-        <main className="flex h-full flex-col overflow-y-auto" role="main">
-          {children}
-        </main>
-      </SidePanelGroup>
+      <ParentSubagentsProvider
+        conversationId={conversationId ?? ''}
+        enabled={conversationEndpoint === EModelEndpoint.agents && conversationAgentId != null}
+      >
+        <SidePanelGroup panel={panelElement}>
+          <main className="flex h-full flex-col overflow-y-auto" role="main">
+            {children}
+          </main>
+        </SidePanelGroup>
+      </ParentSubagentsProvider>
     </DragDropWrapper>
   );
 }

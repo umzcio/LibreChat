@@ -54,10 +54,25 @@ import {
   CLIENT_MESSAGE_SELECT,
   SUBAGENT_TRANSCRIPT_SOURCE_BYTE_LIMIT,
   type MessageMethods,
+  type ParentSubagentTaskRecord,
   type SubagentThreadViewMessageRecord,
   type SubagentTaskResultClaim,
 } from './message';
-import { createConversationMethods, type ConversationMethods } from './conversation';
+import {
+  createConversationMethods,
+  type ConversationMethods,
+  type ParentSubagentThreadRecord,
+} from './conversation';
+export type {
+  AssignConversationToProjectResult,
+  ChatProjectSortBy,
+  ChatProjectSortDirection,
+  CreateChatProjectInput,
+  DeleteChatProjectResult,
+  ListChatProjectsOptions,
+  ListChatProjectsResult,
+  UpdateChatProjectInput,
+} from './chatProject';
 /* Tier 3 — Complex (heavier injection) */
 import {
   createTxMethods,
@@ -380,6 +395,8 @@ export type {
   PresetMethods,
   ConversationTagMethods,
   MessageMethods,
+  ParentSubagentTaskRecord,
+  ParentSubagentThreadRecord,
   SubagentThreadViewMessageRecord,
   SubagentTaskResultClaim,
   ConversationMethods,

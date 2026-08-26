@@ -1,4 +1,5 @@
 import React from 'react';
+import { RecoilRoot } from 'recoil';
 import { render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { EModelEndpoint, mergeFileConfig } from 'librechat-data-provider';
@@ -57,13 +58,15 @@ const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false 
 function renderComponent(conversation: Record<string, unknown> | null, disableInputs = false) {
   return render(
     <QueryClientProvider client={queryClient}>
-      <AttachFileChat
-        conversation={conversation as never}
-        disableInputs={disableInputs}
-        files={new Map()}
-        setFiles={() => {}}
-        setFilesLoading={() => {}}
-      />
+      <RecoilRoot>
+        <AttachFileChat
+          conversation={conversation as never}
+          disableInputs={disableInputs}
+          files={new Map()}
+          setFiles={() => {}}
+          setFilesLoading={() => {}}
+        />
+      </RecoilRoot>
     </QueryClientProvider>,
   );
 }

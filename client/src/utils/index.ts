@@ -45,6 +45,7 @@ export * from './favoritesError';
 export * from './approval';
 export * from './steer';
 export * from './activityLabels';
+export * from './agentModelSelection';
 export * from './runStepDuration';
 export * from './toolCallPhase';
 export * from './documentTitle';

@@ -65,6 +65,18 @@ const latestMessageKeysSelector = atom(
 );
 latestMessageKeysSelector.debugLabel = 'latestMessageKeysSelector';
 
+/**
+ * Epoch ms baseline for the streaming elapsed indicator at this chat index.
+ * Stamped when this session submits a generation, cleared by the terminal
+ * handlers, and only FILLED (never overwritten) when resume-on-load attaches a
+ * run, so a reload reports real elapsed time and the reading survives remounts.
+ */
+const submissionStartFamily = atomFamily((_param: string | number) => {
+  const a = atom<number | null>(null);
+  a.debugLabel = 'submissionStartByIndex';
+  return a;
+});
+
 const submissionKeysSelector = atom(
   (get) => {
     const keys = get(conversationKeysAtom);
@@ -474,7 +486,12 @@ export type PendingSteer = {
   generationProtocolVersion?: GenerationProtocolVersion;
   createdAt: number;
   files?: TMessage['files'];
+  /** Quoted excerpts riding this steer (also sent on the POST — the server
+   *  merges them into the injected turn); kept on the chip so a steer that
+   *  never injects restores onto the queued item with them intact. */
   quotes?: string[];
+  /** Manual skill picks, carried for restoration only (a skill pick
+   *  configures a NEW turn's run, so it never rides the steer POST). */
   manualSkills?: string[];
   /** Asked the run to seal generation at the next safe boundary rather than
    *  wait for a tool step. Labelling only — the server owns the behaviour and
@@ -806,6 +823,7 @@ export default {
   submissionByIndex,
   submissionKeysAtom,
   submissionKeysSelector,
+  submissionStartFamily,
   textByIndex,
   showStopButtonByIndex,
   abortScrollFamily,
