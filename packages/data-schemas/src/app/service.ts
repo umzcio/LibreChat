@@ -200,6 +200,7 @@ export const AppService = async (params?: {
     mcpConfig: mcpServersConfig,
     fileStrategies: config.fileStrategies,
     cloudfront: config.cloudfront as AppConfig['cloudfront'],
+    secureImageLinks: config.secureImageLinks !== false,
   };
 
   const agentsDefaults = agentsConfigSetup(config);
@@ -238,7 +239,6 @@ export const AppService = async (params?: {
   const appConfig: AppConfig = {
     ...defaultConfig,
     fileConfig: config?.fileConfig as AppConfig['fileConfig'],
-    secureImageLinks: config?.secureImageLinks,
     modelSpecs: processModelSpecs(config?.endpoints, config.modelSpecs, interfaceConfig),
     endpoints: loadedEndpoints,
   };
