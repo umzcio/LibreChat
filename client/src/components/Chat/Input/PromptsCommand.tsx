@@ -67,7 +67,7 @@ function PromptsCommand({
   const promptGroupsContext = usePromptGroupsContext();
   const { allPromptGroups, hasAccess, requestAllPromptGroups } = promptGroupsContext ?? {};
   const { data, isLoading } = allPromptGroups ?? {};
-  const showPromptsPopover = useRecoilValue(store.showPromptsPopoverFamily(index));
+  const showPromptsPopover = useAtomValue(store.showPromptsPopoverFamily(index));
 
   const [activeIndex, setActiveIndex] = useState(0);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
