@@ -14,6 +14,7 @@ const {
   discoverConnectedAgents,
   resolveAgentTokenConfig,
   resolveAgentScopedSkillIds,
+  resolveAlwaysApplySkills,
   resolveModelSpecSkillIds,
   getAgentStartupTelemetry,
   isContentFilterError,
@@ -22,6 +23,7 @@ const {
   getLazySubagentConfigId,
   createStatefulCodeEnvironmentPolicyError,
   buildSubagentThreadTaskConfig,
+  backgroundCompletionWakeupsEnabled,
 } = require('@librechat/api');
 const {
   ResourceType,
@@ -64,6 +66,11 @@ const { checkPermission, findAccessibleResources } = require('~/server/services/
 const AgentClient = require('~/server/controllers/agents/client');
 const { processAddedConvo } = require('./addedConvo');
 const subagentThreadTaskStore = require('./subagentThreadStore');
+const {
+  preregisterBackgroundToolCompletion,
+  createBackgroundToolResultPersistence,
+  createDeadBackgroundToolClaimRecovery,
+} = require('./backgroundCompletion');
 const { logViolation } = require('~/cache');
 const db = require('~/models');
 
@@ -156,6 +163,9 @@ const initializeClient = async ({
     throw new Error('Endpoint option not provided');
   }
   const appConfig = req.config;
+  const completionWakeupsEnabled = backgroundCompletionWakeupsEnabled(
+    appConfig?.endpoints?.[EModelEndpoint.agents],
+  );
   /** The normal controller resolves this once for timestamp anchoring. Reuse
    * that trusted document for child-thread execution policy; resume and direct
    * callers fall back to the same owner-scoped lookup. */
@@ -345,6 +355,7 @@ const initializeClient = async ({
   /** @type {Map<string, import('@librechat/api').EndpointTokenConfig | undefined>} */
   const endpointTokenConfigByAgentId = new Map();
 
+  const invokedSkillIdentities = new Map();
   const toolExecuteOptions = {
     loadTools: async (toolNames, agentId, _configurable, callerCapabilityProjection) => {
       const ctx = agentToolContexts.get(agentId) ?? {};
@@ -386,12 +397,48 @@ const initializeClient = async ({
       });
     },
     toolEndCallback,
+    /** Bound later by request.js once the authenticated Event Actor owner and
+     * generation fence are known. Ordinary background calls remain unchanged. */
+    eventActorDetachedAction: {
+      reserve: (input) =>
+        req._agentEventDetachedActionLifecycle?.reserve(input) ??
+        Promise.resolve({ status: 'ignored' }),
+      markRunning: (input) =>
+        req._agentEventDetachedActionLifecycle?.markRunning(input) ?? Promise.resolve(false),
+      settle: (input) =>
+        req._agentEventDetachedActionLifecycle?.settle(input) ?? Promise.resolve(false),
+      wake: (input) => req._agentEventDetachedActionLifecycle?.wake(input) ?? Promise.resolve(),
+    },
     persistBackgroundCodeResult: createBackgroundCodeResultHandler({
       req,
       updateToolCallResult: db.updateToolCallResult,
     }),
+    backgroundToolCompletion: {
+      ...(completionWakeupsEnabled ? { preregister: preregisterBackgroundToolCompletion } : {}),
+      persist: createBackgroundToolResultPersistence({
+        req,
+        updateToolCallResult: db.updateToolCallResult,
+      }),
+      claim: db.claimBackgroundToolResults,
+      recoverDeadClaim: createDeadBackgroundToolClaimRecovery(
+        db.releaseBackgroundToolResultClaims,
+        (conversationId) => GenerationJobManager.getJob(conversationId),
+        ({ userId, conversationId, claimId }) =>
+          GenerationJobManager.fenceGenerationClaimForRecovery(
+            userId,
+            claimId,
+            conversationId,
+            conversationId,
+          ),
+      ),
+    },
     emitAttachment: createAttachmentEmitter({ res, streamId, jobCreatedAt }),
     emitPtcProgress: createPtcProgressEmitter({ res, streamId, jobCreatedAt }),
+    onSkillResolved: (skill, { agentId }) => {
+      if (agentId === primaryConfig.id) {
+        invokedSkillIdentities.set(skill.id, skill);
+      }
+    },
     ...getSkillToolDeps(),
   };
 
@@ -726,6 +773,12 @@ const initializeClient = async ({
   const skippedAgentIds = new Set(discoveredSkippedIds ?? []);
 
   const lazyMetadataByAgentId = new Map();
+  const eventActorContextRequested =
+    req._isAgentTrigger === true && req._agentEventBindingParentConversationId != null;
+  /** Request-scoped cache: lazy descriptors sharing the same Skill ACL scope
+   * reuse one metadata-only always-apply lookup without initializing tools,
+   * files, model clients, or MCP connections. */
+  const lazyAlwaysApplySkillsByScope = new Map();
   const subagentGraphIds = new Set();
   const expandedSubagentDescriptorState = { configCount: 0, rootAgentIds: [] };
 
@@ -836,7 +889,38 @@ const initializeClient = async ({
       ),
     );
 
-  const toLazySubagentMetadata = (agent) => {
+  const resolveLazyAlwaysApplySkillPrimes = (agent) => {
+    if (!eventActorContextRequested) {
+      return Promise.resolve([]);
+    }
+    const scopedSkillIds = resolveAgentScopedSkillIds({
+      agent,
+      accessibleSkillIds,
+      skillsCapabilityEnabled,
+      ephemeralSkillsToggle,
+    });
+    if (scopedSkillIds.length === 0 || typeof skillDbMethods.listAlwaysApplySkills !== 'function') {
+      return Promise.resolve([]);
+    }
+    const scopeKey = scopedSkillIds
+      .map((skillId) => skillId.toString())
+      .sort()
+      .join(':');
+    let resolution = lazyAlwaysApplySkillsByScope.get(scopeKey);
+    if (resolution == null) {
+      resolution = resolveAlwaysApplySkills({
+        listAlwaysApplySkills: skillDbMethods.listAlwaysApplySkills,
+        accessibleSkillIds: scopedSkillIds,
+        userId,
+        skillStates,
+        defaultActiveOnShare,
+      });
+      lazyAlwaysApplySkillsByScope.set(scopeKey, resolution);
+    }
+    return resolution;
+  };
+
+  const toLazySubagentMetadata = async (agent) => {
     const statefulCodeSessions =
       statefulSessionsAvailable === true &&
       codeEnvAvailable === true &&
@@ -857,6 +941,9 @@ const initializeClient = async ({
       model: agent.model,
       model_parameters: { model: agent.model_parameters?.model },
       recursion_limit: agent.recursion_limit,
+      memory_scope: agent.memory_scope,
+      memoryToolsRegistered:
+        memoryAvailable === true && agent.tools?.includes(Tools.memory) === true,
       subagents: agent.subagents,
       configId: getLazySubagentConfigId(agent),
       codeEnvAvailable:
@@ -864,6 +951,7 @@ const initializeClient = async ({
       statefulCodeSessions,
       statefulCodeEnvironment,
       includeReasoningHistory: getIncludeReasoningHistory(agent),
+      alwaysApplySkillPrimes: await resolveLazyAlwaysApplySkillPrimes(agent),
     };
   };
 
@@ -877,7 +965,7 @@ const initializeClient = async ({
         skippedAgentIds.add(agentId);
         return null;
       }
-      const metadata = toLazySubagentMetadata(agent);
+      const metadata = await toLazySubagentMetadata(agent);
       lazyMetadataByAgentId.set(agentId, metadata);
       return metadata;
     } catch (error) {
@@ -1087,12 +1175,15 @@ const initializeClient = async ({
         model: metadata.model,
         model_parameters: metadata.model_parameters,
         recursion_limit: metadata.recursion_limit,
+        memory_scope: metadata.memory_scope,
+        memoryToolsRegistered: metadata.memoryToolsRegistered,
         subagents: metadata.subagents,
         configId: metadata.configId,
         codeEnvAvailable: metadata.codeEnvAvailable,
         statefulCodeSessions: metadata.statefulCodeSessions,
         statefulCodeEnvironment: metadata.statefulCodeEnvironment,
         includeReasoningHistory: metadata.includeReasoningHistory,
+        alwaysApplySkillPrimes: metadata.alwaysApplySkillPrimes,
         lazySubagentConfigs: lazyChildren,
         subagentAgentConfigs: eagerChildren,
         subagentGraphMemberMetadata,
@@ -1267,15 +1358,13 @@ const initializeClient = async ({
               ? { tenantId: req.user.tenantId }
               : {}),
           },
-          {
-            completionWakeups: subagentThreadTaskStore.completionWakeupsEnabled === true,
-          },
+          { completionWakeups: completionWakeupsEnabled },
         )
       : undefined;
   let hasExistingSubagentTask = false;
   if (trustedSubagentTasks != null && !(subagentsAvailableForRun && hasSpawnableSubagent)) {
     try {
-      hasExistingSubagentTask = await subagentThreadTaskStore.hasTasks(
+      hasExistingSubagentTask = await trustedSubagentTasks.store.hasTasks(
         trustedSubagentTasks.scopeId,
       );
     } catch (error) {
@@ -1357,10 +1446,11 @@ const initializeClient = async ({
     },
   );
   const handlePrimeInvokedSkills = skillsCapabilityEnabled
-    ? (payload) =>
+    ? (payload, skillNames) =>
         primeInvokedSkillsForProfiles({
           req,
           payload,
+          skillNames,
           accessibleSkillIds,
           executionProfiles: codeExecutionProfiles,
           ...getSkillToolDeps(),
@@ -1440,6 +1530,7 @@ const initializeClient = async ({
     aggregateContent,
     artifactPromises,
     primeInvokedSkills: handlePrimeInvokedSkills,
+    invokedSkillIdentities,
     agent: primaryConfig,
     spec: endpointOption.spec,
     iconURL: endpointOption.iconURL,

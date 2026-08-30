@@ -1,13 +1,24 @@
 const {
   createAgentTriggerService,
+  createAgentContinuationResolver,
   createAgentEventContinueResolver,
   createSubagentCompletionWakeupResolver,
+  SUBAGENT_COMPLETION_SOURCE,
+  createBackgroundToolCompletionWakeupResolver,
+  BACKGROUND_TOOL_COMPLETION_SOURCE,
   GenerationJobManager,
-  isEnabled,
 } = require('@librechat/api');
 const methods = require('~/models');
 
-const completionResolver = createSubagentCompletionWakeupResolver({
+const subagentCompletionAdapter = createSubagentCompletionWakeupResolver({
+  methods,
+  getGenerationJob: (conversationId) => GenerationJobManager.getJob(conversationId),
+});
+const backgroundToolCompletionAdapter = createBackgroundToolCompletionWakeupResolver({
+  methods,
+  getGenerationJob: (conversationId) => GenerationJobManager.getJob(conversationId),
+});
+const eventActorAdapter = createAgentEventContinueResolver({
   methods,
   getGenerationJob: (conversationId) => GenerationJobManager.getJob(conversationId),
 });
@@ -15,11 +26,13 @@ const completionResolver = createSubagentCompletionWakeupResolver({
 const service = createAgentTriggerService({
   methods,
   isPrincipalActive: methods.isAgentTriggerPrincipalActive,
-  prepareContinue: createAgentEventContinueResolver({
-    methods,
-    getGenerationJob: (conversationId) => GenerationJobManager.getJob(conversationId),
-    fallback: completionResolver,
-    enabled: () => isEnabled(process.env.ENABLE_AGENT_EVENT_CHILD_TURNS),
+  supportsDetachedActionCompletion: () => GenerationJobManager.supportsDetachedAgentEventActions,
+  prepareContinue: createAgentContinuationResolver({
+    eventActor: eventActorAdapter,
+    internalSources: new Map([
+      [SUBAGENT_COMPLETION_SOURCE, subagentCompletionAdapter],
+      [BACKGROUND_TOOL_COMPLETION_SOURCE, backgroundToolCompletionAdapter],
+    ]),
   }),
 });
 
@@ -32,6 +45,8 @@ module.exports = {
   getAgentTriggerDeliveryStatus: service.getDeliveryStatus,
   getAgentTriggerDeadLetters: service.getDeadLetters,
   requeueAgentTrigger: service.requeue,
+  retireAgentTrigger: service.retire,
+  renewAgentTriggerProducerLease: service.renewProducerLease,
   drainAgentTriggerDeliveriesForUser: service.drainUser,
   prepareAgentTriggerUserPurge: service.prepareUserPurge,
   cancelAgentTriggerUserPurge: service.cancelUserPurge,
