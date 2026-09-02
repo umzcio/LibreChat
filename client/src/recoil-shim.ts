@@ -15,6 +15,7 @@
 import { atom as jotaiAtom, useAtom, useAtomValue, useSetAtom, useStore } from 'jotai';
 import { atomFamily as jotaiAtomFamily, RESET, useResetAtom } from 'jotai/utils';
 import type { Atom, WritableAtom, PrimitiveAtom } from 'jotai';
+import { useCallback } from 'react';
 import type { SetStateAction } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -218,22 +219,34 @@ export function useRecoilCallback<Args extends unknown[], Result>(
       getLoadable: <T>(a: Atom<T>) => RecoilLoadable<T>;
     };
   }) => (...args: Args) => Result,
-  deps?: unknown[],
+  deps: unknown[] = [],
 ): (...args: Args) => Result {
   const store = useStore();
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  return ((...args: Args) => {
-    const get = <T>(a: Atom<T>) => store.get(a);
-    const set = <T>(a: WritableAtom<T, [SetStateAction<T>], void>, v: T | SetStateAction<T>) =>
-      store.set(a, v);
-    const reset = <T>(a: WritableAtom<T, [typeof RESET], void>) => store.set(a, RESET);
-    const snapshot = {
-      getPromise: async <T>(a: Atom<T>) => store.get(a),
-      getLoadable: <T>(a: Atom<T>) => makeLoadable(store.get(a)),
-    };
-    return fn({ get, set, reset, snapshot })(...args);
-  }) as (...args: Args) => Result;
+  /**
+   * Recoil keys the returned callback on `deps` alone and ignores `fn`'s
+   * identity, so callers pass an inline arrow and still get a stable
+   * reference. Reproducing that is load-bearing, not a nicety: upstream code
+   * puts the result straight into a `useEffect` dependency array, and an
+   * unstable callback there re-fires the effect on every render — an infinite
+   * loop as soon as that effect writes an atom.
+   */
+  /* eslint-disable react-hooks/exhaustive-deps */
+  return useCallback(
+    (...args: Args) => {
+      const get = <T>(a: Atom<T>) => store.get(a);
+      const set = <T>(a: WritableAtom<T, [SetStateAction<T>], void>, v: T | SetStateAction<T>) =>
+        store.set(a, v);
+      const reset = <T>(a: WritableAtom<T, [typeof RESET], void>) => store.set(a, RESET);
+      const snapshot = {
+        getPromise: async <T>(a: Atom<T>) => store.get(a),
+        getLoadable: <T>(a: Atom<T>) => makeLoadable(store.get(a)),
+      };
+      return fn({ get, set, reset, snapshot })(...args);
+    },
+    [store, ...deps],
+  ) as (...args: Args) => Result;
+  /* eslint-enable react-hooks/exhaustive-deps */
 }
 
 // ---------------------------------------------------------------------------
