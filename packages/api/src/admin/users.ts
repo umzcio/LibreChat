@@ -1,4 +1,4 @@
-import mongoose, { Types } from 'mongoose';
+import { Types } from 'mongoose';
 import { PrincipalType, SystemRoles } from 'librechat-data-provider';
 import { logger, isValidObjectIdString } from '@librechat/data-schemas';
 import type {
@@ -12,7 +12,6 @@ import type { FilterQuery } from 'mongoose';
 import type { Response } from 'express';
 import type { ServerRequest } from '~/types/http';
 import { parsePagination } from './pagination';
-
 
 const MAX_SEARCH_LENGTH = 200;
 
@@ -38,6 +37,7 @@ export interface AdminUsersDeps {
   ) => Promise<void>;
   cancelAgentTriggerUserPurge: (userId: string, fenceStartedAt: Date) => Promise<boolean>;
   purgeAgentTriggerDeliveriesForUser: (userId: string) => Promise<void>;
+  revokeUserCodeEnvironmentWorkers?: (userId: string) => Promise<number>;
   /**
    * Thin data-layer delete — removes the User document only.
    * Full cascade of user-owned resources (conversations, messages, files, tokens, etc.)
@@ -47,6 +47,8 @@ export interface AdminUsersDeps {
    * A future iteration should consolidate the full cascade into a shared service function.
    */
   deleteUserById: (userId: string) => Promise<UserDeleteResult>;
+  deleteUserCodeEnvironments: (userId: string | Types.ObjectId) => Promise<number>;
+  invalidateCodeEnvironmentConfigCache: (tenantId?: string) => Promise<void>;
   deleteConfig: (
     principalType: PrincipalType,
     principalId: string | Types.ObjectId,
@@ -72,7 +74,10 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     prepareAgentTriggerUserPurge,
     cancelAgentTriggerUserPurge,
     purgeAgentTriggerDeliveriesForUser,
+    revokeUserCodeEnvironmentWorkers,
+    deleteUserCodeEnvironments,
     deleteUserById,
+    invalidateCodeEnvironmentConfigCache,
     deleteConfig,
     deleteAclEntries,
     deleteUserCascade,
@@ -202,9 +207,33 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
         return res.status(404).json({ error: 'User not found' });
       }
       userDeleted = true;
+      let codeEnvironmentCleanupSafe = true;
+      try {
+        await revokeUserCodeEnvironmentWorkers?.(id);
+      } catch (error) {
+        codeEnvironmentCleanupSafe = false;
+        logger.error('[adminUsers] failed to revoke code environment workers:', id, error);
+      }
       await purgeAgentTriggerDeliveriesForUser(id);
 
+      if (targetUser?.role === SystemRoles.ADMIN) {
+        const remaining = await countUsers({ role: SystemRoles.ADMIN });
+        if (remaining === 0) {
+          logger.error(
+            `[adminUsers] CRITICAL: last admin deleted via race condition, user: ${id}. ` +
+              'Manual DB intervention required to restore an ADMIN user.',
+          );
+        }
+      }
+
       const objectId = new Types.ObjectId(id);
+
+      if (codeEnvironmentCleanupSafe) {
+        await deleteUserCodeEnvironments(objectId).catch((error: unknown) => {
+          logger.error('[adminUsers] code environment cleanup failed for user:', id, error);
+        });
+      }
+
       if (deleteUserCascade) {
         try {
           await deleteUserCascade(id, objectId);
@@ -222,6 +251,9 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
           }
         }
       }
+      await invalidateCodeEnvironmentConfigCache(targetUser?.tenantId).catch((error: unknown) => {
+        logger.error('[adminUsers] code environment cache invalidation failed:', id, error);
+      });
 
       return res.status(200).json({ message: result.message || 'User deleted successfully' });
     } catch (error) {

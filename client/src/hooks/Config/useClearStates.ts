@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useStore } from 'jotai';
 import { RESET } from 'jotai/utils';
+import { showSkillsPopoverFamily } from '~/components/Chat/Input/skillsState';
 import { clearLocalStorage } from '~/utils/localStorage';
 import store from '~/store';
 
@@ -35,7 +36,7 @@ export default function useClearStates() {
         jotaiStore.set(store.showMentionPopoverFamily(key), false);
         jotaiStore.set(store.showPlusPopoverFamily(key), false);
         jotaiStore.set(store.showPromptsPopoverFamily(key), false);
-        jotaiStore.set(store.showSkillsPopoverFamily(key), false);
+        jotaiStore.set(showSkillsPopoverFamily(key), false);
         jotaiStore.set(store.activePromptByIndex(key), undefined);
         jotaiStore.set(store.globalAudioURLFamily(key), null);
         jotaiStore.set(store.globalAudioFetchingFamily(key), false);
@@ -45,6 +46,17 @@ export default function useClearStates() {
         jotaiStore.set(store.messagesSiblingIdxFamily(key.toString()), 0);
         jotaiStore.set(store.pendingManualSkillsByConvoId(key.toString()), []);
         jotaiStore.set(store.pendingQuotesByConvoId(key.toString()), []);
+
+        /**
+         * Pending skill/quote queues are keyed by the conversation id the
+         * composer wrote under, not this UI index — also clear by the resolved
+         * id so queued-but-unsent selections don't linger.
+         */
+        const convoId = jotaiStore.get(store.conversationByIndex(key))?.conversationId;
+        if (convoId != null) {
+          jotaiStore.set(store.pendingManualSkillsByConvoId(convoId), []);
+          jotaiStore.set(store.pendingQuotesByConvoId(convoId), []);
+        }
       }
 
       clearLocalStorage(skipFirst);

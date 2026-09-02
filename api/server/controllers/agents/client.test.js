@@ -92,6 +92,7 @@ describe('AgentClient - event actor history adapter', () => {
   const fingerprint = { algorithm: 'sha256', version: 1, digest: 'context' };
   const compactionSemanticIndex = {
     version: 1,
+    providedEntryCount: 1,
     entries: [
       {
         type: 'activity_phase',
@@ -187,7 +188,10 @@ describe('AgentClient - event actor history adapter', () => {
       tokenCount: 12,
     });
     expect(client.contextMeta).toEqual({ calibrationRatio: 1.25, encoding: 'o200k_base' });
-    expect(client.compactionSemanticIndex).toEqual(compactionSemanticIndex.entries);
+    expect(client.compactionSemanticIndexSnapshot).toEqual({
+      entries: compactionSemanticIndex.entries,
+      providedEntryCount: 1,
+    });
   });
 
   it('falls back when a durable Skill resolves to a different revision', async () => {
@@ -301,7 +305,10 @@ describe('AgentClient - event actor history adapter', () => {
       },
     ];
     client.contextMeta = { calibrationRatio: 1.3, encoding: 'o200k_base' };
-    client.compactionSemanticIndex = compactionSemanticIndex.entries;
+    client.compactionSemanticIndexSnapshot = {
+      entries: compactionSemanticIndex.entries,
+      providedEntryCount: 1,
+    };
     client.getEventActorAgents = jest.fn(() => []);
     client.getEventActorMemorySnapshots = jest.fn().mockResolvedValue([]);
 
@@ -874,16 +881,19 @@ describe('AgentClient - interrupt discovery persistence', () => {
     client.conversationId = streamId;
     client.responseMessageId = 'response-discovered-pause';
     client.jobCreatedAt = job.createdAt;
-    client.compactionSemanticIndex = [
-      {
-        type: 'activity_phase',
-        sourceMessageId: 'assistant-before-pause',
-        sourceContentIndex: 1,
-        revision: 1,
-        status: 'committed',
-        text: 'Prepared the change',
-      },
-    ];
+    client.compactionSemanticIndexSnapshot = {
+      entries: [
+        {
+          type: 'activity_phase',
+          sourceMessageId: 'assistant-before-pause',
+          sourceContentIndex: 1,
+          revision: 1,
+          status: 'committed',
+          text: 'Prepared the change',
+        },
+      ],
+      providedEntryCount: 1,
+    };
 
     await client.handleRunInterrupt(
       {
@@ -906,7 +916,8 @@ describe('AgentClient - interrupt discovery persistence', () => {
     expect(paused?.metadata.discoveredTools).toEqual(['save_issue_mcp_linear']);
     expect(paused?.metadata.compactionSemanticIndex).toEqual({
       version: 1,
-      entries: client.compactionSemanticIndex,
+      entries: client.compactionSemanticIndexSnapshot.entries,
+      providedEntryCount: 1,
     });
   });
 
@@ -1781,7 +1792,10 @@ describe('AgentClient - startup telemetry', () => {
       indexTokenCountMap: {},
       summary: undefined,
       boundaryTokenAdjustment: undefined,
-      compactionSemanticIndex,
+      compactionSemanticIndexSnapshot: {
+        entries: compactionSemanticIndex,
+        providedEntryCount: compactionSemanticIndex.length,
+      },
     });
     const processStream = jest.fn().mockResolvedValue();
     mockCreateRun.mockResolvedValueOnce({
@@ -1930,6 +1944,55 @@ describe('AgentClient - startup telemetry', () => {
     );
   });
 
+  it('evolves a persisted semantic snapshot from only the warm payload', () => {
+    const { formatAgentMessages } = jest.requireActual('@librechat/agents');
+    const baseEntry = {
+      type: 'activity_phase',
+      sourceMessageId: 'assistant-history',
+      sourceContentIndex: 1,
+      revision: 1,
+      status: 'committed',
+      text: 'Verified the release state',
+    };
+    const baseSnapshot = { entries: [baseEntry], providedEntryCount: 7 };
+    const payload = [
+      {
+        role: 'assistant',
+        messageId: 'assistant-event',
+        content: [
+          {
+            type: ContentTypes.ACTIVITY_LABEL,
+            activity_label: 'Applied the warm event',
+            activity_label_type: 'phase',
+            activity_start_index: 0,
+            pending: false,
+          },
+          { type: ContentTypes.TEXT, text: 'The warm event completed.' },
+        ],
+      },
+    ];
+
+    const baseline = formatAgentMessages(payload);
+    const evolved = formatAgentMessages(payload, undefined, undefined, undefined, {
+      compactionSemanticIndex: { baseSnapshot },
+    });
+
+    expect(evolved.messages.map((message) => message.toDict())).toEqual(
+      baseline.messages.map((message) => message.toDict()),
+    );
+    expect(evolved.compactionSemanticIndexSnapshot).toEqual({
+      entries: expect.arrayContaining([
+        baseEntry,
+        expect.objectContaining({
+          type: 'activity_phase',
+          sourceMessageId: 'assistant-event',
+          text: 'Applied the warm event',
+        }),
+      ]),
+      providedEntryCount: 8,
+    });
+  });
+
   it('propagates final model callback policy errors instead of persisting a generic error part', async () => {
     jest.clearAllMocks();
     let policyError;
@@ -1990,15 +2053,140 @@ describe('AgentClient - startup telemetry', () => {
     );
   });
 
-  it('rehydrates a warm event actor from its fork and injects only the new event message', async () => {
+  it('ends a step-limit turn as incomplete rather than as an error part', async () => {
+    jest.clearAllMocks();
+    const { GraphRecursionError } = require('@langchain/langgraph');
+    /** The exact error LangGraph throws once the graph runs out of supersteps. */
+    const stepLimitError = new GraphRecursionError(
+      'Recursion limit of 50 reached without hitting a stop condition.',
+      { lc_error_code: 'GRAPH_RECURSION_LIMIT' },
+    );
+
+    mockCreateRun.mockResolvedValue({
+      Graph: null,
+      processStream: jest.fn().mockRejectedValue(stepLimitError),
+      getCalibrationRatio: jest.fn(() => 0),
+    });
+    mockIsHITLEnabled.mockReturnValue(false);
+    const client = new AgentClient({
+      req: {
+        user: { id: 'user-123' },
+        body: {},
+        config: { endpoints: { [EModelEndpoint.agents]: {} } },
+        _resumableStreamId: 'conversation-step-limit',
+      },
+      res: {},
+      agent: {
+        id: 'agent-123',
+        endpoint: EModelEndpoint.openAI,
+        provider: EModelEndpoint.openAI,
+        model_parameters: { model: 'gpt-4' },
+        hide_sequential_outputs: false,
+      },
+      endpointTokenConfig: {},
+      eventHandlers: {},
+      /** Work the turn already produced; it must survive the boundary. */
+      contentParts: [{ type: ContentTypes.TEXT, [ContentTypes.TEXT]: 'Partial findings' }],
+      collectedUsage: [],
+      artifactPromises: [],
+    });
+    client.conversationId = 'conversation-step-limit';
+    client.responseMessageId = 'response-step-limit';
+    client.parentMessageId = 'parent-step-limit';
+    client.recordCollectedUsage = jest.fn().mockResolvedValue();
+
+    await client.chatCompletion({ payload: [] });
+
+    expect(client.stepLimitReached).toBe(true);
+    expect(client.contentParts).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: ContentTypes.ERROR })]),
+    );
+    expect(client.contentParts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ [ContentTypes.TEXT]: 'Partial findings' }),
+      ]),
+    );
+  });
+
+  it('still surfaces an error part for an ordinary run failure', async () => {
+    jest.clearAllMocks();
+    mockCreateRun.mockResolvedValue({
+      Graph: null,
+      processStream: jest.fn().mockRejectedValue(new Error('provider exploded')),
+      getCalibrationRatio: jest.fn(() => 0),
+    });
+    mockIsHITLEnabled.mockReturnValue(false);
+    const client = new AgentClient({
+      req: {
+        user: { id: 'user-123' },
+        body: {},
+        config: { endpoints: { [EModelEndpoint.agents]: {} } },
+        _resumableStreamId: 'conversation-plain-error',
+      },
+      res: {},
+      agent: {
+        id: 'agent-123',
+        endpoint: EModelEndpoint.openAI,
+        provider: EModelEndpoint.openAI,
+        model_parameters: { model: 'gpt-4' },
+        hide_sequential_outputs: false,
+      },
+      endpointTokenConfig: {},
+      eventHandlers: {},
+      contentParts: [],
+      collectedUsage: [],
+      artifactPromises: [],
+    });
+    client.conversationId = 'conversation-plain-error';
+    client.responseMessageId = 'response-plain-error';
+    client.parentMessageId = 'parent-plain-error';
+    client.recordCollectedUsage = jest.fn().mockResolvedValue();
+
+    await client.chatCompletion({ payload: [] });
+
+    expect(client.stepLimitReached).toBe(false);
+    expect(client.contentParts).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: ContentTypes.ERROR })]),
+    );
+  });
+
+  it('evolves warm compaction guidance while injecting only the new event message', async () => {
     jest.clearAllMocks();
     const history = { _getType: () => 'human', content: 'old turn' };
     const currentEvent = { _getType: () => 'human', content: 'new event' };
+    const baseCompactionSemanticIndexSnapshot = {
+      entries: [
+        {
+          type: 'activity_phase',
+          sourceMessageId: 'assistant-history',
+          sourceContentIndex: 1,
+          revision: 1,
+          status: 'committed',
+          text: 'Verified the release state',
+        },
+      ],
+      providedEntryCount: 1,
+    };
+    const evolvedCompactionSemanticIndexSnapshot = {
+      entries: [
+        ...baseCompactionSemanticIndexSnapshot.entries,
+        {
+          type: 'activity_phase',
+          sourceMessageId: 'assistant-event',
+          sourceContentIndex: 0,
+          revision: 1,
+          status: 'committed',
+          text: 'Applied the warm event',
+        },
+      ],
+      providedEntryCount: 2,
+    };
     mockFormatAgentMessages.mockReturnValueOnce({
       messages: [history, currentEvent],
       indexTokenCountMap: { 0: 11, 1: 22 },
       summary: undefined,
       boundaryTokenAdjustment: undefined,
+      compactionSemanticIndexSnapshot: evolvedCompactionSemanticIndexSnapshot,
     });
     let client;
     const processStream = jest.fn(async () => {
@@ -2047,16 +2235,7 @@ describe('AgentClient - startup telemetry', () => {
     client.eventActorDiscoveredToolNames = ['deferred_tool'];
     client.eventActorSummary = { text: 'summary of earlier turns', tokenCount: 40 };
     client.contextMeta = { calibrationRatio: 1.25, encoding: client.getEncoding() };
-    client.compactionSemanticIndex = [
-      {
-        type: 'activity_phase',
-        sourceMessageId: 'assistant-history',
-        sourceContentIndex: 1,
-        revision: 1,
-        status: 'committed',
-        text: 'Verified the release state',
-      },
-    ];
+    client.compactionSemanticIndexSnapshot = baseCompactionSemanticIndexSnapshot;
     client.recordCollectedUsage = jest.fn().mockResolvedValue();
 
     await client.chatCompletion({ payload: [] });
@@ -2074,12 +2253,19 @@ describe('AgentClient - startup telemetry', () => {
         indexTokenCountMap: {},
         initialSummary: { text: 'summary of earlier turns', tokenCount: 40 },
         calibrationRatio: 1.25,
-        compactionSemanticIndex: client.compactionSemanticIndex,
+        compactionSemanticIndex: evolvedCompactionSemanticIndexSnapshot.entries,
       }),
     );
-    expect(mockFormatAgentMessages.mock.calls[0][4]).toBeUndefined();
+    expect(mockFormatAgentMessages.mock.calls[0][4]).toEqual(
+      expect.objectContaining({
+        compactionSemanticIndex: expect.objectContaining({
+          baseSnapshot: baseCompactionSemanticIndexSnapshot,
+        }),
+      }),
+    );
     expect(mockFormatAgentMessages).toHaveBeenCalledTimes(1);
-    expect(mockStripActivityLabelParts).toHaveBeenCalledTimes(1);
+    expect(mockStripActivityLabelParts).not.toHaveBeenCalled();
+    expect(client.compactionSemanticIndexSnapshot).toBe(evolvedCompactionSemanticIndexSnapshot);
     expect(processStream).toHaveBeenCalledWith(
       { messages: [currentEvent] },
       expect.objectContaining({
@@ -6478,7 +6664,7 @@ describe('AgentClient - finalizeSubagentContent', () => {
    *  `ON_SUBAGENT_UPDATE` handler so we exercise the same get-or-create
    *  aggregator logic the live request uses, rather than constructing
    *  aggregators directly in the test. */
-  const runSubagentEvents = async (events) => {
+  const runSubagentEvents = async (events, resolveMcpServerName) => {
     const map = new Map();
     const handlers = getDefaultHandlers({
       res: { write: jest.fn(), writableEnded: false },
@@ -6486,6 +6672,7 @@ describe('AgentClient - finalizeSubagentContent', () => {
       toolEndCallback: jest.fn(),
       collectedUsage: [],
       subagentAggregatorsByToolCallId: map,
+      resolveMcpServerName,
     });
     const handler = handlers[GraphEvents.ON_SUBAGENT_UPDATE];
     for (const e of events) {
@@ -6560,6 +6747,94 @@ describe('AgentClient - finalizeSubagentContent', () => {
     /** Buffer drained so a second call (e.g. resumable retry) doesn't
      *  double-append. */
     expect(buffer.size).toBe(0);
+  });
+
+  it('stamps durable MCP server identity onto nested persisted tool calls', () => {
+    const client = makeClient(new Map());
+    client.options.agent.accessibleMcpServerNames = ['bar', 'foo_mcp_bar'];
+    client.options.agent.toolDefinitions = [
+      {
+        name: 'gitlab-get_mcp_server_version_mcp_bar',
+        serverName: 'bar',
+      },
+    ];
+    client.contentParts = [
+      {
+        type: 'tool_call',
+        tool_call: {
+          name: Constants.SUBAGENT,
+          subagent_content: [
+            {
+              type: 'tool_call',
+              tool_call: { name: 'gitlab-get_mcp_server_version_mcp_bar' },
+            },
+          ],
+        },
+      },
+    ];
+
+    client.stampMcpServerIdentities();
+
+    expect(client.contentParts[0].tool_call.subagent_content[0].tool_call.mcpServerName).toBe(
+      'bar',
+    );
+  });
+
+  it('retains the resolved lazy-agent MCP identity for an ambiguous nested key', async () => {
+    const resolveMcpServerName = jest.fn(() => 'bar');
+    const buffer = await runSubagentEvents(
+      [
+        {
+          ...event('run_step', {
+            id: 'step_tool',
+            index: 0,
+            stepDetails: {
+              type: 'tool_calls',
+              tool_calls: [
+                {
+                  id: 'inner_1',
+                  function: { name: 'lookup_mcp_foo_mcp_bar', arguments: '{}' },
+                },
+              ],
+            },
+          }),
+          memberAgentId: 'member',
+        },
+      ],
+      resolveMcpServerName,
+    );
+    const client = makeClient(buffer);
+    client.options.agent.accessibleMcpServerNames = ['bar', 'foo_mcp_bar'];
+    client.contentParts = [
+      {
+        type: 'tool_call',
+        tool_call: { id: 'call_sub', name: Constants.SUBAGENT, args: '{}' },
+      },
+    ];
+
+    client.finalizeSubagentContent();
+    const inner = client.contentParts[0].tool_call.subagent_content[0].tool_call;
+    expect(resolveMcpServerName).toHaveBeenCalledWith('lookup_mcp_foo_mcp_bar', 'member');
+    expect(inner.mcpServerName).toBe('bar');
+
+    const emptyMemberResolver = jest.fn(() => 'bar');
+    await runSubagentEvents(
+      [
+        {
+          ...event('run_step', {
+            id: 'step_tool_2',
+            index: 0,
+            stepDetails: {
+              type: 'tool_calls',
+              tool_calls: [{ id: 'inner_2', name: 'lookup_mcp_foo_mcp_bar', args: '{}' }],
+            },
+          }),
+          memberAgentId: '',
+        },
+      ],
+      emptyMemberResolver,
+    );
+    expect(emptyMemberResolver).toHaveBeenCalledWith('lookup_mcp_foo_mcp_bar', 'child');
   });
 
   it('ignores tool_call parts whose name is not SUBAGENT', async () => {
@@ -6720,6 +6995,7 @@ describe('AgentClient - resumeCompletion content protection', () => {
     applyHideSequentialOutputsFilter: jest.fn(),
     rebaseActivityPhaseBounds: jest.fn(),
     finalizeSubagentContent: jest.fn(),
+    stampMcpServerIdentities: jest.fn(),
     settleActivityLabels: jest.fn().mockResolvedValue(undefined),
     recordCollectedUsage: jest.fn().mockResolvedValue(undefined),
   });

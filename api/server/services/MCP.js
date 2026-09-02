@@ -399,11 +399,12 @@ async function getAssistantToolDefinitions({ req, res, tools }) {
       getAllServerConfigs: (userId, configServers, role) =>
         registry.getAllServerConfigs(userId, configServers, role),
       getMCPServerTools,
-      getServerToolFunctionsSnapshot: async (userId, serverName, serverConfig) =>
+      getServerToolFunctionsSnapshot: async (userId, serverName, serverConfig, options) =>
         (await getMCPManager()?.getServerToolFunctionsSnapshot(
           userId,
           serverName,
           serverConfig,
+          options,
         )) ?? {
           tools: null,
         },
@@ -464,6 +465,18 @@ async function resolveCollisionAuditNames({ rawServerNames, accessibleServerName
     );
     return { names: rawServerNames, complete: false };
   }
+}
+
+/**
+ * The MCP servers a user can reach, keyed by name, with the registry's tier
+ * precedence already applied. This is the resolution behind `GET /api/mcp/servers`,
+ * so anything derived from it agrees with the catalog the client was given.
+ * @param {string} userId
+ * @param {string} [role]
+ * @returns {Promise<Record<string, import('@librechat/api').ParsedServerConfig>>}
+ */
+async function getAccessibleMCPServers(userId, role) {
+  return await resolveAllMcpConfigs(userId, role != null ? { role } : undefined);
 }
 
 async function resolveAllMcpConfigs(userId, user) {
@@ -1647,6 +1660,7 @@ module.exports = {
   resolveCollisionAuditNames,
   resolveMcpConfigNames,
   resolveAllMcpConfigs,
+  getAccessibleMCPServers,
   createOAuthStart,
   checkOAuthFlowStatus,
   getServerConnectionStatus,

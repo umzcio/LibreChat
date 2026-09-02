@@ -26,4 +26,5 @@ export * from './ArtifactsContext';
 export * from './ArtifactContext';
 export * from './PromptGroupsContext';
 export * from './MessagesViewContext';
+export * from './MediaContext';
 export { default as BadgeRowProvider } from './BadgeRowContext';

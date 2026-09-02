@@ -14,7 +14,7 @@
 
 import { atom as jotaiAtom, useAtom, useAtomValue, useSetAtom, useStore } from 'jotai';
 import { atomFamily as jotaiAtomFamily, RESET, useResetAtom } from 'jotai/utils';
-import type { WritableAtom, PrimitiveAtom } from 'jotai';
+import type { Atom, WritableAtom, PrimitiveAtom } from 'jotai';
 import type { SetStateAction } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -52,7 +52,7 @@ export function atom<T>(options: RecoilAtomOptions<T>): PrimitiveAtom<T> {
 // selector({ key, get, set }) → jotaiAtom(getter, setter)
 // ---------------------------------------------------------------------------
 
-type RecoilGetRecoilValue = <T>(a: WritableAtom<T, never[], unknown>) => T;
+type RecoilGetRecoilValue = <T>(a: Atom<T>) => T;
 
 interface RecoilSelectorGetOpts {
   get: RecoilGetRecoilValue;
@@ -78,24 +78,17 @@ interface RecoilSelectorReadWrite<T> {
 export function selector<T>(
   options: RecoilSelectorReadOnly<T> | RecoilSelectorReadWrite<T>,
 ): WritableAtom<T, [SetStateAction<T>], void> {
-  const getter = (get: <V>(a: WritableAtom<V, never[], unknown>) => V) =>
-    options.get({ get });
+  const getter = (get: <V>(a: Atom<V>) => V) => options.get({ get });
 
   let a: WritableAtom<T, [SetStateAction<T>], void>;
 
   if ('set' in options && typeof options.set === 'function') {
     const recoilSet = options.set;
-    a = jotaiAtom(
-      getter,
-      (get, set, newValue: SetStateAction<T>) => {
-        const resetFn = <V>(target: WritableAtom<V, [typeof RESET], void>) =>
-          set(target, RESET as never);
-        recoilSet(
-          { get, set: set as never, reset: resetFn },
-          newValue,
-        );
-      },
-    ) as WritableAtom<T, [SetStateAction<T>], void>;
+    a = jotaiAtom(getter, (get, set, newValue: SetStateAction<T>) => {
+      const resetFn = <V>(target: WritableAtom<V, [typeof RESET], void>) =>
+        set(target, RESET as never);
+      recoilSet({ get, set: set as never, reset: resetFn }, newValue);
+    }) as WritableAtom<T, [SetStateAction<T>], void>;
   } else {
     a = jotaiAtom(getter) as WritableAtom<T, [SetStateAction<T>], void>;
   }
@@ -142,24 +135,17 @@ export function selectorFamily<T, P>(
   options: RecoilSelectorFamilyOptions<T, P>,
 ): (param: P) => WritableAtom<T, [SetStateAction<T>], void> {
   const family = jotaiAtomFamily((param: P) => {
-    const getter = (get: <V>(a: WritableAtom<V, never[], unknown>) => V) =>
-      options.get(param)({ get });
+    const getter = (get: <V>(a: Atom<V>) => V) => options.get(param)({ get });
 
     let a: WritableAtom<T, [SetStateAction<T>], void>;
 
     if (options.set) {
       const recoilSet = options.set;
-      a = jotaiAtom(
-        getter,
-        (get, set, newValue: SetStateAction<T>) => {
-          const resetFn = <V>(target: WritableAtom<V, [typeof RESET], void>) =>
-            set(target, RESET as never);
-          recoilSet(param)(
-            { get, set: set as never, reset: resetFn },
-            newValue,
-          );
-        },
-      ) as WritableAtom<T, [SetStateAction<T>], void>;
+      a = jotaiAtom(getter, (get, set, newValue: SetStateAction<T>) => {
+        const resetFn = <V>(target: WritableAtom<V, [typeof RESET], void>) =>
+          set(target, RESET as never);
+        recoilSet(param)({ get, set: set as never, reset: resetFn }, newValue);
+      }) as WritableAtom<T, [SetStateAction<T>], void>;
     } else {
       a = jotaiAtom(getter) as WritableAtom<T, [SetStateAction<T>], void>;
     }
@@ -182,7 +168,7 @@ export function useRecoilState<T>(
 }
 
 /** Drop-in for `useRecoilValue(atom)` → `useAtomValue(atom)` */
-export function useRecoilValue<T>(a: WritableAtom<T, never[], unknown>): T {
+export function useRecoilValue<T>(a: Atom<T>): T {
   return useAtomValue(a);
 }
 
@@ -194,9 +180,7 @@ export function useSetRecoilState<T>(
 }
 
 /** Drop-in for `useResetRecoilState(atom)` → `useResetAtom(atom)` */
-export function useResetRecoilState<T>(
-  a: WritableAtom<T, [typeof RESET], void>,
-): Resetter {
+export function useResetRecoilState<T>(a: WritableAtom<T, [typeof RESET], void>): Resetter {
   return useResetAtom(a);
 }
 
@@ -230,8 +214,8 @@ export function useRecoilCallback<Args extends unknown[], Result>(
     set: <T>(a: WritableAtom<T, [SetStateAction<T>], void>, v: T | SetStateAction<T>) => void;
     reset: <T>(a: WritableAtom<T, [typeof RESET], void>) => void;
     snapshot: {
-      getPromise: <T>(a: WritableAtom<T, never[], unknown>) => Promise<T>;
-      getLoadable: <T>(a: WritableAtom<T, never[], unknown>) => RecoilLoadable<T>;
+      getPromise: <T>(a: Atom<T>) => Promise<T>;
+      getLoadable: <T>(a: Atom<T>) => RecoilLoadable<T>;
     };
   }) => (...args: Args) => Result,
   deps?: unknown[],
@@ -240,14 +224,13 @@ export function useRecoilCallback<Args extends unknown[], Result>(
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   return ((...args: Args) => {
-    const get = <T>(a: WritableAtom<T, never[], unknown>) => store.get(a);
+    const get = <T>(a: Atom<T>) => store.get(a);
     const set = <T>(a: WritableAtom<T, [SetStateAction<T>], void>, v: T | SetStateAction<T>) =>
       store.set(a, v);
-    const reset = <T>(a: WritableAtom<T, [typeof RESET], void>) =>
-      store.set(a, RESET);
+    const reset = <T>(a: WritableAtom<T, [typeof RESET], void>) => store.set(a, RESET);
     const snapshot = {
-      getPromise: async <T>(a: WritableAtom<T, never[], unknown>) => store.get(a),
-      getLoadable: <T>(a: WritableAtom<T, never[], unknown>) => makeLoadable(store.get(a)),
+      getPromise: async <T>(a: Atom<T>) => store.get(a),
+      getLoadable: <T>(a: Atom<T>) => makeLoadable(store.get(a)),
     };
     return fn({ get, set, reset, snapshot })(...args);
   }) as (...args: Args) => Result;

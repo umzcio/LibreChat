@@ -55,6 +55,7 @@ import {
   getBlockedUninspectableFileField,
   inspectContent,
   isContentTraversalLimitError,
+  isContentTraversalProtected,
 } from '~/protection';
 import {
   CREATE_FILE_TOOL_NAME,
@@ -68,15 +69,18 @@ import {
   isContentFilterError,
 } from '~/middleware/contentFilter';
 import {
+  BACKGROUND_TASK_ABORT_GRACE_MS,
+  BACKGROUND_TOOL_PRODUCER_HEARTBEAT_MS,
+} from './backgroundCompletion';
+import {
   hasIntentArg,
   stripIntentArg,
   stripIntentLabelsFromToolDefinitions,
   INTENT_ARG,
 } from './intent';
 import { getSafeErrorMetadata, logAxiosError, runOutsideTracing, truncateMiddle } from '~/utils';
+import { buildSkillPrimeMessage, isSkillFilePath, SKILL_FILE_PREFIX } from './skills';
 import { resolveCallerCapabilityProjectionSnapshot } from './callerCapabilities';
-import { BACKGROUND_TOOL_PRODUCER_HEARTBEAT_MS } from './backgroundCompletion';
-import { buildSkillPrimeMessage, SKILL_FILE_PREFIX } from './skills';
 import { createSkillContentDigest } from './compatibility';
 import { parseFrontmatter } from '../skills/import';
 import { cleanCodeToolOutput } from './cleanup';
@@ -386,6 +390,7 @@ export interface ToolExecuteOptions {
     read_only?: boolean;
     codeApiBaseUrl?: string;
     executionProfile?: CodeExecutionContext['executionProfile'];
+    bridgeWorkerId?: string;
   }) => Promise<{
     storage_session_id: string;
     files: Array<{ fileId: string; filename: string }>;
@@ -397,6 +402,7 @@ export interface ToolExecuteOptions {
     route?: {
       baseUrl?: string;
       executionProfile?: CodeExecutionContext['executionProfile'];
+      bridgeWorkerId?: string;
     },
   ) => Promise<string | null>;
   /** 23-hour freshness check */
@@ -447,6 +453,8 @@ export interface ToolExecuteOptions {
     runtime_session_hint?: string;
     codeApiBaseUrl?: string;
     executionProfile?: CodeExecutionContext['executionProfile'];
+    bridgeWorkerId?: string;
+    executionRouteKey?: string;
     req?: ServerRequest;
   }) => Promise<{ content: string } | null>;
   /**
@@ -467,10 +475,19 @@ export interface ToolExecuteOptions {
     runtime_session_hint?: string;
     codeApiBaseUrl?: string;
     executionProfile?: CodeExecutionContext['executionProfile'];
+    bridgeWorkerId?: string;
+    executionRouteKey?: string;
     /** In-sandbox size cap; files larger than this return `tooLarge` without transferring bytes. */
     maxBytes?: number;
     req?: ServerRequest;
-  }) => Promise<{ base64: string; bytes: number } | { tooLarge: true; bytes: number } | null>;
+  }) => Promise<
+    | { base64: string; bytes: number }
+    /** `size`: over `maxBytes`. `round_trips`: within the byte cap, but more
+     *  windowed `/exec` reads than one call may spend on the Code API's
+     *  per-user execution limiter. */
+    | { tooLarge: true; reason?: 'size' | 'round_trips'; bytes: number; inlineCeiling?: number }
+    | null
+  >;
   /**
    * Writes a UTF-8 text file into the code-execution sandbox via the
    * sandbox `/exec` endpoint. Mirrors `readSandboxFile` session forwarding
@@ -544,6 +561,8 @@ function getCodeExecutionContext(
 function codeExecutionRequestParams(context?: CodeExecutionContext): {
   codeApiBaseUrl?: string;
   executionProfile?: CodeExecutionContext['executionProfile'];
+  bridgeWorkerId?: string;
+  executionRouteKey?: string;
   runtime_session_hint?: string;
 } {
   if (!context) {
@@ -552,6 +571,8 @@ function codeExecutionRequestParams(context?: CodeExecutionContext): {
   return {
     codeApiBaseUrl: context.baseUrl,
     executionProfile: context.executionProfile,
+    ...(context.executionRouteKey ? { executionRouteKey: context.executionRouteKey } : {}),
+    ...(context.bridgeWorkerId ? { bridgeWorkerId: context.bridgeWorkerId } : {}),
     ...(context.runtimeSessionHint ? { runtime_session_hint: context.runtimeSessionHint } : {}),
   };
 }
@@ -852,10 +873,13 @@ function filteredToolArgumentsResult(
     if (!isContentTraversalLimitError(error)) {
       throw error;
     }
-    return (
-      filteredContentResult(tc, req, getContentTraversalFragments(error)) ??
-      errorResult(tc, error.body.message)
-    );
+    const filtered = filteredContentResult(tc, req, getContentTraversalFragments(error));
+    if (filtered != null) {
+      return filtered;
+    }
+    return isContentTraversalProtected({ error, filters: req?.config?.filters })
+      ? errorResult(tc, error.body.message)
+      : null;
   }
 }
 
@@ -903,10 +927,13 @@ function filteredToolOutputResult(
     if (!isContentTraversalLimitError(error)) {
       throw error;
     }
-    return (
-      filteredContentResult(tc, req, getContentTraversalFragments(error)) ??
-      errorResult(tc, error.body.message)
-    );
+    const filtered = filteredContentResult(tc, req, getContentTraversalFragments(error));
+    if (filtered != null) {
+      return filtered;
+    }
+    return isContentTraversalProtected({ error, filters: req?.config?.filters })
+      ? errorResult(tc, error.body.message)
+      : null;
   }
 }
 
@@ -951,7 +978,7 @@ function isFilteredSkillProjection(
     return filteredSkillResult(tc, req, input) != null;
   } catch (error) {
     if (isContentTraversalLimitError(error)) {
-      return true;
+      return isContentTraversalProtected({ error, filters: req?.config?.filters });
     }
     throw error;
   }
@@ -1846,14 +1873,55 @@ function looksBinary(content: string): boolean {
 }
 
 /**
+ * True for the errors a sandbox raises about the requested PATH, and only
+ * those. Deliberately narrower than {@link isSandboxMissingFileError}: that
+ * predicate also accepts a bare "not found", which the sandbox reader emits
+ * for a missing interpreter (`python3: not found`). Reporting that as a
+ * missing image would send the model to `ls /mnt/data` while hiding a
+ * runner dependency the operator needs to see.
+ */
+function isMissingSandboxPathError(reason: string): boolean {
+  const message = reason.toLowerCase();
+  return (
+    message.includes('no such file or directory') ||
+    message.includes('cannot access') ||
+    message.includes('cannot find the path') ||
+    message.includes('enoent')
+  );
+}
+
+/**
+ * Model-visible error for an image the sandbox could not hand back. The
+ * read is a supported operation that FAILED, so the message must not reuse
+ * the "images cannot be read as text" phrasing — that reads as a permanent
+ * capability limit and stops the model from ever retrying. State the real
+ * cause and the affordance that matches it: a rate-limited or truncated
+ * read is worth retrying, a missing path is worth listing, and only a
+ * genuine transport dead end falls back to `bash_tool`. Classification is
+ * by message, matching how `isSandboxMissingFileError` already reads
+ * sandbox failures; the rate-limit wording is the one `readSandboxImage`
+ * throws when the Code API limiter turns a chunk away.
+ */
+function buildImageReadError(filePath: string, reason: string): string {
+  const detail = reason.replace(/\.$/, '');
+  if (isMissingSandboxPathError(reason)) {
+    return `"${filePath}" was not found in the code-execution sandbox (${detail}). List the directory with \`bash_tool\` (e.g. \`ls /mnt/data\`) to find the correct path.`;
+  }
+  if (/rate limit/i.test(reason)) {
+    return `Could not read image "${filePath}": ${detail}. Wait for the sandbox to accept requests again, then read it once more.`;
+  }
+  return `Could not read image "${filePath}" from the code-execution sandbox: ${detail}. Retry the read; if it keeps failing, inspect the file with \`bash_tool\` (e.g. \`file ${filePath}\`).`;
+}
+
+/**
  * Reads a sandbox image as a viewable artifact so `read_file` can hand the
  * bytes to vision-capable models instead of refusing them. Fetches the file
  * base64-encoded from the sandbox (`readSandboxImage`), verifies the decoded
  * length matches the size the sandbox reported (guards against codeapi
  * truncating a large `/exec` stdout into a corrupt image), sniffs the real
- * MIME, and returns the shared image-artifact result. Degrades to the
- * text-oriented binary hint when the reader is unavailable, the image is
- * over the inline cap, or the read fails — never throws.
+ * MIME, and returns the shared image-artifact result. Never throws: a
+ * mislabeled or corrupt image degrades to the binary hint, while a failed
+ * read reports what actually went wrong (see {@link buildImageReadError}).
  */
 async function handleSandboxImageRead(
   tc: ToolCallRequest,
@@ -1876,12 +1944,21 @@ async function handleSandboxImageRead(
     content: '',
     errorMessage: buildBinaryFileError(filePath, ext),
   });
+  const readFailure = (reason: string): ToolExecuteResult => ({
+    toolCallId: tc.id,
+    status: 'error',
+    content: '',
+    errorMessage: buildImageReadError(filePath, reason),
+  });
   if (!readSandboxImage) {
     return binaryHint();
   }
 
   const ctx = tc.codeSessionContext as SandboxSessionContext | undefined;
-  let read: { base64: string; bytes: number } | { tooLarge: true; bytes: number } | null;
+  let read:
+    | { base64: string; bytes: number }
+    | { tooLarge: true; reason?: 'size' | 'round_trips'; bytes: number; inlineCeiling?: number }
+    | null;
   try {
     read = await readSandboxImage({
       file_path: filePath,
@@ -1892,9 +1969,9 @@ async function handleSandboxImageRead(
       ...(req ? { req } : {}),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    const message = getThrownValueMessage(error);
     logger.warn(`[handleReadFileCall] Sandbox image read failed for "${filePath}": ${message}`);
-    return binaryHint();
+    return readFailure(message);
   }
 
   if (!read) {
@@ -1902,10 +1979,22 @@ async function handleSandboxImageRead(
   }
   if ('tooLarge' in read) {
     onSuccess?.();
+    /* Name the size that would actually work: each window costs one sandbox
+     * execution, so what can be inlined depends on the runner's stdout
+     * budget, not only on the byte cap. Without a target the model can only
+     * guess how far to downscale. */
+    const ceiling =
+      read.reason === 'round_trips' && read.inlineCeiling != null
+        ? read.inlineCeiling
+        : MAX_SANDBOX_INLINE_IMAGE_BYTES;
+    const overBudget =
+      read.reason === 'round_trips'
+        ? `more than this sandbox can return inline (about ${ceiling} bytes)`
+        : `over the ${MAX_SANDBOX_INLINE_IMAGE_BYTES}-byte inline limit`;
     return {
       toolCallId: tc.id,
       status: 'success',
-      content: `Image "${filePath}" is ${read.bytes} bytes, over the ${MAX_SANDBOX_INLINE_IMAGE_BYTES}-byte inline limit. Use \`bash_tool\` to process it (e.g. \`file ${filePath}\` for metadata).`,
+      content: `Image "${filePath}" is ${read.bytes} bytes, ${overBudget}. Downscale it under ${ceiling} bytes in the sandbox with \`bash_tool\` and read the smaller copy to view it, or inspect it with \`bash_tool\` (e.g. \`file ${filePath}\` for metadata).`,
     };
   }
 
@@ -1914,7 +2003,9 @@ async function handleSandboxImageRead(
     logger.warn(
       `[handleReadFileCall] Sandbox image byte mismatch for "${filePath}" (decoded ${buffer.length} != reported ${read.bytes})`,
     );
-    return binaryHint();
+    return readFailure(
+      `the sandbox returned ${buffer.length} of ${read.bytes} bytes (truncated transfer)`,
+    );
   }
   // Resolve the MIME from the actual bytes, never the extension: a file
   // routed here by its `.png`/`.jpg`/... name whose header matches none of
@@ -3213,7 +3304,7 @@ async function handleCreateFileCall(
   }
 
   const overwrite = args.overwrite === true;
-  if (!args.path.startsWith(SKILL_FILE_PREFIX)) {
+  if (!isSkillFilePath(args.path)) {
     if (mergedConfigurable?.codeEnvAvailable !== true) {
       return errorResult(
         tc,
@@ -3324,7 +3415,7 @@ async function handleEditFileCall(
     return errorResult(tc, edits);
   }
 
-  if (!args.path.startsWith(SKILL_FILE_PREFIX)) {
+  if (!isSkillFilePath(args.path)) {
     if (mergedConfigurable?.codeEnvAvailable !== true) {
       return errorResult(
         tc,
@@ -4388,6 +4479,8 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
             );
             const codeExecutionContext = getCodeExecutionContext(mergedConfigurable);
             const runtimeSessionHint = codeExecutionContext?.runtimeSessionHint;
+            const executionRouteKey =
+              codeExecutionContext?.executionRouteKey ?? codeExecutionContext?.executionProfile;
             const sandboxConversationId =
               ((metadata as Record<string, unknown>)?.thread_id as string | undefined) ??
               (mergedConfigurable?.thread_id as string | undefined) ??
@@ -4398,7 +4491,7 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
               )?.conversationId;
             const markCodeSandboxWarm = (): void => {
               if (runtimeSessionHint) {
-                void markSandboxReady(runtimeSessionHint);
+                void markSandboxReady(runtimeSessionHint, executionRouteKey);
               }
               if (sandboxConversationId) {
                 void markSandboxReady(sandboxConversationId);
@@ -4504,7 +4597,7 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 return {
                   toolCallId: tc.id,
                   status: 'success' as const,
-                  content: buildBackgroundCapacityContent(tc.name),
+                  content: buildBackgroundCapacityContent(tc.name, capacityAdmission.scope),
                 };
               }
               const capacityPermit =
@@ -4585,7 +4678,7 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                 return {
                   toolCallId: tc.id,
                   status: 'success' as const,
-                  content: buildBackgroundCapacityContent(tc.name),
+                  content: buildBackgroundCapacityContent(tc.name, created.scope),
                 };
               }
               const { task, isNew } = created;
@@ -4848,6 +4941,30 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                     );
                   }
                 };
+                const persistSettledBackgroundResult = async (params: {
+                  output?: string;
+                  artifact?: unknown;
+                  status: 'completed' | 'error';
+                }): Promise<void> => {
+                  if (harvestEnabled) {
+                    await persistBackgroundResult(params);
+                    return;
+                  }
+                  backgroundTaskRegistry.markCompletionPersistencePending(
+                    backgroundUserId,
+                    backgroundConversationId,
+                    task.id,
+                  );
+                  try {
+                    await persistBackgroundResult(params);
+                  } finally {
+                    backgroundTaskRegistry.markCompletionPersistenceFinished(
+                      backgroundUserId,
+                      backgroundConversationId,
+                      task.id,
+                    );
+                  }
+                };
                 let invokePromise: Promise<{ content?: unknown; artifact?: unknown }>;
                 const backgroundAbortController = new AbortController();
                 try {
@@ -4916,11 +5033,15 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                   }
                 };
                 let producerHeartbeatInFlight: Promise<void> | undefined;
+                let producerHeartbeatStopped = false;
                 const producerAdmission = completionAdmission;
                 const producerHeartbeat =
                   producerAdmission == null
                     ? undefined
                     : setInterval(() => {
+                        if (producerHeartbeatStopped) {
+                          return;
+                        }
                         if (producerHeartbeatInFlight != null) {
                           return;
                         }
@@ -4944,12 +5065,51 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                           });
                       }, BACKGROUND_TOOL_PRODUCER_HEARTBEAT_MS);
                 (producerHeartbeat as { unref?: () => void } | undefined)?.unref?.();
+                const stopProducerHeartbeat = async (retireReason?: string): Promise<void> => {
+                  if (!producerHeartbeatStopped) {
+                    producerHeartbeatStopped = true;
+                    if (producerHeartbeat != null) {
+                      clearInterval(producerHeartbeat);
+                    }
+                  }
+                  await producerHeartbeatInFlight;
+                  if (retireReason == null || producerAdmission == null) {
+                    return;
+                  }
+                  try {
+                    const retired = await producerAdmission.retire(retireReason, {
+                      onlyIfUnclaimed: true,
+                    });
+                    if (!retired) {
+                      logger.warn(
+                        `[background] Could not retire timed-out completion delivery for task ${task.id}.`,
+                      );
+                    }
+                  } catch (retireError) {
+                    logger.warn(
+                      `[background] Failed to retire timed-out completion delivery for task ${task.id}:`,
+                      retireError,
+                    );
+                  }
+                };
+                let producerRetirementTimeout: ReturnType<typeof setTimeout> | undefined;
+                const requestBackgroundAbort = (): void => {
+                  backgroundAbortController.abort(
+                    new DOMException('Background task timed out', 'AbortError'),
+                  );
+                  producerRetirementTimeout = setTimeout(() => {
+                    producerRetirementTimeout = undefined;
+                    void stopProducerHeartbeat(
+                      'background task did not settle after its abort grace period',
+                    );
+                  }, BACKGROUND_TASK_ABORT_GRACE_MS);
+                  producerRetirementTimeout.unref?.();
+                };
                 void (async () => {
                   try {
-                    const result = await withBackgroundTaskTimeout(invokePromise, () =>
-                      backgroundAbortController.abort(
-                        new DOMException('Background task timed out', 'AbortError'),
-                      ),
+                    const result = await withBackgroundTaskTimeout(
+                      invokePromise,
+                      requestBackgroundAbort,
                     );
                     if (isCodeCall) {
                       markCodeSandboxWarm();
@@ -4982,7 +5142,10 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                         registryError,
                         { harvestStarted: harvestEnabled },
                       );
-                      await persistBackgroundResult({ output: errorOutput, status: 'error' });
+                      await persistSettledBackgroundResult({
+                        output: errorOutput,
+                        status: 'error',
+                      });
                       await wakeDetachedActor();
                       return;
                     }
@@ -5039,7 +5202,7 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                       task.id,
                       { content, artifact: result.artifact, harvestStarted: harvestEnabled },
                     );
-                    await persistBackgroundResult({
+                    await persistSettledBackgroundResult({
                       /** Use the registry's canonical bounded serialization so
                        * structured content cannot leave the durable card on its
                        * synthetic running handle. */
@@ -5088,13 +5251,16 @@ export function createToolExecuteHandler(options: ToolExecuteOptions): EventHand
                        *  the dispatch card on the handle JSON forever. */
                       { harvestStarted: harvestEnabled },
                     );
-                    await persistBackgroundResult({ output: deliveredError, status: 'error' });
+                    await persistSettledBackgroundResult({
+                      output: deliveredError,
+                      status: 'error',
+                    });
                     await wakeDetachedActor();
                   } finally {
-                    if (producerHeartbeat != null) {
-                      clearInterval(producerHeartbeat);
+                    if (producerRetirementTimeout != null) {
+                      clearTimeout(producerRetirementTimeout);
                     }
-                    await producerHeartbeatInFlight;
+                    await stopProducerHeartbeat();
                   }
                 })();
                 if (

@@ -6,6 +6,7 @@ import * as permissions from './accessPermissions';
 import * as endpoints from './api-endpoints';
 import { uploadEventStream } from './upload';
 import * as mcp from './types/mcpServers';
+import * as qt from './types/queuedTurns';
 import * as sch from './types/schedules';
 import * as a from './types/assistants';
 import * as m from './types/mutations';
@@ -67,12 +68,41 @@ export function deleteUser(payload?: t.TDeleteUserRequest): Promise<unknown> {
   return request.deleteWithOptions(endpoints.deleteUser(), { data: payload });
 }
 
+export function getCodeEnvironments(): Promise<t.TCodeEnvironmentsResponse> {
+  return request.get(endpoints.codeEnvironments());
+}
+
+export function pairCodeEnvironment(payload: {
+  name: string;
+  controlPlaneId: string;
+}): Promise<t.TCodeEnvironmentPairingResponse> {
+  return request.post(endpoints.codeEnvironmentPairings(), payload);
+}
+
+export function deleteCodeEnvironment(
+  id: string,
+): Promise<{ environment: t.TCodeEnvironmentSummary }> {
+  return request.delete(endpoints.codeEnvironmentById(id));
+}
+
+export function updateCodeEnvironmentSettings({
+  id,
+  settings,
+}: {
+  id: string;
+  settings: config.CodeEnvironmentUserSettings;
+}): Promise<{ environment: t.TCodeEnvironmentSummary }> {
+  return request.patch(endpoints.codeEnvironmentSettings(id), { settings });
+}
+
 export function getFavorites(): Promise<q.TUserFavorite[]> {
   return request.get(`${endpoints.apiBaseUrl()}/api/user/settings/favorites`);
 }
 
 export function updateFavorites(favorites: q.TUserFavorite[]): Promise<q.TUserFavorite[]> {
-  return request.post(`${endpoints.apiBaseUrl()}/api/user/settings/favorites`, { favorites });
+  return request.post(`${endpoints.apiBaseUrl()}/api/user/settings/favorites`, {
+    favorites,
+  });
 }
 
 /** Tool favorites — starred marketplace items (builtins, tools, MCP servers, skills). */
@@ -135,7 +165,10 @@ export function updateSharedLink(
   targetMessageId?: string,
   snapshotFiles?: boolean,
 ): Promise<t.TSharedLinkResponse> {
-  return request.patch(endpoints.updateSharedLink(shareId), { targetMessageId, snapshotFiles });
+  return request.patch(endpoints.updateSharedLink(shareId), {
+    targetMessageId,
+    snapshotFiles,
+  });
 }
 
 export function deleteSharedLink(shareId: string): Promise<m.TDeleteSharedLinkResponse> {
@@ -892,7 +925,9 @@ export function forkSharedConversation(
 }
 
 export function deleteConversation(payload: t.TDeleteConversationRequest) {
-  return request.deleteWithOptions(endpoints.deleteConversation(), { data: { arg: payload } });
+  return request.deleteWithOptions(endpoints.deleteConversation(), {
+    data: { arg: payload },
+  });
 }
 
 export function clearAllConversations(): Promise<unknown> {
@@ -925,12 +960,15 @@ export function archiveConversation(
   return request.post(endpoints.archiveConversation(), { arg: payload });
 }
 
+export function archiveAllConversations(): Promise<t.TArchiveAllConversationsResponse> {
+  return request.post(endpoints.archiveAllConversations(), {});
+}
+
 export function pinConversation(
   payload: t.TPinConversationRequest,
 ): Promise<t.TPinConversationResponse> {
   return request.post(endpoints.pinConversation(), { arg: payload });
 }
-
 
 export function genTitle(payload: m.TGenTitleRequest): Promise<m.TGenTitleResponse> {
   return request.get(endpoints.genTitle(payload.conversationId));
@@ -946,7 +984,9 @@ export function updateMessage(payload: t.TUpdateMessageRequest): Promise<unknown
     throw new Error('conversationId is required');
   }
 
-  return request.put(endpoints.messages({ conversationId, messageId }), { text });
+  return request.put(endpoints.messages({ conversationId, messageId }), {
+    text,
+  });
 }
 
 export function updateMessageContent(payload: t.TUpdateMessageContent): Promise<unknown> {
@@ -955,7 +995,10 @@ export function updateMessageContent(payload: t.TUpdateMessageContent): Promise<
     throw new Error('conversationId is required');
   }
 
-  return request.put(endpoints.messages({ conversationId, messageId }), { text, index });
+  return request.put(endpoints.messages({ conversationId, messageId }), {
+    text,
+    index,
+  });
 }
 
 export const editArtifact = async ({
@@ -1085,6 +1128,25 @@ export function listSkills(params?: sk.TSkillListRequest): Promise<sk.TSkillList
 
 export function getSchedules(): Promise<sch.TSchedulesResponse> {
   return request.get(endpoints.schedules());
+}
+
+export function enqueueAgentQueuedTurn(
+  payload: qt.TEnqueueAgentQueuedTurnRequest,
+): Promise<qt.TEnqueueAgentQueuedTurnResponse> {
+  return request.post(endpoints.agentQueuedTurns(), payload);
+}
+
+export function listAgentQueuedTurns(
+  conversationId: string,
+  clientRequestIds?: string[],
+): Promise<qt.TListAgentQueuedTurnsResponse> {
+  return request.get(endpoints.agentQueuedTurnsByConversation(conversationId, clientRequestIds));
+}
+
+export function cancelAgentQueuedTurn(
+  queuedTurnId: string,
+): Promise<qt.TCancelAgentQueuedTurnResponse> {
+  return request.delete(endpoints.agentQueuedTurn(queuedTurnId));
 }
 
 export function getSchedule(id: string): Promise<sch.TSchedule> {
@@ -1457,7 +1519,10 @@ export const updateMemory = (
   originalKey?: string,
   agentId?: string,
 ): Promise<q.UpdateMemoryResponse> => {
-  return request.patch(endpoints.memory(originalKey || key, agentId), { key, value });
+  return request.patch(endpoints.memory(originalKey || key, agentId), {
+    key,
+    value,
+  });
 };
 
 export const updateMemoryById = (

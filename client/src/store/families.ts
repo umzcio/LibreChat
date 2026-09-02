@@ -4,7 +4,13 @@ import { useStore, useAtomValue, useSetAtom } from 'jotai';
 import { createSearchParams } from 'react-router-dom';
 import { atomFamily, selectAtom, RESET } from 'jotai/utils';
 import { LocalStorageKeys, isEphemeralAgentId, Constants } from 'librechat-data-provider';
-import type { EModelEndpoint, TConversation, TMessage, TSubmission, TPreset } from 'librechat-data-provider';
+import type {
+  EModelEndpoint,
+  TConversation,
+  TMessage,
+  TSubmission,
+  TPreset,
+} from 'librechat-data-provider';
 import type { GenerationProtocolVersion } from '~/data-provider/SSE/protocol';
 import type { TOptionSettings, ExtendedFile } from '~/common';
 import {
@@ -30,7 +36,11 @@ const _latestMessageFamily = atomFamily((_param: string | number | null) => {
   return a;
 });
 
-type LatestMsgUpdate = TMessage | null | typeof RESET | ((prev: TMessage | null) => TMessage | null);
+type LatestMsgUpdate =
+  | TMessage
+  | null
+  | typeof RESET
+  | ((prev: TMessage | null) => TMessage | null);
 
 const latestMessageFamily = atomFamily((param: string | number | null) =>
   atom(
@@ -40,7 +50,8 @@ const latestMessageFamily = atomFamily((param: string | number | null) =>
         set(_latestMessageFamily(param), null);
         return;
       }
-      const newValue = typeof update === 'function' ? update(get(_latestMessageFamily(param))) : update;
+      const newValue =
+        typeof update === 'function' ? update(get(_latestMessageFamily(param))) : update;
       logger.log('Setting latestMessage', { key: param, newValue });
       set(_latestMessageFamily(param), newValue);
     },
@@ -95,7 +106,11 @@ const _conversationByIndex = atomFamily((_param: string | number) => {
   return a;
 });
 
-type ConvoUpdate = TConversation | null | typeof RESET | ((prev: TConversation | null) => TConversation | null);
+type ConvoUpdate =
+  | TConversation
+  | null
+  | typeof RESET
+  | ((prev: TConversation | null) => TConversation | null);
 
 const conversationByIndex = atomFamily((index: string | number) =>
   atom(
@@ -182,39 +197,27 @@ const allConversationsSelector = atom((get) => {
 allConversationsSelector.debugLabel = 'allConversationsSelector';
 
 const conversationIdByIndex = atomFamily((index: string | number) =>
-  atom<string | null>((get) =>
-    get(conversationByIndex(index))?.conversationId ?? null,
-  ),
+  atom<string | null>((get) => get(conversationByIndex(index))?.conversationId ?? null),
 );
 
 const conversationEndpointByIndex = atomFamily((index: string | number) =>
-  atom<EModelEndpoint | null>((get) =>
-    get(conversationByIndex(index))?.endpoint ?? null,
-  ),
+  atom<EModelEndpoint | null>((get) => get(conversationByIndex(index))?.endpoint ?? null),
 );
 
 const conversationModelByIndex = atomFamily((index: string | number) =>
-  atom<string | null>((get) =>
-    get(conversationByIndex(index))?.model ?? null,
-  ),
+  atom<string | null>((get) => get(conversationByIndex(index))?.model ?? null),
 );
 
 const conversationSpecByIndex = atomFamily((index: string | number) =>
-  atom<string | null>((get) =>
-    get(conversationByIndex(index))?.spec ?? null,
-  ),
+  atom<string | null>((get) => get(conversationByIndex(index))?.spec ?? null),
 );
 
 const conversationAgentIdByIndex = atomFamily((index: string | number) =>
-  atom<string | null>((get) =>
-    get(conversationByIndex(index))?.agent_id ?? null,
-  ),
+  atom<string | null>((get) => get(conversationByIndex(index))?.agent_id ?? null),
 );
 
 const conversationAssistantIdByIndex = atomFamily((index: string | number) =>
-  atom<string | null>((get) =>
-    get(conversationByIndex(index))?.assistant_id ?? null,
-  ),
+  atom<string | null>((get) => get(conversationByIndex(index))?.assistant_id ?? null),
 );
 
 const latestMessageErrorFamily = atomFamily((param: string | number) => {
@@ -224,7 +227,9 @@ const latestMessageErrorFamily = atomFamily((param: string | number) => {
 });
 
 const latestMessageParentIdFamily = atomFamily((param: string | number) => {
-  const a = atom<string | null | undefined>((get) => get(latestMessageFamily(param))?.parentMessageId);
+  const a = atom<string | null | undefined>(
+    (get) => get(latestMessageFamily(param))?.parentMessageId,
+  );
   a.debugLabel = 'latestMessageParentIdFamily';
   return a;
 });
@@ -292,7 +297,8 @@ const abortScrollFamily = atomFamily((param: string | number) =>
         set(_abortScrollFamily(param), false);
         return;
       }
-      const newValue = typeof update === 'function' ? update(get(_abortScrollFamily(param))) : update;
+      const newValue =
+        typeof update === 'function' ? update(get(_abortScrollFamily(param))) : update;
       logger.log('message_scrolling', 'Setting abortScrollByIndex', {
         key: param,
         newValue,
@@ -316,7 +322,8 @@ const isSubmittingFamily = atomFamily((param: string | number) =>
         set(_isSubmittingFamily(param), false);
         return;
       }
-      const newValue = typeof update === 'function' ? update(get(_isSubmittingFamily(param))) : update;
+      const newValue =
+        typeof update === 'function' ? update(get(_isSubmittingFamily(param))) : update;
       logger.log('message_stream', 'Setting isSubmittingByIndex', {
         key: param,
         newValue,
@@ -344,21 +351,17 @@ const showPopoverFamily = atomFamily((_param: string | number) => {
   return a;
 });
 
-const activePromptByIndex = atomFamily(
-  (_param: string | number | null) => {
-    const a = atom<string | undefined>(undefined);
-    a.debugLabel = 'activePromptByIndex';
-    return a;
-  },
-);
+const activePromptByIndex = atomFamily((_param: string | number | null) => {
+  const a = atom<string | undefined>(undefined);
+  a.debugLabel = 'activePromptByIndex';
+  return a;
+});
 
-const showMentionPopoverFamily = atomFamily(
-  (_param: string | number | null) => {
-    const a = atom<boolean>(false);
-    a.debugLabel = 'showMentionPopoverFamily';
-    return a;
-  },
-);
+const showMentionPopoverFamily = atomFamily((_param: string | number | null) => {
+  const a = atom<boolean>(false);
+  a.debugLabel = 'showMentionPopoverFamily';
+  return a;
+});
 
 /** Returns `endpointType ?? endpoint`, matching the effective endpoint used for feature gating. */
 const effectiveEndpointByIndex = atomFamily((index: string | number) =>
@@ -368,65 +371,45 @@ const effectiveEndpointByIndex = atomFamily((index: string | number) =>
   }),
 );
 
-const showPlusPopoverFamily = atomFamily(
-  (_param: string | number | null) => {
-    const a = atom<boolean>(false);
-    a.debugLabel = 'showPlusPopoverFamily';
-    return a;
-  },
-);
-
-const showPromptsPopoverFamily = atomFamily(
-  (_param: string | number | null) => {
-    const a = atom<boolean>(false);
-    a.debugLabel = 'showPromptsPopoverFamily';
-    return a;
-  },
-);
-
-const globalAudioURLFamily = atomFamily(
-  (_param: string | number | null) => {
-    const a = atom<string | null>(null);
-    a.debugLabel = 'globalAudioURLFamily';
-    return a;
-  },
-);
-
-const globalAudioFetchingFamily = atomFamily(
-  (_param: string | number | null) => {
-    const a = atom<boolean>(false);
-    a.debugLabel = 'globalAudioFetchingFamily';
-    return a;
-  },
-);
-
-const globalAudioPlayingFamily = atomFamily(
-  (_param: string | number | null) => {
-    const a = atom<boolean>(false);
-    a.debugLabel = 'globalAudioPlayingFamily';
-    return a;
-  },
-);
-
-const activeRunFamily = atomFamily(
-  (_param: string | number | null) => {
-    const a = atom<string | null>(null);
-    a.debugLabel = 'activeRunFamily';
-    return a;
-  },
-);
-
-const audioRunFamily = atomFamily(
-  (_param: string | number | null) => {
-    const a = atom<string | null>(null);
-    a.debugLabel = 'audioRunFamily';
-    return a;
-  },
-);
-
-const showSkillsPopoverFamily = atomFamily((_param: string | number | null) => {
+const showPlusPopoverFamily = atomFamily((_param: string | number | null) => {
   const a = atom<boolean>(false);
-  a.debugLabel = 'showSkillsPopoverFamily';
+  a.debugLabel = 'showPlusPopoverFamily';
+  return a;
+});
+
+const showPromptsPopoverFamily = atomFamily((_param: string | number | null) => {
+  const a = atom<boolean>(false);
+  a.debugLabel = 'showPromptsPopoverFamily';
+  return a;
+});
+
+const globalAudioURLFamily = atomFamily((_param: string | number | null) => {
+  const a = atom<string | null>(null);
+  a.debugLabel = 'globalAudioURLFamily';
+  return a;
+});
+
+const globalAudioFetchingFamily = atomFamily((_param: string | number | null) => {
+  const a = atom<boolean>(false);
+  a.debugLabel = 'globalAudioFetchingFamily';
+  return a;
+});
+
+const globalAudioPlayingFamily = atomFamily((_param: string | number | null) => {
+  const a = atom<boolean>(false);
+  a.debugLabel = 'globalAudioPlayingFamily';
+  return a;
+});
+
+const activeRunFamily = atomFamily((_param: string | number | null) => {
+  const a = atom<string | null>(null);
+  a.debugLabel = 'activeRunFamily';
+  return a;
+});
+
+const audioRunFamily = atomFamily((_param: string | number | null) => {
+  const a = atom<string | null>(null);
+  a.debugLabel = 'audioRunFamily';
   return a;
 });
 
@@ -461,6 +444,26 @@ const pendingQuotesByConvoId = atomFamily((_param: string) => {
 const messagesSiblingIdxFamily = atomFamily((_param: string | null | undefined) => {
   const a = atom<number>(0);
   a.debugLabel = 'messagesSiblingIdxFamily';
+  return a;
+});
+
+/**
+ * Text handed to a conversation's composer by a surface the user is leaving —
+ * today, a subagent thread continued into a chat of its own, where the panel
+ * and its composer unmount as the destination opens.
+ *
+ * Keyed by conversation rather than by composer index because the handoff
+ * outlives the navigation that carries it: a first visit resolves its record
+ * before the route moves, so the destination's composer mounts commits later.
+ * `useTextarea` drains it when that conversation's composer is on screen.
+ *
+ * Deliberately in memory rather than in the composer draft store: nothing the
+ * user has not sent should be written to storage they asked not to use, and
+ * draft restoration is itself gated on the Save Drafts preference.
+ */
+const pendingComposerTextByConvoId = atomFamily((_param: string) => {
+  const a = atom<string | undefined>(undefined);
+  a.debugLabel = 'pendingComposerTextByConvoId';
   return a;
 });
 
@@ -519,9 +522,33 @@ export type QueuedMessage = {
   id: string;
   text: string;
   createdAt: number;
-  /** Stable only for this queued recovery attempt and its transport retries.
-   * A failed generation re-converts the durable source with a fresh key. */
+  /** Server authority for an Agent queued turn. Absence means the row remains
+   * on the legacy mounted-client drain path (including a definite old-server
+   * fallback). `uncertain` is deliberately still server-owned: falling back
+   * after an ambiguous POST could submit the same words twice. */
+  server?: {
+    id?: string;
+    status: 'sending' | 'uncertain' | 'indeterminate' | 'rejected' | 'queued' | 'claimed';
+    errorCode?: string;
+    errorMessage?: string;
+    /** Observation time for a transport-ambiguous enqueue. The logical item
+     * may be much older than the request that just became uncertain. */
+    uncertainSince?: number;
+    /** The bounded reconciliation window elapsed without authoritative
+     * evidence. The outcome remains ambiguous and must never become resendable. */
+    reconciliationExpired?: boolean;
+    /** Current one-based projection; server sequence remains the stable
+     * fallback when predecessors settle and positions close up. */
+    position?: number;
+    revision?: number;
+  };
+  /** Stable identity for server enqueue/retry. Recovered steer rows also use
+   * it to dismiss their parked source; a later recovery attempt gets a fresh
+   * identity. */
   clientRequestId?: string;
+  /** Exact visible branch leaf captured when this turn entered the server
+   * queue. The server revalidates it before admitting the fresh successor. */
+  parentMessageId?: string;
   /** Correlation used only to durably dismiss/reclaim the parked source. */
   recoveryClientSteerId?: string;
   recoverySteerId?: string;
@@ -550,6 +577,31 @@ export type QueuedMessageOrigin = {
 const queuedMessagesByConvoId = atomFamily((_param: string) => {
   const a = atom<QueuedMessage[]>([]);
   a.debugLabel = 'queuedMessagesByConvoId';
+  return a;
+});
+
+export type SettledQueuedTurnReceipt = {
+  clientRequestId: string;
+  status: 'admitted' | 'admitted_pending_boundary' | 'indeterminate' | 'cancelled' | 'dead';
+  effectivePredecessorCreatedAt?: number;
+  rootPredecessor?: true;
+  boundaryConsumed?: boolean;
+};
+
+/** Monotonic client knowledge of terminal server queue receipts. Admission
+ * records preserve boundary multiplicity by request identity. Other terminal
+ * records exist only while their original enqueue callback is outstanding. */
+const settledQueuedTurnReceiptsByConvoId = atomFamily((_param: string) => {
+  const a = atom<SettledQueuedTurnReceipt[]>([]);
+  a.debugLabel = 'settledQueuedTurnReceiptsByConvoId';
+  return a;
+});
+
+/** Enqueue callbacks that can still race newer GET/cancellation evidence.
+ * Entries retire as soon as that one callback settles. */
+const pendingQueuedTurnEnqueueIdsByConvoId = atomFamily((_param: string) => {
+  const a = atom<string[]>([]);
+  a.debugLabel = 'pendingQueuedTurnEnqueueIdsByConvoId';
   return a;
 });
 
@@ -656,6 +708,26 @@ const drainAfterAbortByIndex = atomFamily((_param: string | number) => {
 const appliedSteerIdsByConvoId = atomFamily((_param: string) => {
   const a = atom<string[]>([]);
   a.debugLabel = 'appliedSteerIdsByConvoId';
+  return a;
+});
+
+/**
+ * Steer ids whose applied event landed in THIS session, pending their one-shot
+ * receipt draw-in. `SteerPart` consumes its id on mount so the animation plays
+ * exactly once, at the live chip→inline hand-off — never on reload, share, or
+ * a later revisit. Global rather than per-conversation: steer ids are unique,
+ * and the applied part renders in surfaces that don't know their convo id. */
+const liveAppliedSteerIds = atom<string[]>([]);
+liveAppliedSteerIds.debugLabel = 'liveAppliedSteerIds';
+
+/** Membership view of `liveAppliedSteerIds` so each `SteerPart` subscribes to
+ *  its own id only: stamping/consuming one steer re-renders that part, not
+ *  every mounted historical part in a long conversation. */
+const liveAppliedSteerFamily = atomFamily((steerId: string) => {
+  const a = atom<boolean>(
+    (get) => steerId.length > 0 && get(liveAppliedSteerIds).includes(steerId),
+  );
+  a.debugLabel = 'liveAppliedSteerFamily';
   return a;
 });
 
@@ -863,15 +935,19 @@ export default {
   activePromptByIndex,
   useClearSubmissionState,
   showPromptsPopoverFamily,
-  showSkillsPopoverFamily,
+  pendingComposerTextByConvoId,
   pendingManualSkillsByConvoId,
   pendingQuotesByConvoId,
   pendingSteersByConvoId,
   queuedMessagesByConvoId,
+  settledQueuedTurnReceiptsByConvoId,
+  pendingQueuedTurnEnqueueIdsByConvoId,
   runEndByIndex,
   pendingRunEndByConvoId,
   drainAfterAbortByIndex,
   appliedSteerIdsByConvoId,
+  liveAppliedSteerIds,
+  liveAppliedSteerFamily,
   acceptedSteerClientIdsByConvoId,
   activeGenerationCreatedAtByConvoId,
   activeGenerationProtocolVersionByConvoId,

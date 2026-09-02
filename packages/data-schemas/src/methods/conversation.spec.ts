@@ -26,6 +26,7 @@ jest.mock('~/config/winston', () => ({
   debug: jest.fn(),
 }));
 
+const MEILI_SEARCH_LIMIT = 1000;
 let mongoServer: InstanceType<typeof MongoMemoryServer>;
 let Conversation: mongoose.Model<IConversation>;
 let ChatProject: mongoose.Model<IChatProject>;
@@ -40,6 +41,7 @@ let modelsToCleanup: string[] = [];
 // Mock message methods (same as original test mocking ./Message)
 const getMessages = jest.fn().mockResolvedValue([]);
 const deleteMessages = jest.fn().mockResolvedValue({ deletedCount: 0 });
+const searchMessages = jest.fn().mockResolvedValue({ hits: [] });
 
 let methods: ConversationMethods;
 
@@ -59,7 +61,7 @@ beforeAll(async () => {
     position: number;
   }>;
 
-  methods = createConversationMethods(mongoose, { getMessages, deleteMessages });
+  methods = createConversationMethods(mongoose, { getMessages, deleteMessages, searchMessages });
 
   await mongoose.connect(mongoUri);
 });
@@ -138,6 +140,7 @@ describe('Conversation Operations', () => {
     jest.clearAllMocks();
     getMessages.mockResolvedValue([]);
     deleteMessages.mockResolvedValue({ deletedCount: 0 });
+    searchMessages.mockResolvedValue({ hits: [] });
 
     mockCtx = {
       userId: 'user123',
@@ -1767,6 +1770,59 @@ describe('Conversation Operations', () => {
   });
 
   describe('deleteConvos', () => {
+    it('retires queued-turn work before each conversation deletion wave', async () => {
+      const conversationId = uuidv4();
+      await Conversation.create({
+        conversationId,
+        user: 'user123',
+        tenantId: 'tenant-1',
+        endpoint: EModelEndpoint.agents,
+      });
+      const transitions: string[] = [];
+      const deleteAgentQueuedTurns = jest.fn(async () => {
+        transitions.push('queue-retired');
+      });
+      const scopedMethods = createConversationMethods(mongoose, {
+        getMessages,
+        deleteMessages,
+        deleteAgentQueuedTurns,
+      });
+
+      await scopedMethods.deleteConvos(
+        'user123',
+        { conversationId },
+        {
+          beforeDelete: async () => {
+            transitions.push('generation-drained');
+          },
+        },
+      );
+
+      expect(deleteAgentQueuedTurns).toHaveBeenCalledWith('user123', [
+        { conversationId, tenantId: 'tenant-1' },
+      ]);
+      expect(transitions).toEqual(['queue-retired', 'generation-drained']);
+    });
+
+    it('fails closed before deleting a conversation when queued-turn retirement fails', async () => {
+      const conversationId = uuidv4();
+      await Conversation.create({
+        conversationId,
+        user: 'user123',
+        endpoint: EModelEndpoint.agents,
+      });
+      const scopedMethods = createConversationMethods(mongoose, {
+        getMessages,
+        deleteMessages,
+        deleteAgentQueuedTurns: async () => Promise.reject(new Error('retirement unavailable')),
+      });
+
+      await expect(scopedMethods.deleteConvos('user123', { conversationId })).rejects.toThrow(
+        'retirement unavailable',
+      );
+      expect(await Conversation.findOne({ conversationId })).not.toBeNull();
+    });
+
     it('should delete conversations and associated messages', async () => {
       await Conversation.create({
         conversationId: mockConversationData.conversationId,
@@ -4680,6 +4736,7 @@ describe('Conversation Operations', () => {
       const contextMeta = { calibrationRatio: 1.25, encoding: 'o200k_base' };
       const compactionSemanticIndex = {
         version: 1 as const,
+        providedEntryCount: 9,
         entries: [
           {
             type: 'activity_phase' as const,
@@ -4828,6 +4885,22 @@ describe('Conversation Operations', () => {
           compactionSemanticIndex: {
             version: 1,
             entries: [{ ...compactionSemanticIndex.entries[0], sourceContentIndex: -1 }],
+          },
+        }),
+      ).rejects.toThrow('Event actor compaction semantic index is invalid');
+
+      await expect(
+        methods.commitAgentEventActorState({
+          user: 'actor-context-user',
+          conversationId,
+          invocationId: 'invalid-compaction-count',
+          expectedEpoch: 0,
+          action: { toolName: 'submit_move' },
+          checkpoint: actorCheckpoint,
+          compactionSemanticIndex: {
+            version: 1,
+            entries: compactionSemanticIndex.entries,
+            providedEntryCount: 0,
           },
         }),
       ).rejects.toThrow('Event actor compaction semantic index is invalid');
@@ -5554,6 +5627,48 @@ describe('Conversation Operations', () => {
       ).resolves.toMatchObject({
         agentEventActorReconciliations: [expect.objectContaining({ invocationId: 'recent' })],
       });
+    });
+
+    it('sends a pure inclusion projection for the candidate read', async () => {
+      /** The string form `'_id +field'` compiles to `{ _id: 1 }` plus a `: 0`
+       * exclusion for every other `select: false` sibling — a mixed projection
+       * MongoDB tolerates but Amazon DocumentDB rejects, which failed this
+       * sweep on every maintenance pass. The candidate read must stay a pure
+       * inclusion AND still return the hidden reconciliations field. */
+      const conversationId = uuidv4();
+      const now = new Date();
+      await Conversation.create({
+        conversationId,
+        user: 'actor-projection-user',
+        endpoint: EModelEndpoint.agents,
+        agentEventActorReconciliations: [
+          {
+            invocationId: 'projection-probe',
+            status: 'settled',
+            resolution: 'action_compensated',
+            checkpoint: {
+              threadId: conversationId,
+              checkpointNs: 'event-actor/projection-probe',
+            },
+            action: { toolName: 'submit_move' },
+            observedAt: new Date(now.getTime() - 91 * 24 * 60 * 60_000),
+          },
+        ],
+      });
+      const projections: Array<Record<string, number> | undefined> = [];
+      const originalFind = Conversation.collection.find.bind(Conversation.collection);
+      const findSpy = jest
+        .spyOn(Conversation.collection, 'find')
+        .mockImplementation((filter, options) => {
+          projections.push(options?.projection);
+          return originalFind(filter, options);
+        });
+      try {
+        await expect(methods.expireLegacyAgentEventActorReceipts(now)).resolves.toBe(1);
+      } finally {
+        findSpy.mockRestore();
+      }
+      expect(projections[0]).toEqual({ _id: 1, agentEventActorReconciliations: 1 });
     });
 
     it('retains an expired legacy receipt while its delivery handling is nonterminal', async () => {
@@ -6444,6 +6559,162 @@ describe('Conversation Operations', () => {
       expect(refreshedProject?.conversationCount).toBe(1);
       expect(refreshedProject?.lastConversationId).toBe(conversationId);
       expect(refreshedProject?.lastConversationAt?.toISOString()).toBe(createdAt.toISOString());
+    });
+  });
+
+  describe('getConvosByCursor search', () => {
+    it('should include conversations matched only by message content', async () => {
+      const titleMatch = await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Contains keyword',
+        endpoint: EModelEndpoint.openAI,
+      });
+      const contentMatch = await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Unrelated title',
+        endpoint: EModelEndpoint.openAI,
+      });
+      await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'No match anywhere',
+        endpoint: EModelEndpoint.openAI,
+      });
+
+      const meiliSearch = jest
+        .fn()
+        .mockResolvedValue({ hits: [{ conversationId: titleMatch.conversationId }] });
+      Object.assign(Conversation, { meiliSearch });
+      searchMessages.mockResolvedValue({
+        hits: [{ conversationId: contentMatch.conversationId }],
+      });
+
+      const result = await getConvosByCursor('user123', { search: 'keyword' });
+
+      const searchParams = {
+        filter: 'user = "user123"',
+        limit: MEILI_SEARCH_LIMIT,
+        attributesToRetrieve: ['conversationId', 'originalConversationId'],
+      };
+      expect(meiliSearch).toHaveBeenCalledWith('keyword', searchParams);
+      expect(searchMessages).toHaveBeenCalledWith('keyword', searchParams);
+      const convoIds = result?.conversations.map((c) => c.conversationId);
+      expect(convoIds).toHaveLength(2);
+      expect(convoIds).toContain(titleMatch.conversationId);
+      expect(convoIds).toContain(contentMatch.conversationId);
+    });
+
+    it('should dedupe conversations matched by both title and message search', async () => {
+      const overlapMatch = await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Contains keyword',
+        endpoint: EModelEndpoint.openAI,
+      });
+      const titleOnlyMatch = await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Keyword in title',
+        endpoint: EModelEndpoint.openAI,
+      });
+      const messageOnlyMatch = await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Unrelated title',
+        endpoint: EModelEndpoint.openAI,
+      });
+
+      const meiliSearch = jest.fn().mockResolvedValue({
+        hits: [
+          { conversationId: overlapMatch.conversationId },
+          { conversationId: titleOnlyMatch.conversationId },
+        ],
+      });
+      Object.assign(Conversation, { meiliSearch });
+      searchMessages.mockResolvedValue({
+        hits: [
+          { conversationId: overlapMatch.conversationId },
+          { conversationId: messageOnlyMatch.conversationId },
+        ],
+      });
+
+      const result = await getConvosByCursor('user123', { search: 'keyword' });
+
+      const searchParams = {
+        filter: 'user = "user123"',
+        limit: MEILI_SEARCH_LIMIT,
+        attributesToRetrieve: ['conversationId', 'originalConversationId'],
+      };
+      expect(meiliSearch).toHaveBeenCalledWith('keyword', searchParams);
+      expect(searchMessages).toHaveBeenCalledWith('keyword', searchParams);
+      const convoIds = result?.conversations.map((c) => c.conversationId);
+      expect(convoIds).toHaveLength(3);
+      expect(convoIds).toContain(overlapMatch.conversationId);
+      expect(convoIds).toContain(titleOnlyMatch.conversationId);
+      expect(convoIds).toContain(messageOnlyMatch.conversationId);
+    });
+
+    it('should return an empty result when neither titles nor messages match', async () => {
+      await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'No match anywhere',
+        endpoint: EModelEndpoint.openAI,
+      });
+
+      Object.assign(Conversation, { meiliSearch: jest.fn().mockResolvedValue({ hits: [] }) });
+      searchMessages.mockResolvedValue({ hits: [] });
+
+      const result = await getConvosByCursor('user123', { search: 'keyword' });
+
+      expect(result?.conversations).toHaveLength(0);
+      expect(result?.nextCursor).toBeNull();
+    });
+
+    it('should fall back to title matches when the message index search fails', async () => {
+      const titleMatch = await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Contains keyword',
+        endpoint: EModelEndpoint.openAI,
+      });
+
+      Object.assign(Conversation, {
+        meiliSearch: jest
+          .fn()
+          .mockResolvedValue({ hits: [{ conversationId: titleMatch.conversationId }] }),
+      });
+      searchMessages.mockRejectedValue(new Error('MeiliSearch plugin not registered'));
+
+      const result = await getConvosByCursor('user123', { search: 'keyword' });
+
+      expect(result?.conversations.map((c) => c.conversationId)).toEqual([
+        titleMatch.conversationId,
+      ]);
+    });
+
+    it('should search titles when message methods are not injected', async () => {
+      const titleMatch = await Conversation.create({
+        conversationId: uuidv4(),
+        user: 'user123',
+        title: 'Contains keyword',
+        endpoint: EModelEndpoint.openAI,
+      });
+
+      Object.assign(Conversation, {
+        meiliSearch: jest
+          .fn()
+          .mockResolvedValue({ hits: [{ conversationId: titleMatch.conversationId }] }),
+      });
+
+      const scopedMethods = createConversationMethods(mongoose);
+      const result = await scopedMethods.getConvosByCursor('user123', { search: 'keyword' });
+
+      expect(result?.conversations.map((c) => c.conversationId)).toEqual([
+        titleMatch.conversationId,
+      ]);
     });
   });
 });
