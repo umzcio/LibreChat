@@ -112,6 +112,7 @@ export type NavLink = {
   Component?: React.ComponentType;
   onClick?: (e?: React.MouseEvent) => void;
   variant?: 'default' | 'ghost';
+  disabled?: boolean;
   id: string;
 };
 
