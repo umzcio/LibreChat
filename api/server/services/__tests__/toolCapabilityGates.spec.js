@@ -35,8 +35,10 @@ const CLASSIFIED = {
   /** `codeEnvAvailable` and `fileSearchAvailable` for the Responses route,
    *  both paired with the shared grant read. */
   'api/server/controllers/agents/responses.js': 2,
-  /** `codeEnvAvailable` for the memory-agent initializer. */
-  'api/server/controllers/agents/client.js': 1,
+  /** Mem0 fork: the memory-agent initializer upstream gates with
+   *  `codeEnvAvailable` is replaced by the Mem0 client, so this file reads no
+   *  role-gated capability. Kept at 0 so the guard still catches real drift. */
+  'api/server/controllers/agents/client.js': 0,
   /** Upload processing: two consumer-map entries, the role-gated consumer checks,
    *  and the code-environment/file-search branches. All consumer selection shares
    *  the role grant resolved before routing. */
