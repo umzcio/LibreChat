@@ -19,9 +19,11 @@ import store from '~/store';
 export default function useAppStartup({
   startupConfig,
   user,
+  mcpWarmupAllowed,
 }: {
   startupConfig?: TStartupConfig;
   user?: TUser;
+  mcpWarmupAllowed: boolean;
 }) {
   const [defaultPreset, setDefaultPreset] = useAtom(store.defaultPreset);
   const canUseMcp = useHasAccess({
@@ -45,6 +47,7 @@ export default function useAppStartup({
       !serversLoading &&
       !!loadedServers &&
       Object.keys(loadedServers).length > 0 &&
+      mcpWarmupAllowed &&
       !!user,
   });
 

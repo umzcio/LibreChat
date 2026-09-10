@@ -20,6 +20,7 @@ import SiblingSwitch from '~/components/Chat/Messages/SiblingSwitch';
 import HoverButtons from '~/components/Chat/Messages/HoverButtons';
 import MessageRow from '~/components/Chat/Messages/ui/MessageRow';
 import MessageIcon from '~/components/Chat/Messages/MessageIcon';
+import { showThinkingAtom } from '~/store/showThinking';
 import SubRow from '~/components/Chat/Messages/SubRow';
 import store from '~/store';
 
@@ -106,6 +107,7 @@ const ContentRender = memo(function ContentRender({
     chatContext,
   });
   const maximizeChatSpace = useAtomValue(store.maximizeChatSpace);
+  const showThinking = useAtomValue(showThinkingAtom);
 
   const handleRegenerateMessage = useCallback(() => regenerateMessage(), [regenerateMessage]);
   const isLast = useMemo(
@@ -170,6 +172,17 @@ const ContentRender = memo(function ContentRender({
       isEditing={edit}
       footer={
         <SubRow classes={cn(messageFooterClasses, msg.isCreatedByUser && 'justify-end')}>
+          {/* The reading holds the column start: it takes over the slot the streaming
+              dot vacates, so the retry navigation beside it — whose width the footer
+              reserves whether or not hover has revealed it — must never push the
+              timer inboard of that column. */}
+          {shouldShowElapsed({
+            isSubmitting,
+            isLatestMessage,
+            isCreatedByUser: msg.isCreatedByUser,
+            siblingIdx,
+            siblingCount,
+          }) && <Elapsed index={index} />}
           {/* While the answer is generating every other action is withheld, which
               would otherwise leave this counter sitting alone under a half-written
               response. It reveals on hover there, like the actions it sits with. */}
@@ -179,13 +192,6 @@ const ContentRender = memo(function ContentRender({
             setSiblingIdx={setSiblingIdx}
             className={cn(isSubmitting && isLatestMessage && revealOnRowHoverClasses)}
           />
-          {shouldShowElapsed({
-            isSubmitting,
-            isLatestMessage,
-            isCreatedByUser: msg.isCreatedByUser,
-            siblingIdx,
-            siblingCount,
-          }) && <Elapsed index={index} />}
           <HoverButtons
             index={index}
             message={msg}
@@ -219,6 +225,7 @@ const ContentRender = memo(function ContentRender({
         isSubmitting={isSubmitting}
         isCreatedByUser={msg.isCreatedByUser}
         createdAt={msg.createdAt ?? msg.clientTimestamp}
+        showThinking={showThinking}
         conversationId={conversation?.conversationId}
         content={msg.content as Array<TMessageContentParts | undefined>}
       />

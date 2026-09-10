@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useStore } from 'jotai';
 import { RESET } from 'jotai/utils';
+import { siblingIdxFamily, siblingKey } from '~/components/Chat/Messages/Thread/state';
 import { showSkillsPopoverFamily } from '~/components/Chat/Input/skillsState';
 import { clearLocalStorage } from '~/utils/localStorage';
 import store from '~/store';
@@ -43,7 +44,7 @@ export default function useClearStates() {
         jotaiStore.set(store.globalAudioPlayingFamily(key), false);
         jotaiStore.set(store.activeRunFamily(key), null);
         jotaiStore.set(store.audioRunFamily(key), null);
-        jotaiStore.set(store.messagesSiblingIdxFamily(key.toString()), 0);
+        jotaiStore.set(siblingIdxFamily(siblingKey(key.toString())), 0);
         jotaiStore.set(store.pendingManualSkillsByConvoId(key.toString()), []);
         jotaiStore.set(store.pendingQuotesByConvoId(key.toString()), []);
 

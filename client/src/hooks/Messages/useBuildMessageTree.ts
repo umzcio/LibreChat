@@ -1,14 +1,13 @@
 import { useCallback } from 'react';
 import { useStore } from 'jotai';
 import type { TMessage } from 'librechat-data-provider';
-import store from '~/store';
+import { siblingIdxFamily, siblingKey } from '~/components/Chat/Messages/Thread/state';
 
 export default function useBuildMessageTree() {
   const jotaiStore = useStore();
-
   const getSiblingIdx = useCallback(
     (messageId: string | null | undefined) =>
-      jotaiStore.get(store.messagesSiblingIdxFamily(messageId)),
+      jotaiStore.get(siblingIdxFamily(siblingKey(messageId))),
     [jotaiStore],
   );
 

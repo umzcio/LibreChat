@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { v4 } from 'uuid';
 import { SSE } from 'sse.js';
-import { useSetAtom } from 'jotai';
+import { useStore, useSetAtom } from 'jotai';
 import {
   request,
   UsageEvents,
@@ -20,6 +20,7 @@ import type {
 import type { EventHandlerParams } from './useEventHandlers';
 import type { TResData } from '~/common';
 import { clearComposerDrafts, applyPendingAction, findPendingActionMessageIndex } from '~/utils';
+import { pendingApprovalActionFamily } from '~/components/Chat/approval/state';
 import { useGetStartupConfig, useGetUserBalance } from '~/data-provider';
 import { startedAsNewConversation } from './useEventHandlers';
 import { useAuthContext } from '~/hooks/AuthContext';
@@ -39,17 +40,14 @@ export default function useSSE(
   isAddedRequest = false,
   runIndex = 0,
 ) {
+  const jotaiStore = useStore();
   const setActiveRunId = useSetAtom(store.activeRunFamily(runIndex));
 
   const { token, isAuthenticated } = useAuthContext();
   const completed = useRef(new Set<unknown>());
-  const setCompleted = useCallback<React.Dispatch<React.SetStateAction<Set<unknown>>>>(
-    (action) => {
-      completed.current =
-        typeof action === 'function' ? action(completed.current) : action;
-    },
-    [],
-  );
+  const setCompleted = useCallback<React.Dispatch<React.SetStateAction<Set<unknown>>>>((action) => {
+    completed.current = typeof action === 'function' ? action(completed.current) : action;
+  }, []);
   const setAbortScroll = useSetAtom(store.abortScrollFamily(runIndex));
   const setShowStopButton = useSetAtom(store.showStopButtonByIndex(runIndex));
 
@@ -172,6 +170,11 @@ export default function useSSE(
          * produced — apply any queued delta before reading the cache. */
         flushPendingDeltas();
         const pendingAction = data.data as Agents.PendingAction;
+        const pendingConversationId =
+          pendingAction.conversationId ?? submission.conversation?.conversationId;
+        if (pendingConversationId) {
+          jotaiStore.set(pendingApprovalActionFamily(pendingConversationId), pendingAction);
+        }
         const messages = getMessages() ?? [];
         const index = findPendingActionMessageIndex(messages, pendingAction);
         if (index >= 0) {

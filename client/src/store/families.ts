@@ -441,12 +441,6 @@ const pendingQuotesByConvoId = atomFamily((_param: string) => {
   return a;
 });
 
-const messagesSiblingIdxFamily = atomFamily((_param: string | null | undefined) => {
-  const a = atom<number>(0);
-  a.debugLabel = 'messagesSiblingIdxFamily';
-  return a;
-});
-
 /**
  * Text handed to a conversation's composer by a surface the user is leaving —
  * today, a subagent thread continued into a chat of its own, where the panel
@@ -902,7 +896,6 @@ export default {
   isSubmittingFamily,
   optionSettingsFamily,
   showPopoverFamily,
-  messagesSiblingIdxFamily,
   anySubmittingSelector,
   allConversationsSelector,
   conversationIdByIndex,

@@ -3,6 +3,10 @@ import {
   createOpenIDRefreshFlightMethods,
   type OpenIDRefreshFlightMethods,
 } from './openidRefreshFlight';
+export {
+  createMCPAuthorizationFenceRetryStorage,
+  type MCPAuthorizationFenceRetryStorage,
+} from './mcpAuthorizationFenceRetry';
 import {
   createRefreshTokenBridgeMethods,
   type RefreshTokenBridgeMethods,
@@ -63,6 +67,7 @@ import { createCategoriesMethods, type CategoriesMethods } from './categories';
 import { createPresetMethods, type PresetMethods } from './preset';
 /* Tier 2 — Moderate (service deps injected) */
 import { createConversationTagMethods, type ConversationTagMethods } from './conversationTag';
+import { createConversationImportMethods, type ConversationImportMethods } from './import';
 import {
   createMessageMethods,
   CLIENT_MESSAGE_SELECT,
@@ -154,7 +159,14 @@ import type {
   UpsertSkillSyncCredentialInput,
 } from './skillSync';
 /* Tier 5 — Agent */
-import { createAgentMethods, type AgentMethods, type AgentDeps } from './agent';
+import {
+  createAgentMethods,
+  type AgentMethods,
+  type AgentDeps,
+  type AgentGraphNode,
+  type AgentGraphAccess,
+  type AgentGraphAccessContext,
+} from './agent';
 /* Config */
 import { createConfigMethods, type ConfigMethods } from './config';
 import {
@@ -240,6 +252,7 @@ export type AllMethods = UserMethods &
   CategoriesMethods &
   PresetMethods &
   ConversationTagMethods &
+  ConversationImportMethods &
   MessageMethods &
   ConversationMethods &
   TxMethods &
@@ -428,6 +441,8 @@ export function createMethods(
     removeAllPermissions,
     getActions: actionMethods.getActions,
     getSoleOwnedResourceIds: aclEntryMethods.getSoleOwnedResourceIds,
+    getUserPrincipals: userGroupMethods.getUserPrincipals,
+    findAccessibleResources: aclEntryMethods.findAccessibleResources,
     isExternalSkillId: deps.isExternalSkillId,
   };
   const agentMethods = createAgentMethods(mongoose, agentDeps);
@@ -463,6 +478,7 @@ export function createMethods(
     ...createPresetMethods(mongoose),
     /* Tier 2 */
     ...createConversationTagMethods(mongoose),
+    ...createConversationImportMethods(mongoose),
     ...messageMethods,
     ...conversationMethods,
     /* Tier 3 */
@@ -520,6 +536,7 @@ export type {
   CategoriesMethods,
   PresetMethods,
   ConversationTagMethods,
+  ConversationImportMethods,
   MessageMethods,
   ParentSubagentTaskRecord,
   ParentSubagentThreadRecord,
@@ -555,6 +572,9 @@ export type {
   ScheduleMethods,
   AgentMethods,
   ChatProjectMethods,
+  AgentGraphNode,
+  AgentGraphAccess,
+  AgentGraphAccessContext,
   ConfigMethods,
   MCPAuthorityMethods,
   MCPAuthorityMethodHooks,

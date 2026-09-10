@@ -1,5 +1,5 @@
 import { GraphEvents } from '@librechat/agents';
-import { ErrorTypes } from 'librechat-data-provider';
+import { ErrorTypes, Permissions, PermissionTypes } from 'librechat-data-provider';
 import type { FiltersConfig } from 'librechat-data-provider';
 import type { ChatCompletionDependencies } from './service';
 import { createAgentChatCompletion } from './service';
@@ -255,7 +255,18 @@ describe('createAgentChatCompletion - MCP permission user propagation', () => {
       'agent_test',
       expect.objectContaining({ requestBody: runArgs.requestBody }),
       undefined,
+      processStream.mock.calls[0][1].signal,
     );
+    expect(loadTools.mock.calls[0][4]).toBeInstanceOf(AbortSignal);
+    await runArgs.customHandlers[GraphEvents.ON_TOOL_EXECUTE].handle(GraphEvents.ON_TOOL_EXECUTE, {
+      toolCalls: [{ id: 'child-call', name: 'deferred_mcp_tool', args: {} }],
+      agentId: 'agent_test',
+      configurable: streamConfig.configurable,
+      metadata: { run_id: 'detached-child' },
+      resolve,
+      reject,
+    });
+    expect(loadTools.mock.calls[1][4]).toBeUndefined();
   });
 
   it('uses the root parent sentinel when chat completions omit a parent id', async () => {
@@ -352,6 +363,45 @@ describe('createAgentChatCompletion - MCP permission user propagation', () => {
         statefulSessionsAvailable: true,
         allowedStatefulCodeEnvironments: ['user', 'agent-user'],
       }),
+    );
+  });
+
+  it('mirrors the capabilities alone when the embedder wires no role lookup', async () => {
+    deps.appConfig = {
+      endpoints: { agents: { capabilities: ['file_search'] } },
+    } as never;
+
+    await createAgentChatCompletion(createMockReq({ id: 'user-123' }), createMockRes(), deps);
+
+    expect(deps.initializeAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ fileSearchAvailable: true, codeEnvAvailable: false }),
+    );
+  });
+
+  /** One role read answers both grants, so an embedder that wires
+   *  `getRoleByName` pays for the pairing once and gets each flag separately. */
+  it('pairs each capability with its own grant from a single role read', async () => {
+    deps.appConfig = {
+      endpoints: { agents: { capabilities: ['file_search', 'execute_code'] } },
+    } as never;
+    const getRoleByName = jest.fn().mockResolvedValue({
+      name: 'USER',
+      permissions: {
+        [PermissionTypes.FILE_SEARCH]: { [Permissions.USE]: false },
+        [PermissionTypes.RUN_CODE]: { [Permissions.USE]: true },
+      },
+    });
+    deps.getRoleByName = getRoleByName as never;
+
+    await createAgentChatCompletion(
+      createMockReq({ id: 'user-123', role: 'USER' }),
+      createMockRes(),
+      deps,
+    );
+
+    expect(getRoleByName).toHaveBeenCalledTimes(1);
+    expect(deps.initializeAgent).toHaveBeenCalledWith(
+      expect.objectContaining({ fileSearchAvailable: false, codeEnvAvailable: true }),
     );
   });
 
