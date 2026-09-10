@@ -12,10 +12,17 @@
  *   Types  — RecoilState, SetterOrUpdater, Resetter
  */
 
-import { atom as jotaiAtom, useAtom, useAtomValue, useSetAtom, useStore } from 'jotai';
+import {
+  atom as jotaiAtom,
+  getDefaultStore,
+  useAtom,
+  useAtomValue,
+  useSetAtom,
+  useStore,
+} from 'jotai';
 import { atomFamily as jotaiAtomFamily, RESET, useResetAtom } from 'jotai/utils';
 import type { Atom, WritableAtom, PrimitiveAtom } from 'jotai';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import type { SetStateAction } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -254,10 +261,36 @@ export function useRecoilCallback<Args extends unknown[], Result>(
 // ---------------------------------------------------------------------------
 
 /**
- * No-op wrapper. The app already has Jotai's Provider at the root.
- * This exists so upstream code that renders `<RecoilRoot>` in tests doesn't break.
+ * Drop-in for `<RecoilRoot>`, which upstream specs use to seed atoms through
+ * `initializeState`. The shim's original pass-through silently dropped every
+ * seed, so a spec's arranged state never reached the component under test.
+ *
+ * The seed is applied to Jotai's **default** store rather than a fresh
+ * per-root one. Isolating each root the way Recoil does would be closer to the
+ * original semantics, but fork state modules hold `getDefaultStore()` at module
+ * scope (`store/agents.ts`, `store/usage.ts`), so their writes would land in
+ * the default store while a Provider-scoped read looked somewhere else. Seeding
+ * the default store keeps writer and reader on the same store, which is what
+ * the app itself does at runtime.
  */
-export function RecoilRoot({ children }: { children: React.ReactNode }) {
+export function RecoilRoot({
+  children,
+  initializeState,
+}: {
+  children: React.ReactNode;
+  initializeState?: (opts: {
+    set: <T>(a: WritableAtom<T, [SetStateAction<T>], void>, value: T) => void;
+  }) => void;
+}) {
+  /** Recoil seeds once at mount, before the first render of its children. */
+  useState(() => {
+    const target = getDefaultStore();
+    initializeState?.({
+      set: <T>(a: WritableAtom<T, [SetStateAction<T>], void>, value: T) =>
+        target.set(a, value as never),
+    });
+    return null;
+  });
   return children;
 }
 
