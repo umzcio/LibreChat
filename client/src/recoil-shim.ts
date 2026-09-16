@@ -14,7 +14,8 @@
 
 import {
   atom as jotaiAtom,
-  getDefaultStore,
+  createStore,
+  Provider,
   useAtom,
   useAtomValue,
   useSetAtom,
@@ -22,7 +23,7 @@ import {
 } from 'jotai';
 import { atomFamily as jotaiAtomFamily, RESET, useResetAtom } from 'jotai/utils';
 import type { Atom, WritableAtom, PrimitiveAtom } from 'jotai';
-import { useCallback, useState } from 'react';
+import { createElement, useCallback, useState } from 'react';
 import type { SetStateAction } from 'react';
 
 // ---------------------------------------------------------------------------
@@ -261,17 +262,17 @@ export function useRecoilCallback<Args extends unknown[], Result>(
 // ---------------------------------------------------------------------------
 
 /**
- * Drop-in for `<RecoilRoot>`, which upstream specs use to seed atoms through
- * `initializeState`. The shim's original pass-through silently dropped every
- * seed, so a spec's arranged state never reached the component under test.
+ * Drop-in for `<RecoilRoot>`, which upstream specs use both to seed atoms via
+ * `initializeState` and — just as often — to get a clean slate per render. Each
+ * root therefore gets its own Jotai store, reproducing both halves: the seed is
+ * applied before first render, and sibling roots never see each other's writes.
  *
- * The seed is applied to Jotai's **default** store rather than a fresh
- * per-root one. Isolating each root the way Recoil does would be closer to the
- * original semantics, but fork state modules hold `getDefaultStore()` at module
- * scope (`store/agents.ts`, `store/usage.ts`), so their writes would land in
- * the default store while a Provider-scoped read looked somewhere else. Seeding
- * the default store keeps writer and reader on the same store, which is what
- * the app itself does at runtime.
+ * Isolation requires that state modules never bind `getDefaultStore()` at module
+ * scope, or their writes land in the default store while a Provider-scoped read
+ * looks elsewhere. `store/agents.ts` was lifted onto `useStore()` for exactly
+ * that reason; `store/usage.ts` still calls it from the non-hook
+ * `hydrateSnapshots`, which is why that one is worth watching if a spec ever
+ * reads hydrated usage through a root.
  */
 export function RecoilRoot({
   children,
@@ -283,15 +284,15 @@ export function RecoilRoot({
   }) => void;
 }) {
   /** Recoil seeds once at mount, before the first render of its children. */
-  useState(() => {
-    const target = getDefaultStore();
+  const [store] = useState(() => {
+    const created = createStore();
     initializeState?.({
       set: <T>(a: WritableAtom<T, [SetStateAction<T>], void>, value: T) =>
-        target.set(a, value as never),
+        created.set(a, value as never),
     });
-    return null;
+    return created;
   });
-  return children;
+  return createElement(Provider, { store }, children);
 }
 
 // ---------------------------------------------------------------------------

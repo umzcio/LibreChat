@@ -1,31 +1,24 @@
 import { useCallback } from 'react';
-import { atom, getDefaultStore } from 'jotai';
+import { atom, useStore } from 'jotai';
 import { atomFamily } from 'jotai/utils';
 import { Constants } from 'librechat-data-provider';
 import type { TEphemeralAgent } from 'librechat-data-provider';
 import { logger } from '~/utils';
 
-const jotaiStore = getDefaultStore();
-
 export const ephemeralAgentByConvoId = atomFamily((convId: string) => {
   const base = atom<TEphemeralAgent | null>(null);
   base.debugLabel = `ephemeralAgentByConvoId(${convId})`;
-  base.onMount = (set) => {
-    const unsub = jotaiStore.sub(base, () => {
-      const newValue = jotaiStore.get(base);
-      logger.log('agents', 'Setting ephemeral agent:', { conversationId: convId, newValue });
-    });
-    return unsub;
-  };
   return base;
 });
 
 export function useUpdateEphemeralAgent() {
+  const jotaiStore = useStore();
   const updateEphemeralAgent = useCallback(
     (convoId: string, agent: TEphemeralAgent | null) => {
+      logger.log('agents', 'Setting ephemeral agent:', { conversationId: convoId, agent });
       jotaiStore.set(ephemeralAgentByConvoId(convoId), agent);
     },
-    [],
+    [jotaiStore],
   );
 
   return updateEphemeralAgent;
@@ -36,6 +29,7 @@ export function useUpdateEphemeralAgent() {
  * from the "new" conversation template to a specified conversation ID.
  */
 export function useApplyNewAgentTemplate() {
+  const jotaiStore = useStore();
   const applyTemplate = useCallback(
     (
       targetId: string,
@@ -73,7 +67,7 @@ export function useApplyNewAgentTemplate() {
         jotaiStore.set(ephemeralAgentByConvoId(targetId), null);
       }
     },
-    [],
+    [jotaiStore],
   );
 
   return applyTemplate;
@@ -84,12 +78,13 @@ export function useApplyNewAgentTemplate() {
  * for a specified conversation ID without subscribing the component.
  */
 export function useGetEphemeralAgent() {
+  const jotaiStore = useStore();
   const getEphemeralAgent = useCallback(
     (conversationId: string): TEphemeralAgent | null => {
       logger.log('agents', `[useGetEphemeralAgent] Getting loadable for ID: ${conversationId}`);
       return jotaiStore.get(ephemeralAgentByConvoId(conversationId));
     },
-    [],
+    [jotaiStore],
   );
 
   return getEphemeralAgent;
