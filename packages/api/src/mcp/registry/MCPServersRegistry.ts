@@ -1379,7 +1379,7 @@ export class MCPServersRegistry {
         }
         await this.configCacheRepo.update(serverName, merged);
         await this.readThroughCache.delete(this.getReadThroughCacheKey(serverName));
-        await this.readThroughCacheAll.clear();
+        await this.readThroughCacheAll.invalidateAllGlobal();
         return;
       }
       logger.warn(
@@ -1401,7 +1401,7 @@ export class MCPServersRegistry {
 
     await this.cacheConfigsRepo.update(serverName, merged);
     await this.readThroughCache.delete(this.getReadThroughCacheKey(serverName));
-    await this.readThroughCacheAll.clear();
+    await this.readThroughCacheAll.invalidateAllGlobal();
   }
 
   /**
