@@ -9,6 +9,7 @@ jest.mock('react-router-dom', () => ({
 
 const mockUseSetAtom = jest.fn();
 const mockUseAtom = jest.fn();
+const mockResetCurrentArtifactId = jest.fn();
 
 jest.mock('jotai', () => ({
   useSetAtom: (...args: unknown[]) => mockUseSetAtom(...args),
@@ -17,6 +18,7 @@ jest.mock('jotai', () => ({
 
 jest.mock('jotai/utils', () => ({
   RESET: Symbol('RESET'),
+  useResetAtom: () => mockResetCurrentArtifactId,
 }));
 
 jest.mock('~/hooks', () => ({
@@ -45,6 +47,13 @@ jest.mock('~/store', () => ({
 jest.mock('~/components/Chat/Input/Files/FilePreview', () => () => (
   <div data-testid="artifact-file-preview" />
 ));
+
+jest.mock('~/components/Chat/Messages/Content/Parts/ArtifactRow', () => ({
+  __esModule: true,
+  default: ({ onOpen }: { onOpen: () => void }) => (
+    <button type="button" onClick={onOpen} data-testid="artifact-row" />
+  ),
+}));
 
 describe('ArtifactButton', () => {
   const mockSetVisible = jest.fn();

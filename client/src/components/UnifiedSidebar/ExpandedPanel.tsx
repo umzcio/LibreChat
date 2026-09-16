@@ -1,11 +1,12 @@
 import { memo, useCallback, lazy, Suspense } from 'react';
-import { useRecoilValue } from 'recoil';
+import { useAtomValue } from 'jotai';
 import { SquarePen } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Skeleton, Sidebar, Button, TooltipAnchor } from '@librechat/client';
 import type { NavLink } from '~/common';
 import { useShortcutAriaKey, useShortcutHint } from '~/hooks/useKeyboardShortcuts';
 import { useActivePanel, resolveActivePanel, DEFAULT_PANEL } from '~/Providers';
+import AgentMarketplaceButton from '~/components/Nav/AgentMarketplaceButton';
 import { useGetStartupConfig } from '~/data-provider';
 import { CLOSE_SIDEBAR_ID } from '~/components/Chat/Menus/OpenSidebar';
 import useNewChat from '~/hooks/Chat/useNewChat';
@@ -21,7 +22,7 @@ const NewChatButton = memo(function NewChatButton({
   setActive: (id: string) => void;
 }) {
   const localize = useLocalize();
-  const switchToHistory = useRecoilValue(store.newChatSwitchToHistory);
+  const switchToHistory = useAtomValue(store.newChatSwitchToHistory);
   const tooltipDescription = useShortcutHint('newChat', localize('com_ui_new_chat'));
   const ariaKey = useShortcutAriaKey('newChat');
 
@@ -193,6 +194,7 @@ function ExpandedPanel({
         }
       />
       <NewChatButton setActive={setActive} />
+      <AgentMarketplaceButton />
       <div className="mx-2 border-b border-border-light" />
       <div className="flex flex-col gap-1 overflow-y-auto">
         {links.map((link) => (
