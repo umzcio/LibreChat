@@ -1,6 +1,7 @@
 import { atom } from 'jotai';
 import { atomWithReset, atomFamily } from 'jotai/utils';
 import type { Artifact } from '~/common';
+import { logger } from '~/utils';
 
 export type ArtifactPanelMode = 'side' | 'fullscreen';
 
@@ -60,13 +61,13 @@ const artifactByIdSelector = atomFamily((artifactId: string) => {
 /**
  * One-shot signal that an attachment's deferred preview just transitioned
  * from `pending` to `ready` during the current session — keyed by
- * `file_id` (raw, NOT the `tool-artifact-${file_id}` form).
+ * `[messageId, file_id]`. The same file can appear in more than one response;
+ * a historical card must not consume a live response's pending signal.
  *
  * The preview-sync hook flips this to `true` on the pending→ready edge.
- * `ToolArtifactCard` reads it on mount; if set, it auto-opens the panel
- * (even when no submission is in flight) and then resets the flag, so
- * subsequent re-mounts (panel close/reopen, re-render of the same card
- * from history) do not steal focus a second time.
+ * `ToolArtifactCard` reads it for the same owning message; if set, it
+ * auto-opens the panel (even when no submission is in flight) and then
+ * resets the flag, so later mounts of that response do not steal focus.
  *
  * Why a separate signal rather than reusing `mountedDuringStreamRef`:
  * the deferred render can complete *after* the SSE stream has closed,
@@ -78,11 +79,14 @@ const artifactByIdSelector = atomFamily((artifactId: string) => {
  * scrolling through history doesn't get the panel popping open every
  * time a previously resolved chip enters the viewport.
  */
-const previewJustResolved = atomFamily((_fileId: string) => {
-  const a = atom<boolean>(false);
-  a.debugLabel = 'previewJustResolved';
-  return a;
-});
+const previewJustResolved = atomFamily(
+  (_key: [messageId: string, fileId: string]) => {
+    const a = atom<boolean>(false);
+    a.debugLabel = 'previewJustResolved';
+    return a;
+  },
+  (a, b) => a[0] === b[0] && a[1] === b[1],
+);
 
 export {
   artifactsPanelMode,

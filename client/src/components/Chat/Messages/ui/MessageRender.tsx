@@ -4,10 +4,11 @@ import { fontSizeAtom } from '~/store/fontSize';
 import type { TMessage } from 'librechat-data-provider';
 import type { TMessageProps, TMessageIcon, TMessageChatContext } from '~/common';
 import {
-  areMessageFieldsEqual,
   cn,
-  getHeaderPrefixForScreenReader,
+  isSameTailRelation,
   getMessageAriaLabel,
+  areMessageFieldsEqual,
+  getHeaderPrefixForScreenReader,
 } from '~/utils';
 import { revealOnRowHoverClasses, messageFooterClasses } from '~/components/Chat/Messages/styles';
 import { parseWakeupText } from '~/components/Chat/Messages/Content/Parts/wakeup';
@@ -34,6 +35,9 @@ type MessageRenderProps = {
   isSubmitting?: boolean;
   /** Stable context object from wrapper — avoids ChatContext subscription inside memo */
   chatContext: TMessageChatContext;
+  /** The thread's tail; the comparator re-renders only when this row's relation to it changes */
+  latestMessageId?: string;
+  latestMessageDepth?: number;
 } & Pick<
   TMessageProps,
   'currentEditId' | 'setCurrentEditId' | 'siblingIdx' | 'setSiblingIdx' | 'siblingCount'
@@ -67,7 +71,7 @@ function areMessageRenderPropsEqual(prev: MessageRenderProps, next: MessageRende
     return false;
   }
 
-  return areMessageFieldsEqual(prev.message, next.message);
+  return areMessageFieldsEqual(prev.message, next.message) && isSameTailRelation(prev, next);
 }
 
 const MessageRender = memo(function MessageRender({
@@ -79,6 +83,8 @@ const MessageRender = memo(function MessageRender({
   setCurrentEditId,
   isSubmitting = false,
   chatContext,
+  latestMessageId,
+  latestMessageDepth,
 }: MessageRenderProps) {
   const localize = useLocalize();
   const {
@@ -92,11 +98,9 @@ const MessageRender = memo(function MessageRender({
     messageLabel,
     handleFeedback,
     handleContinue,
-    latestMessageId,
     copyToClipboard,
     getCanCopy,
     regenerateMessage,
-    latestMessageDepth,
     hasConfiguredSender,
   } = useMessageActions({
     message: msg,
@@ -108,6 +112,7 @@ const MessageRender = memo(function MessageRender({
   const maximizeChatSpace = useAtomValue(store.maximizeChatSpace);
 
   const handleRegenerateMessage = useCallback(() => regenerateMessage(), [regenerateMessage]);
+  const getLatestMessageId = useCallback(() => chatContext.latestMessageId, [chatContext]);
   const hasNoChildren = !(msg?.children?.length ?? 0);
   const isLast = useMemo(
     () => hasNoChildren && (msg?.depth === latestMessageDepth || msg?.depth === -1),
@@ -174,7 +179,7 @@ const MessageRender = memo(function MessageRender({
       hasParallelContent={hasParallelContent}
       fullWidth={maximizeChatSpace}
       isEditing={edit}
-      plain={wakeupDisplay != null && !edit}
+      systemLabel={wakeupDisplay != null && !edit ? localize('com_ui_system_event') : undefined}
       footer={
         <SubRow classes={cn(messageFooterClasses, msg.isCreatedByUser && 'justify-end')}>
           {/* The reading holds the column start: it takes over the slot the streaming
@@ -208,13 +213,13 @@ const MessageRender = memo(function MessageRender({
             isEditing={edit}
             message={msg}
             enterEdit={enterEdit}
-            isSubmitting={chatContext.isSubmitting}
             conversation={conversation ?? null}
             regenerate={handleRegenerateMessage}
             copyToClipboard={copyToClipboard}
             getCanCopy={getCanCopy}
             handleContinue={handleContinue}
             latestMessageId={latestMessageId}
+            getLatestMessageId={getLatestMessageId}
             handleFeedback={handleFeedback}
             isLast={isLast}
           />

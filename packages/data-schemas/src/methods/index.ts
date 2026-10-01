@@ -47,7 +47,12 @@ import {
   type UserGroupMethods,
   type UserGroupDeps,
 } from './userGroup';
-import { createAclEntryMethods, permissionBitSupersets, type AclEntryMethods } from './aclEntry';
+import {
+  createAclEntryMethods,
+  permissionBitSupersets,
+  PERM_BITS_WRITE_ATTEMPTS,
+  type AclEntryMethods,
+} from './aclEntry';
 import { createSystemGrantMethods, type SystemGrantMethods } from './systemGrant';
 import {
   createAuditLogMethods,
@@ -135,6 +140,8 @@ import {
   type ListSkillsByAccessResult,
   type UpdateSkillResult,
   type ValidationIssue,
+  type DeleteSkillCleanupStep,
+  type DeleteSkillResult,
 } from './skill';
 import { createScheduleMethods, type ScheduleMethods } from './schedule';
 import {
@@ -202,7 +209,7 @@ export {
   digestMCPAuthorityValue,
 };
 export { tokenValues, cacheTokenValues, premiumTokenValues, defaultRate, createTxMethods };
-export { permissionBitSupersets };
+export { permissionBitSupersets, PERM_BITS_WRITE_ATTEMPTS };
 export { CLIENT_MESSAGE_SELECT, SUBAGENT_TRANSCRIPT_SOURCE_BYTE_LIMIT };
 export {
   partitionIssues,
@@ -331,6 +338,10 @@ export function createMethods(
     getMessages: messageMethods.getMessages,
     deleteMessages: messageMethods.deleteMessages,
     searchMessages: messageMethods.searchMessages,
+    eraseAgentTriggerDeliveryConversationResults:
+      agentTriggerDeliveryMethods.eraseAgentTriggerDeliveryConversationResults,
+    prepareAgentTriggerConversationResultErasure:
+      agentTriggerDeliveryMethods.prepareAgentTriggerConversationResultErasure,
     deleteAgentQueuedTurns: async (user, conversations) => {
       /** Queued-turn ownership is ObjectId-backed. Conversation methods also
        * support synthetic/non-ObjectId owners in embedded integrations and
@@ -352,6 +363,9 @@ export function createMethods(
             sourceId: 'agent-queued-turn',
             reason: 'queued_turn_conversation_deleted',
             settledAt,
+            /** The source lane is fenced and admission has settled. Queued-turn
+             * deliveries need not receive a later terminal handling receipt. */
+            allowSucceeded: true,
           };
           let retired = await agentTriggerDeliveryMethods.retireAgentTriggerDelivery(retirement);
           if (!retired) {
@@ -564,6 +578,8 @@ export type {
   ListSkillsByAccessResult,
   UpdateSkillResult,
   ValidationIssue,
+  DeleteSkillCleanupStep,
+  DeleteSkillResult,
   SkillSyncStatusInput,
   SkillSyncCredentialSummary,
   UpsertSkillSyncCredentialInput,

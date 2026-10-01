@@ -37,6 +37,7 @@ export default function Presentation({
   const conversationId = useAtomValue(store.conversationIdByIndex(0));
   const conversationEndpoint = useAtomValue(store.effectiveEndpointByIndex(0));
   const conversationAgentId = useAtomValue(store.conversationAgentIdByIndex(0));
+  const isSubmitting = useAtomValue(store.isSubmittingFamily(0));
   const selectedSubagent = useAtomValue(activeSubagentPanel);
   const setSelectedSubagent = useSetAtom(activeSubagentPanel);
   const resetSelectedSubagent = useCallback(() => setSelectedSubagent(null), [setSelectedSubagent]);
@@ -154,6 +155,7 @@ export default function Presentation({
         <ParentSubagentsProvider
           conversationId={conversationId ?? ''}
           enabled={conversationEndpoint === EModelEndpoint.agents && conversationAgentId != null}
+          isSubmitting={isSubmitting}
         >
           <SidePanelGroup panel={panelElement}>
             <main className="flex h-full flex-col overflow-y-auto" role="main">

@@ -7,6 +7,9 @@ import {
   getProps,
   getTemplate,
   getArtifactWorkspaceFilename,
+  getArtifactFilename,
+  getSvgFiles,
+  isSvgArtifactType,
   languageForFilename,
   wrapAsFencedCodeBlock,
   TOOL_ARTIFACT_TYPES,
@@ -71,6 +74,10 @@ export default function useArtifactProps({ artifact }: { artifact: Artifact }) {
       ];
     }
 
+    if (isSvgArtifactType(type)) {
+      return [getArtifactFilename(type), getSvgFiles(artifact.content ?? '')];
+    }
+
     const fileKey = getArtifactWorkspaceFilename(artifact.type ?? '', artifact.language);
     const files = removeNullishValues({
       [fileKey]: artifact.content,
@@ -92,10 +99,20 @@ export default function useArtifactProps({ artifact }: { artifact: Artifact }) {
 
   const sharedProps = useMemo(() => getProps(artifact.type ?? ''), [artifact.type]);
 
+  /* SVG previews render a *derived* `index.html`, not the edited file itself,
+   * so swapping `fileKey` alone would leave the preview on the original
+   * source while the code tab shows the new one. Consumers that hold editor
+   * text rebuild the whole set through this instead. */
+  const deriveFiles = useMemo(
+    () => (isSvgArtifactType(artifact.type ?? '') ? getSvgFiles : undefined),
+    [artifact.type],
+  );
+
   return {
     files,
     fileKey,
     template,
     sharedProps,
+    deriveFiles,
   };
 }

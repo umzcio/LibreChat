@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { memo, useState, useRef } from 'react';
 import { useAtom } from 'jotai';
 import * as Ariakit from '@ariakit/react';
 import { VisuallyHidden } from '@ariakit/react';
@@ -199,17 +199,18 @@ const CheckboxOption: React.FC<CheckboxOptionProps> = ({
   );
 };
 
-export default function Fork({
+function Fork({
   messageId,
   conversationId: _convoId,
   forkingSupported = false,
-  latestMessageId,
+  getLatestMessageId,
   isLast = false,
 }: {
   messageId: string;
   conversationId: string | null;
   forkingSupported?: boolean;
-  latestMessageId?: string;
+  /** Read when a fork starts: the split target must be the tail at click time. */
+  getLatestMessageId?: () => string | undefined;
   isLast?: boolean;
 }) {
   const localize = useLocalize();
@@ -278,7 +279,7 @@ export default function Fork({
       conversationId,
       option,
       splitAtTarget,
-      latestMessageId,
+      latestMessageId: getLatestMessageId?.(),
     });
   };
 
@@ -338,7 +339,7 @@ export default function Fork({
                   splitAtTarget,
                   conversationId,
                   option: forkSetting,
-                  latestMessageId,
+                  latestMessageId: getLatestMessageId?.(),
                 });
               } else {
                 popoverStore.toggle();
@@ -441,3 +442,6 @@ export default function Fork({
     </>
   );
 }
+
+/** Memoized: a send re-renders every row's toolbar, and nothing here depends on it. */
+export default memo(Fork);

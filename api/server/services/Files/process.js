@@ -265,16 +265,8 @@ const processDeleteRequest = async ({ req, files }) => {
     await initializeClients();
   }
 
-  const agentFiles = [];
-
   for (const file of files) {
     const source = file.source ?? FileSources.local;
-    if (req.body.agent_id && req.body.tool_resource) {
-      agentFiles.push({
-        tool_resource: req.body.tool_resource,
-        file_id: file.file_id,
-      });
-    }
 
     if (source === FileSources.text) {
       resolvedFileIds.add(file.file_id);
@@ -313,15 +305,6 @@ const processDeleteRequest = async ({ req, files }) => {
     });
   }
 
-  if (agentFiles.length > 0) {
-    promises.push(
-      db.removeAgentResourceFiles({
-        agent_id: req.body.agent_id,
-        files: agentFiles,
-      }),
-    );
-  }
-
   const results = await Promise.allSettled(promises);
   for (const result of results) {
     if (result.status === 'rejected') {
@@ -339,6 +322,9 @@ const processDeleteRequest = async ({ req, files }) => {
       metadataDeletedFileIds = [];
       throw error;
     }
+    /* The only place a delete removes agent references, and it runs after the metadata delete
+       succeeded: a file that kept its storage, its chunks or its record keeps its references too,
+       so the agent it was removed from can be asked again (see issue #12776). */
     if (metadataDeletedFileIds.length > 0) {
       try {
         await db.removeAgentResourceFilesFromAllAgents({ file_ids: metadataDeletedFileIds });
@@ -558,7 +544,10 @@ const processImageFile = async ({ req, res, metadata, returnFile = false, sseStr
       try {
         await deleteFile(req, { filepath, source });
       } catch (cleanupErr) {
-        logger.error('[processImageFile] Failed to clean up remote file after DB error', cleanupErr);
+        logger.error(
+          '[processImageFile] Failed to clean up remote file after DB error',
+          cleanupErr,
+        );
       }
     }
     throw dbError;

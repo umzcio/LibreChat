@@ -17,6 +17,7 @@ const {
   getBalanceConfig,
   omitTitleOptions,
   getProviderConfig,
+  formatMemoryContext,
   memoryInstructions,
   createCachedTokenCounter,
   applyContextToAgent,
@@ -173,6 +174,7 @@ const {
   restoreCompactionSemanticIndexSnapshot,
   MAX_AGENT_CONTEXT_SKILLS,
   isAgentFadingTier,
+  isCurrentAgentFadingTier,
   isAgentFadingTierEntries,
   resolveRunContextMeta,
   resolveRunFadingTiers,
@@ -226,7 +228,7 @@ const db = require('~/models');
 
 const loadAgent = (params) =>
   loadAgentFn(params, {
-    getAgent: db.getAgent,
+    getAgent: db.getAgentWithVersionCount,
     getMCPServerTools,
     getAccessibleMCPServers,
   });
@@ -297,7 +299,7 @@ function resolveRunSeeds(client) {
   const encodingMatch = prevMeta.encoding === currentEncoding;
   const calibrationRatio =
     encodingMatch && prevMeta.calibrationRatio > 0 ? prevMeta.calibrationRatio : undefined;
-  const fadingTier = isAgentFadingTier(prevMeta.fading) ? prevMeta.fading : undefined;
+  const fadingTier = isCurrentAgentFadingTier(prevMeta.fading) ? prevMeta.fading : undefined;
   const fadingTiers = resolveRunFadingTiers(prevMeta.fadingTiers);
   logger.debug(
     `[AgentClient] contextMeta from parent: ratio=${prevMeta.calibrationRatio}, encoding=${prevMeta.encoding}, current=${currentEncoding}, seeded=${calibrationRatio ?? 'none'}, fading=${fadingTier ? `${fadingTier.budgetTokens}/${fadingTier.masked}` : 'none'}, agents=${fadingTiers ? Object.keys(fadingTiers).length : 0}`,
@@ -1989,6 +1991,15 @@ class AgentClient extends BaseClient {
     );
   }
 
+  /** Attachments alone defer only the message, so a new conversation still gets its row when
+   * the run starts, as it did before that deferral. A content policy holds back every write. */
+  shouldSeedDeferredConversation() {
+    return !hasModelBoundContentProtection(
+      this.options.req?.config?.filters,
+      this.options.req?.config?.messageFilter?.pii,
+    );
+  }
+
   /** Legacy `messageFilter.pii` historically covered the restored branch
    * before model-input construction and persistence. Retain that contract
    * without scanning new source-aware filters before SDK pruning. */
@@ -2972,7 +2983,7 @@ class AgentClient extends BaseClient {
           modelBoundMemoryContexts.add(partitionMemories.withoutKeys);
           agentMemoryContexts.push(partitionMemories.withoutKeys);
         }
-        const agentMemoryContext = buildMemoryContext(
+        const agentMemoryContext = formatMemoryContext(
           agentHasMemory ? partitionMemories?.withKeys : partitionMemories?.withoutKeys,
         );
         if (agentMemoryContext) {
@@ -4188,13 +4199,18 @@ class AgentClient extends BaseClient {
     let run;
     /** @type {Promise<(TAttachment | null)[] | undefined>} */
     let memoryPromise;
+    const appConfig = this.options.req.config;
     const terminalRunError = createTerminalRunErrorObserver({
+      maxProviderErrorChars: appConfig?.endpoints?.agents?.maxProviderErrorChars,
       logger,
       responseMessageId: this.responseMessageId,
       source: '[api/server/controllers/agents/client.js #sendCompletion]',
       genericMessage: '[api/server/controllers/agents/client.js #sendCompletion] Unhandled error',
+      protectionEnabled: hasModelBoundContentProtection(
+        appConfig?.filters,
+        appConfig?.messageFilter?.pii,
+      ),
     });
-    const appConfig = this.options.req.config;
     const balanceConfig = getBalanceConfig(appConfig);
     const transactionsConfig = getTransactionsConfig(appConfig);
     try {
@@ -5077,13 +5093,18 @@ class AgentClient extends BaseClient {
     let config;
     /** @type {ReturnType<createRun>} */
     let run;
+    const appConfig = this.options.req.config;
     const terminalRunError = createTerminalRunErrorObserver({
+      maxProviderErrorChars: appConfig?.endpoints?.agents?.maxProviderErrorChars,
       logger,
       responseMessageId: this.responseMessageId,
       source: '[api/server/controllers/agents/client.js #resumeCompletion]',
       genericMessage: '[api/server/controllers/agents/client.js #resumeCompletion] Unhandled error',
+      protectionEnabled: hasModelBoundContentProtection(
+        appConfig?.filters,
+        appConfig?.messageFilter?.pii,
+      ),
     });
-    const appConfig = this.options.req.config;
     const balanceConfig = getBalanceConfig(appConfig);
     const transactionsConfig = getTransactionsConfig(appConfig);
     try {

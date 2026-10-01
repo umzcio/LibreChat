@@ -24,7 +24,6 @@ const artifactFilename = {
   'application/vnd.ant.react': 'App.tsx',
   'text/html': 'index.html',
   'application/vnd.code-html': 'index.html',
-  'image/svg+xml': 'image.svg',
   /* Office preview buckets — the backend produces a complete sanitized
    * `index.html` document (head + body) and ships it via `attachment.text`.
    * The Sandpack `static` template loads it as-is. See
@@ -32,6 +31,11 @@ const artifactFilename = {
   'application/vnd.librechat.docx-preview': 'index.html',
   'application/vnd.librechat.spreadsheet-preview': 'index.html',
   'application/vnd.librechat.presentation-preview': 'index.html',
+  /* SVG artifacts are a bare `<svg>` document. The Sandpack `static`
+   * template always loads `index.html`, so `getSvgFiles` ships a
+   * companion HTML shell; the editor/download file stays `index.svg`. */
+  'image/svg+xml': 'index.svg',
+  'image/svg': 'index.svg',
   // mermaid and markdown types are handled separately in useArtifactProps.ts
   default: 'index.html',
   // 'css': 'css',
@@ -55,7 +59,6 @@ const artifactTemplate: Record<
   'application/vnd.ant.react': 'react-ts',
   'application/vnd.mermaid': 'react-ts',
   'application/vnd.code-html': 'static',
-  'image/svg+xml': 'static',
   /* CODE bucket reuses the static markdown pipeline — `useArtifactProps`
    * pre-wraps the content in a fenced block and hands it to
    * `getMarkdownFiles`, so the rendered HTML uses the same `marked`
@@ -70,6 +73,8 @@ const artifactTemplate: Record<
   'application/vnd.librechat.docx-preview': 'static',
   'application/vnd.librechat.spreadsheet-preview': 'static',
   'application/vnd.librechat.presentation-preview': 'static',
+  'image/svg+xml': 'static',
+  'image/svg': 'static',
   default: 'static',
   // 'css': 'css',
   // 'javascript': 'js',
@@ -110,6 +115,13 @@ export function getArtifactWorkspaceFilename(type: string, language?: string): s
 
   if (type === 'text/plain') {
     return 'content.txt';
+  }
+
+  /* The shared map now answers `index.svg` for upstream's Sandpack preview,
+   * which pairs the source with a generated `index.html` shell. A workspace
+   * import wants the file named for what it is, not for the preview harness. */
+  if (isSvgArtifactType(type)) {
+    return 'image.svg';
   }
 
   return getArtifactFilename(type, language);
@@ -259,6 +271,47 @@ export function getTemplate(type: string, language?: string): SandpackPredefined
   return artifactTemplate[key] ?? (artifactTemplate.default as SandpackPredefinedTemplate);
 }
 
+/** `image/svg` is the alias some callers emit for `image/svg+xml`. */
+export function isSvgArtifactType(type: string): boolean {
+  return type === 'image/svg+xml' || type === 'image/svg';
+}
+
+/**
+ * Files for an `image/svg+xml` (or `image/svg`) artifact. The Sandpack
+ * `static` template always loads `index.html`; a bare SVG in that slot
+ * renders blank. Keep the source on `index.svg` for the code tab and wrap
+ * a copy in a full-viewport HTML shell for the preview. viewBox-only
+ * sources fill the panel via `body > svg { width/height: 100% }`, scoped to
+ * the root because CSS beats presentation attributes: an unscoped `svg` rule
+ * would stretch a nested `<svg>` viewport, such as a sprite or inset diagram,
+ * over its own `width`/`height` and corrupt the artifact's internal layout.
+ *
+ * The shell holds a *copy* of the source, so an edit cannot be applied by
+ * replacing `index.svg` alone — both entries have to be rebuilt from the
+ * new text. `useArtifactProps` exposes this builder as `deriveFiles` for
+ * exactly that.
+ */
+export function getSvgFiles(content: string): Record<string, string> {
+  const svg = content.replace(/^\uFEFF?\s*<\?xml\b[^?]*\?>\s*/i, '');
+  return {
+    'index.svg': content,
+    'index.html': `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+html,body{margin:0;height:100%;overflow:hidden}
+body>svg{display:block;width:100%;height:100%}
+</style>
+</head>
+<body>
+${svg}
+</body>
+</html>`,
+  };
+}
+
 const standardDependencies = {
   three: '^0.167.1',
   'lucide-react': '^0.394.0',
@@ -323,7 +376,6 @@ const dependenciesMap: Record<
   'application/vnd.ant.react': standardDependencies,
   'text/html': standardDependencies,
   'application/vnd.code-html': standardDependencies,
-  'image/svg+xml': {},
   /* CODE renders in the static markdown template; no React or other
    * runtime deps. Empty map skips the sandpack `package.json` install
    * step entirely (same as MARKDOWN/PLAIN_TEXT). */
@@ -336,6 +388,9 @@ const dependenciesMap: Record<
   'application/vnd.librechat.docx-preview': {},
   'application/vnd.librechat.spreadsheet-preview': {},
   'application/vnd.librechat.presentation-preview': {},
+  /* SVG preview is a static HTML shell + the source file; no npm deps. */
+  'image/svg+xml': {},
+  'image/svg': {},
   default: standardDependencies,
 };
 
