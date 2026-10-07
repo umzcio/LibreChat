@@ -1,5 +1,4 @@
-import { memo, useCallback, lazy, Suspense } from 'react';
-import { useAtomValue } from 'jotai';
+import { memo, useCallback, Suspense } from 'react';
 import { SquarePen } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { Skeleton, Sidebar, Button, TooltipAnchor } from '@librechat/client';
@@ -9,20 +8,21 @@ import { useActivePanel, resolveActivePanel, DEFAULT_PANEL } from '~/Providers';
 import AgentMarketplaceButton from '~/components/Nav/AgentMarketplaceButton';
 import { useGetStartupConfig } from '~/data-provider';
 import { CLOSE_SIDEBAR_ID } from '~/components/Chat/Menus/OpenSidebar';
+import { lazyWithRecovery } from '~/lib/assets/lazy';
 import useNewChat from '~/hooks/Chat/useNewChat';
 import { useLocalize } from '~/hooks';
 import { cn } from '~/utils';
-import store from '~/store';
 
-const AccountSettings = lazy(() => import('~/components/Nav/AccountSettings'));
+const AccountSettings = lazyWithRecovery(() => import('~/components/Nav/AccountSettings'));
 
 const NewChatButton = memo(function NewChatButton({
   setActive,
+  switchToHistory,
 }: {
   setActive: (id: string) => void;
+  switchToHistory: boolean;
 }) {
   const localize = useLocalize();
-  const switchToHistory = useAtomValue(store.newChatSwitchToHistory);
   const tooltipDescription = useShortcutHint('newChat', localize('com_ui_new_chat'));
   const ariaKey = useShortcutAriaKey('newChat');
 
@@ -44,10 +44,10 @@ const NewChatButton = memo(function NewChatButton({
           data-testid="new-chat-button"
           aria-label={localize('com_ui_new_chat')}
           aria-keyshortcuts={ariaKey}
-          className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-surface-hover"
+          className="hover:bg-surface-hover flex h-9 w-9 items-center justify-center rounded-lg transition-colors"
           onClick={handleNewChatClick}
         >
-          <SquarePen className="h-5 w-5 text-text-primary" />
+          <SquarePen className="text-text-primary h-5 w-5" />
         </a>
       }
     />
@@ -130,6 +130,7 @@ function ExpandedPanel({
   onExpand,
   onNavigate,
   onLeaveInsights,
+  switchToHistory,
 }: {
   links: NavLink[];
   expanded?: boolean;
@@ -137,6 +138,7 @@ function ExpandedPanel({
   onExpand?: () => void;
   onNavigate?: () => void;
   onLeaveInsights?: () => void;
+  switchToHistory: boolean;
 }) {
   const localize = useLocalize();
   const location = useLocation();
@@ -152,7 +154,7 @@ function ExpandedPanel({
   const toggleSidebarAriaKey = useShortcutAriaKey('toggleSidebar');
 
   return (
-    <div className="flex h-full flex-shrink-0 flex-col gap-2 border-r border-border-light bg-surface-primary-alt px-2 py-2">
+    <div className="border-border-inset bg-surface-primary-alt flex h-full shrink-0 flex-col gap-2 border-r px-2 py-2">
       <TooltipAnchor
         side="right"
         description={toggleSidebarHint}
@@ -184,18 +186,18 @@ function ExpandedPanel({
                 />
                 <Sidebar
                   aria-hidden="true"
-                  className="hidden h-5 w-5 text-text-primary group-hover/toggle:!block"
+                  className="text-text-primary hidden h-5 w-5 group-hover/toggle:!block"
                 />
               </>
             ) : (
-              <Sidebar aria-hidden="true" className="h-5 w-5 text-text-primary" />
+              <Sidebar aria-hidden="true" className="text-text-primary h-5 w-5" />
             )}
           </Button>
         }
       />
-      <NewChatButton setActive={setActive} />
+      <NewChatButton setActive={setActive} switchToHistory={switchToHistory} />
       <AgentMarketplaceButton />
-      <div className="mx-2 border-b border-border-light" />
+      <div className="border-border-inset mx-2 border-b" />
       <div className="flex flex-col gap-1 overflow-y-auto">
         {links.map((link) => (
           <NavIconButton

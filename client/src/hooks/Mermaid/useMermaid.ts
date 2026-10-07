@@ -8,7 +8,7 @@ import {
   inlineFlowchartConfig,
   sanitizeMermaidSvg,
 } from '~/utils/mermaid';
-import { logger } from '~/utils';
+import { importWithRecovery } from '~/lib/assets/lazy';
 
 // Constants
 const MD5_LENGTH_THRESHOLD = 10_000;
@@ -23,7 +23,7 @@ const loadMermaid = () => {
   }
 
   if (!mermaidPromise) {
-    mermaidPromise = import('mermaid').then((mod) => mod.default);
+    mermaidPromise = importWithRecovery(() => import('mermaid')).then((mod) => mod.default);
   }
 
   return mermaidPromise;
@@ -160,7 +160,7 @@ export const useMermaid = ({
 
       return sanitizedSvg;
     } catch (error) {
-      logger.error('Mermaid', 'rendering error:', error);
+      console.error('Mermaid rendering error:', error);
 
       // Return last valid content if available (graceful degradation)
       if (validContent) {

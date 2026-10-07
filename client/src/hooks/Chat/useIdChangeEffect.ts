@@ -1,8 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useSetAtom } from 'jotai';
-import { RESET } from 'jotai/utils';
+import { useChatSettings } from '~/Providers/ChatSettingsContext';
 import { logger } from '~/utils';
-import store from '~/store';
 
 /**
  * Hook to reset visible artifacts when the conversation ID changes
@@ -10,13 +8,13 @@ import store from '~/store';
  */
 export default function useIdChangeEffect(conversationId: string) {
   const lastConvoId = useRef<string | null>(null);
-  const setVisibleArtifacts = useSetAtom(store.visibleArtifacts);
+  const { resetVisibleArtifacts } = useChatSettings();
 
   useEffect(() => {
     if (conversationId !== lastConvoId.current) {
       logger.log('conversation', 'Conversation ID change');
-      setVisibleArtifacts(RESET);
+      resetVisibleArtifacts();
     }
     lastConvoId.current = conversationId;
-  }, [conversationId, setVisibleArtifacts]);
+  }, [conversationId, resetVisibleArtifacts]);
 }

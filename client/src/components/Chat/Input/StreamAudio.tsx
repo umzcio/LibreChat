@@ -1,8 +1,8 @@
 import { useEffect, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { QueryKeys } from 'librechat-data-provider';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { QueryKeys, getSpeechText } from 'librechat-data-provider';
+import { useRecoilState, useRecoilValue, useSetRecoilState } from 'recoil';
 import type { TMessage } from 'librechat-data-provider';
 import {
   useCustomAudioRef,
@@ -27,15 +27,15 @@ const maxPromiseTime = 15000;
 export default function StreamAudio({ index = 0 }) {
   const { token } = useAuthContext();
 
-  const cacheTTS = useAtomValue(store.cacheTTS);
-  const playbackRate = useAtomValue(store.playbackRate);
+  const cacheTTS = useRecoilValue(store.cacheTTS);
+  const playbackRate = useRecoilValue(store.playbackRate);
 
-  const voice = useAtomValue(store.voice);
-  const automaticPlayback = useAtomValue(store.automaticPlayback);
-  const setIsPlaying = useSetAtom(store.globalAudioPlayingFamily(index));
-  const setAudioRunId = useSetAtom(store.audioRunFamily(index));
-  const [isFetching, setIsFetching] = useAtom(store.globalAudioFetchingFamily(index));
-  const [globalAudioURL, setGlobalAudioURL] = useAtom(store.globalAudioURLFamily(index));
+  const voice = useRecoilValue(store.voice);
+  const automaticPlayback = useRecoilValue(store.automaticPlayback);
+  const setIsPlaying = useSetRecoilState(store.globalAudioPlayingFamily(index));
+  const setAudioRunId = useSetRecoilState(store.audioRunFamily(index));
+  const [isFetching, setIsFetching] = useRecoilState(store.globalAudioFetchingFamily(index));
+  const [globalAudioURL, setGlobalAudioURL] = useRecoilState(store.globalAudioURLFamily(index));
 
   const { shouldPlay, activeRunId, latestMessage } = useAutoplayTrigger(index);
   const { audioRef } = useCustomAudioRef({ setIsPlaying });
@@ -66,7 +66,9 @@ export default function StreamAudio({ index = 0 }) {
           setGlobalAudioURL(null);
         }
 
-        let cacheKey = latestMessage?.text ?? '';
+        /** Keyed by the spoken text, as manual playback is, so audio cached from an
+         *  unfiltered message (reasoning included) is never replayed. */
+        let cacheKey = latestMessage ? getSpeechText(latestMessage) : '';
         const cache = await caches.open('tts-responses');
         const cachedResponse = await cache.match(cacheKey);
 
@@ -139,7 +141,7 @@ export default function StreamAudio({ index = 0 }) {
             const targetMessage = latestMessages.find(
               (msg) => msg.messageId === latestMessage?.messageId,
             );
-            cacheKey = targetMessage?.text ?? '';
+            cacheKey = targetMessage ? getSpeechText(targetMessage) : '';
             if (!cacheKey) {
               logger.warn('Cache key not found, skipping audio cache');
             } else {

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { replaceSpecialVars } from 'librechat-data-provider';
-import type { TMessage } from 'librechat-data-provider';
+import type { TMessage, TReasoningOverride } from 'librechat-data-provider';
 import { useChatContext, useChatFormContext, useAddedChatContext } from '~/Providers';
 import { useGetLatestMessage } from '~/hooks/Messages/useLatestMessage';
 import { useAuthContext } from '~/hooks/AuthContext';
@@ -25,6 +25,7 @@ export default function useSubmitMessage() {
       overrideFiles?: TMessage['files'];
       overrideQuotes?: string[];
       overrideManualSkills?: string[];
+      overrideReasoning?: TReasoningOverride | null;
       overrideClientRequestId?: string;
       overrideRecoverySteerId?: string;
       overrideExpectedPredecessorCreatedAt?: number;
@@ -57,6 +58,7 @@ export default function useSubmitMessage() {
           overrideFiles: data.overrideFiles,
           overrideQuotes: data.overrideQuotes,
           overrideManualSkills: data.overrideManualSkills,
+          overrideReasoning: data.overrideReasoning,
           overrideClientRequestId: data.overrideClientRequestId,
           overrideRecoverySteerId: data.overrideRecoverySteerId,
           overrideExpectedPredecessorCreatedAt: data.overrideExpectedPredecessorCreatedAt,

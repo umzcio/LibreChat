@@ -57,7 +57,11 @@ export interface AdminUsersDeps {
     principalType: PrincipalType;
     principalId: string | Types.ObjectId;
   }) => Promise<void>;
-  deleteUserCascade?: (userId: string, userObjectId: Types.ObjectId) => Promise<void>;
+  /**
+   * Credential IDs are globally unique, so passkeys left behind by a deleted user
+   * keep authentication material and can collide with a later registration.
+   */
+  deletePasskeysByUser: (userId: string) => Promise<number>;
 }
 
 export function createAdminUsersHandlers(deps: AdminUsersDeps): {
@@ -80,7 +84,7 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
     invalidateCodeEnvironmentConfigCache,
     deleteConfig,
     deleteAclEntries,
-    deleteUserCascade,
+    deletePasskeysByUser,
   } = deps;
 
   async function listUsersHandler(req: ServerRequest, res: Response) {
@@ -227,28 +231,15 @@ export function createAdminUsersHandlers(deps: AdminUsersDeps): {
       }
 
       const objectId = new Types.ObjectId(id);
-
-      if (codeEnvironmentCleanupSafe) {
-        await deleteUserCodeEnvironments(objectId).catch((error: unknown) => {
-          logger.error('[adminUsers] code environment cleanup failed for user:', id, error);
-        });
-      }
-
-      if (deleteUserCascade) {
-        try {
-          await deleteUserCascade(id, objectId);
-        } catch (cascadeErr) {
-          logger.error('[adminUsers] cascade cleanup failed for user:', id, cascadeErr);
-        }
-      } else {
-        const cleanupResults = await Promise.allSettled([
-          deleteConfig(PrincipalType.USER, id),
-          deleteAclEntries({ principalType: PrincipalType.USER, principalId: objectId }),
-        ]);
-        for (const r of cleanupResults) {
-          if (r.status === 'rejected') {
-            logger.error('[adminUsers] cascade cleanup failed for user:', id, r.reason);
-          }
+      const cleanupResults = await Promise.allSettled([
+        deleteConfig(PrincipalType.USER, id),
+        ...(codeEnvironmentCleanupSafe ? [deleteUserCodeEnvironments(objectId)] : []),
+        deleteAclEntries({ principalType: PrincipalType.USER, principalId: objectId }),
+        deletePasskeysByUser(id),
+      ]);
+      for (const r of cleanupResults) {
+        if (r.status === 'rejected') {
+          logger.error('[adminUsers] cascade cleanup failed for user:', id, r.reason);
         }
       }
       await invalidateCodeEnvironmentConfigCache(targetUser?.tenantId).catch((error: unknown) => {

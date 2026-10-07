@@ -21,7 +21,7 @@ import {
   useSetAtom,
   useStore,
 } from 'jotai';
-import { atomFamily as jotaiAtomFamily, RESET, useResetAtom } from 'jotai/utils';
+import { atomFamily as jotaiAtomFamily, RESET } from 'jotai/utils';
 import type { Atom, WritableAtom, PrimitiveAtom } from 'jotai';
 import { createElement, useCallback, useState } from 'react';
 import type { SetStateAction } from 'react';
@@ -38,6 +38,25 @@ export type SetterOrUpdater<T> = (valOrUpdater: SetStateAction<T>) => void;
 
 /** Equivalent to Recoil's `Resetter` */
 export type Resetter = () => void;
+
+type ResetGet = <V>(a: Atom<V>) => V;
+type ResetSet = (a: WritableAtom<unknown, [never], void>, value: never) => void;
+
+/**
+ * Recoil's `reset` restores any atom's default. Jotai honors `RESET` only on
+ * resettable atoms (`atomWithReset`, `atomWithStorage`) and writes the symbol
+ * itself into a primitive atom, so fall back to the atom's `init` there.
+ */
+function hasInit(a: object): a is { init: unknown } {
+  return 'init' in a;
+}
+
+function resetToDefault(get: ResetGet, set: ResetSet, a: WritableAtom<unknown, [never], void>) {
+  set(a, RESET as never);
+  if (get(a) === RESET && hasInit(a)) {
+    set(a, a.init as never);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // atom({ key, default }) → jotaiAtom(default)
@@ -95,7 +114,7 @@ export function selector<T>(
     const recoilSet = options.set;
     a = jotaiAtom(getter, (get, set, newValue: SetStateAction<T>) => {
       const resetFn = <V>(target: WritableAtom<V, [typeof RESET], void>) =>
-        set(target, RESET as never);
+        resetToDefault(get, set as never, target as never);
       recoilSet({ get, set: set as never, reset: resetFn }, newValue);
     }) as WritableAtom<T, [SetStateAction<T>], void>;
   } else {
@@ -152,7 +171,7 @@ export function selectorFamily<T, P>(
       const recoilSet = options.set;
       a = jotaiAtom(getter, (get, set, newValue: SetStateAction<T>) => {
         const resetFn = <V>(target: WritableAtom<V, [typeof RESET], void>) =>
-          set(target, RESET as never);
+          resetToDefault(get, set as never, target as never);
         recoilSet(param)({ get, set: set as never, reset: resetFn }, newValue);
       }) as WritableAtom<T, [SetStateAction<T>], void>;
     } else {
@@ -190,7 +209,8 @@ export function useSetRecoilState<T>(
 
 /** Drop-in for `useResetRecoilState(atom)` → `useResetAtom(atom)` */
 export function useResetRecoilState<T>(a: WritableAtom<T, [typeof RESET], void>): Resetter {
-  return useResetAtom(a);
+  const store = useStore();
+  return useCallback(() => resetToDefault(store.get, store.set as never, a as never), [store, a]);
 }
 
 /**
@@ -245,7 +265,8 @@ export function useRecoilCallback<Args extends unknown[], Result>(
       const get = <T>(a: Atom<T>) => store.get(a);
       const set = <T>(a: WritableAtom<T, [SetStateAction<T>], void>, v: T | SetStateAction<T>) =>
         store.set(a, v);
-      const reset = <T>(a: WritableAtom<T, [typeof RESET], void>) => store.set(a, RESET);
+      const reset = <T>(a: WritableAtom<T, [typeof RESET], void>) =>
+        resetToDefault(store.get, store.set as never, a as never);
       const snapshot = {
         getPromise: async <T>(a: Atom<T>) => store.get(a),
         getLoadable: <T>(a: Atom<T>) => makeLoadable(store.get(a)),

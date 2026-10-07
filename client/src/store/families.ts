@@ -13,6 +13,7 @@ import type {
 } from 'librechat-data-provider';
 import type { GenerationProtocolVersion } from '~/data-provider/SSE/protocol';
 import type { TOptionSettings, ExtendedFile } from '~/common';
+import type { PendingSteer } from '~/hooks/Chat/queue';
 import {
   clearModelForNonEphemeralAgent,
   createChatSearchParams,
@@ -462,235 +463,14 @@ const pendingComposerTextByConvoId = atomFamily((_param: string) => {
 });
 
 /**
- * A steer message submitted mid-run. Server truth: `sending` covers the POST
- * in flight, `pending` means the server queued it (awaiting its injection
- * boundary — the next tool batch, or the next safe token boundary when
- * `preempt` was armed), `failed` keeps the text recoverable after a rejected
- * POST. The chip disappears when `on_steer_applied` lands (the inline content
- * part becomes the durable record).
+ * Per-conversation steers awaiting injection. Reconciled against the server:
+ * `on_steer_applied` removes its chip; `sync`/`resumeState.pendingSteers`
+ * replaces the list on reconnect; run-end reports convert leftovers into
+ * `queuedMessagesByConvoId` entries.
  */
-export type PendingSteer = {
-  steerId: string;
-  /** Optimistic id echoed by server state when SYNC beats the POST callback. */
-  clientSteerId?: string;
-  text: string;
-  status: 'sending' | 'pending' | 'failed';
-  /** The transport failed without a definitive server rejection. The durable
-   * enqueue may have committed. Same-id Retry is safe only under protocol v2;
-   * edit/queue/remove stay hidden until ownership is resolved. */
-  deliveryUncertain?: boolean;
-  /** Protocol selected for the generation that owns this attempt. */
-  generationProtocolVersion?: GenerationProtocolVersion;
-  createdAt: number;
-  files?: TMessage['files'];
-  /** Quoted excerpts riding this steer (also sent on the POST — the server
-   *  merges them into the injected turn); kept on the chip so a steer that
-   *  never injects restores onto the queued item with them intact. */
-  quotes?: string[];
-  /** Manual skill picks, carried for restoration only (a skill pick
-   *  configures a NEW turn's run, so it never rides the steer POST). */
-  manualSkills?: string[];
-  /** Asked the run to seal generation at the next safe boundary rather than
-   *  wait for a tool step. Labelling only — the server owns the behaviour and
-   *  echoes what it actually armed. */
-  preempt?: boolean;
-  /** Monotonic server revision; delayed ACKs cannot undo SSE corrections. */
-  preemptRevision?: number;
-  /** Exact server generation this steer belongs to. Conversation ids are
-   * reused by later turns, so retries/arm/cancel must retain this epoch rather
-   * than mutating whatever generation currently occupies the conversation. */
-  generationCreatedAt?: number;
-  /** Exact client queue identity/order to restore if this accepted steer is
-   *  returned as a terminal leftover before injection. */
-  queuedOrigin?: QueuedMessageOrigin;
-};
-
 const pendingSteersByConvoId = atomFamily((_param: string) => {
   const a = atom<PendingSteer[]>([]);
   a.debugLabel = 'pendingSteersByConvoId';
-  return a;
-});
-
-/** A message composed during a run, queued to send after it finishes. */
-export type QueuedMessage = {
-  id: string;
-  text: string;
-  createdAt: number;
-  /** Server authority for an Agent queued turn. Absence means the row remains
-   * on the legacy mounted-client drain path (including a definite old-server
-   * fallback). `uncertain` is deliberately still server-owned: falling back
-   * after an ambiguous POST could submit the same words twice. */
-  server?: {
-    id?: string;
-    status: 'sending' | 'uncertain' | 'indeterminate' | 'rejected' | 'queued' | 'claimed';
-    errorCode?: string;
-    errorMessage?: string;
-    /** Observation time for a transport-ambiguous enqueue. The logical item
-     * may be much older than the request that just became uncertain. */
-    uncertainSince?: number;
-    /** The bounded reconciliation window elapsed without authoritative
-     * evidence. The outcome remains ambiguous and must never become resendable. */
-    reconciliationExpired?: boolean;
-    /** Current one-based projection; server sequence remains the stable
-     * fallback when predecessors settle and positions close up. */
-    position?: number;
-    revision?: number;
-  };
-  /** Stable identity for server enqueue/retry. Recovered steer rows also use
-   * it to dismiss their parked source; a later recovery attempt gets a fresh
-   * identity. */
-  clientRequestId?: string;
-  /** Exact visible branch leaf captured when this turn entered the server
-   * queue. The server revalidates it before admitting the fresh successor. */
-  parentMessageId?: string;
-  /** Correlation used only to durably dismiss/reclaim the parked source. */
-  recoveryClientSteerId?: string;
-  recoverySteerId?: string;
-  /** Generation observed before this queued follow-up became eligible. */
-  expectedPredecessorCreatedAt?: number;
-  files?: TMessage['files'];
-  quotes?: string[];
-  manualSkills?: string[];
-  priority?: boolean;
-};
-
-/** Snapshot of a queued item's logical position while it is temporarily sent
- * into a live run. Neighbour ids make restoration resilient to concurrent
- * drains and sends without minting a replacement item. */
-export type QueuedMessageOrigin = {
-  item: QueuedMessage;
-  beforeIds: string[];
-  afterIds: string[];
-};
-
-/**
- * Per-conversation client-side queue of follow-up messages. Drained one per
- * run completion by `useQueueDrain` (each dequeued message starts a normal
- * turn whose own final event drains the next).
- */
-const queuedMessagesByConvoId = atomFamily((_param: string) => {
-  const a = atom<QueuedMessage[]>([]);
-  a.debugLabel = 'queuedMessagesByConvoId';
-  return a;
-});
-
-export type SettledQueuedTurnReceipt = {
-  clientRequestId: string;
-  status: 'admitted' | 'admitted_pending_boundary' | 'indeterminate' | 'cancelled' | 'dead';
-  effectivePredecessorCreatedAt?: number;
-  rootPredecessor?: true;
-  boundaryConsumed?: boolean;
-};
-
-/** Monotonic client knowledge of terminal server queue receipts. Admission
- * records preserve boundary multiplicity by request identity. Other terminal
- * records exist only while their original enqueue callback is outstanding. */
-const settledQueuedTurnReceiptsByConvoId = atomFamily((_param: string) => {
-  const a = atom<SettledQueuedTurnReceipt[]>([]);
-  a.debugLabel = 'settledQueuedTurnReceiptsByConvoId';
-  return a;
-});
-
-/** Enqueue callbacks that can still race newer GET/cancellation evidence.
- * Entries retire as soon as that one callback settles. */
-const pendingQueuedTurnEnqueueIdsByConvoId = atomFamily((_param: string) => {
-  const a = atom<string[]>([]);
-  a.debugLabel = 'pendingQueuedTurnEnqueueIdsByConvoId';
-  return a;
-});
-
-/**
- * One-shot run-termination signal written by the SSE final/error handlers and
- * consumed (reset to null) by `useQueueDrain`. Keyed by chat index like
- * `isSubmittingFamily`. Carrying the outcome lets the drain skip auto-send on
- * user aborts/errors while `startedAsNewConvo` migrates a queue keyed under
- * `Constants.NEW_CONVO` to the real conversation id.
- */
-export type RunEnd = {
-  conversationId: string | null;
-  outcome: 'completed' | 'aborted' | 'error';
-  startedAsNewConvo?: boolean;
-  endedAt: number;
-  /** Exact terminal epoch whose idle transition may release one queued start. */
-  generationCreatedAt?: number;
-  /** The completed run's response, which a revealed queued follow-up parents to. */
-  responseMessageId?: string;
-  /** Armed "Interrupt & send" flag traveling with a PARKED signal, so
-   *  another run on the same pane can neither consume nor clear it. */
-  interruptArmed?: boolean;
-};
-
-type RunEndUpdate = RunEnd | null | typeof RESET;
-
-/** A pane can receive A's terminal frame after the user has navigated to and
- * started B. Keep each terminal epoch until the queue drain has either parked
- * or consumed it; a single replaceable slot loses A when B finishes first. */
-const runEndsByIndex = atomFamily((_param: string | number) => {
-  const a = atom<RunEnd[]>([]);
-  a.debugLabel = 'runEndsByIndex';
-  return a;
-});
-
-/** Preserve the original nullable one-shot API for stream writers while the
- * backing state retains every not-yet-consumed terminal epoch. Writing null
- * consumes only the visible (oldest) signal; RESET clears all. */
-const runEndByIndex = atomFamily((index: string | number) =>
-  atom(
-    (get) => get(runEndsByIndex(index))[0] ?? null,
-    (get, set, value: RunEndUpdate) => {
-      if (value === RESET) {
-        set(runEndsByIndex(index), []);
-        return;
-      }
-      if (value == null) {
-        set(runEndsByIndex(index), (prev) => prev.slice(1));
-        return;
-      }
-      set(runEndsByIndex(index), (prev) => [...prev, value]);
-    },
-  ),
-);
-
-/** Foreign terminal epochs are moved off the shared pane immediately. This
- * per-conversation carrier is queued for the same reason as the pane carrier:
- * successive epochs cannot overwrite one another while the chat is hidden. */
-const pendingRunEndsByConvoId = atomFamily((_param: string) => {
-  const a = atom<RunEnd[]>([]);
-  a.debugLabel = 'pendingRunEndsByConvoId';
-  return a;
-});
-
-const pendingRunEndByConvoId = atomFamily((conversationId: string) =>
-  atom(
-    (get) => get(pendingRunEndsByConvoId(conversationId))[0] ?? null,
-    (get, set, value: RunEndUpdate) => {
-      if (value === RESET) {
-        set(pendingRunEndsByConvoId(conversationId), []);
-        return;
-      }
-      if (value == null) {
-        set(pendingRunEndsByConvoId(conversationId), (prev) => prev.slice(1));
-        return;
-      }
-      set(pendingRunEndsByConvoId(conversationId), (prev) => [...prev, value]);
-    },
-  ),
-);
-
-export type DrainAfterAbort = {
-  conversationId: string;
-  generationCreatedAt: number;
-};
-
-/**
- * One-shot override armed by "interrupt & send": the next `aborted` run-end
- * for the exact conversation generation drains the queue exactly once (a
- * plain Stop press leaves queued chips for manual send). `false` remains the
- * clear value used by stream reconciliation paths.
- */
-const drainAfterAbortByIndex = atomFamily((_param: string | number) => {
-  const a = atom<DrainAfterAbort | false>(false);
-  a.debugLabel = 'drainAfterAbortByIndex';
   return a;
 });
 
@@ -704,26 +484,6 @@ const drainAfterAbortByIndex = atomFamily((_param: string | number) => {
 const appliedSteerIdsByConvoId = atomFamily((_param: string) => {
   const a = atom<string[]>([]);
   a.debugLabel = 'appliedSteerIdsByConvoId';
-  return a;
-});
-
-/**
- * Steer ids whose applied event landed in THIS session, pending their one-shot
- * receipt draw-in. `SteerPart` consumes its id on mount so the animation plays
- * exactly once, at the live chip→inline hand-off — never on reload, share, or
- * a later revisit. Global rather than per-conversation: steer ids are unique,
- * and the applied part renders in surfaces that don't know their convo id. */
-const liveAppliedSteerIds = atom<string[]>([]);
-liveAppliedSteerIds.debugLabel = 'liveAppliedSteerIds';
-
-/** Membership view of `liveAppliedSteerIds` so each `SteerPart` subscribes to
- *  its own id only: stamping/consuming one steer re-renders that part, not
- *  every mounted historical part in a long conversation. */
-const liveAppliedSteerFamily = atomFamily((steerId: string) => {
-  const a = atom<boolean>(
-    (get) => steerId.length > 0 && get(liveAppliedSteerIds).includes(steerId),
-  );
-  a.debugLabel = 'liveAppliedSteerFamily';
   return a;
 });
 
@@ -934,15 +694,7 @@ export default {
   pendingManualSkillsByConvoId,
   pendingQuotesByConvoId,
   pendingSteersByConvoId,
-  queuedMessagesByConvoId,
-  settledQueuedTurnReceiptsByConvoId,
-  pendingQueuedTurnEnqueueIdsByConvoId,
-  runEndByIndex,
-  pendingRunEndByConvoId,
-  drainAfterAbortByIndex,
   appliedSteerIdsByConvoId,
-  liveAppliedSteerIds,
-  liveAppliedSteerFamily,
   acceptedSteerClientIdsByConvoId,
   activeGenerationCreatedAtByConvoId,
   activeGenerationProtocolVersionByConvoId,
