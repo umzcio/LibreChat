@@ -2306,6 +2306,13 @@ describe('Claude Model Tests', () => {
     );
   });
 
+  it('should price Claude Haiku 5.5 as its own model, not Haiku 4.5', () => {
+    expect(getMultiplier({ model: 'claude-haiku-5-5', tokenType: 'prompt' })).toBe(0.1);
+    expect(getMultiplier({ model: 'claude-haiku-5-5', tokenType: 'completion' })).toBe(0.5);
+    expect(getCacheMultiplier({ model: 'claude-haiku-5-5', cacheType: 'write' })).toBe(0.125);
+    expect(getCacheMultiplier({ model: 'claude-haiku-5-5', cacheType: 'read' })).toBe(0.01);
+  });
+
   it('should return correct prompt and completion rates for Claude Opus 4.5', () => {
     expect(getMultiplier({ model: 'claude-opus-4-5', tokenType: 'prompt' })).toBe(
       tokenValues['claude-opus-4-5'].prompt,
