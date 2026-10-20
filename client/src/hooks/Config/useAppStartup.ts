@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { useAtom } from 'jotai';
-import TagManager from 'react-gtm-module';
 import { installCloudFrontImageRetry } from '@librechat/client';
 import {
   getTokenHeader,
@@ -96,13 +95,4 @@ export default function useAppStartup({
   useEffect(() => {
     return installCloudFrontImageRetry(startupConfig, { getAuthorizationHeader: getTokenHeader });
   }, [startupConfig]);
-
-  useEffect(() => {
-    if (startupConfig?.analyticsGtmId != null && typeof window.google_tag_manager === 'undefined') {
-      const tagManagerArgs = {
-        gtmId: startupConfig.analyticsGtmId,
-      };
-      TagManager.initialize(tagManagerArgs);
-    }
-  }, [startupConfig?.analyticsGtmId]);
 }

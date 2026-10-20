@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { Trans } from 'react-i18next';
-import { useRecoilValue } from 'recoil';
 import { BookCopy } from 'lucide-react';
+import { presetFamily } from '@librechat/chat/react';
 import { tConvoUpdateSchema } from 'librechat-data-provider';
 import { Content, Portal, Root, Trigger } from '@radix-ui/react-popover';
 import {
@@ -19,7 +19,6 @@ import { SaveAsPresetDialog } from '~/components/Endpoints';
 import { EditPresetDialog, PresetItems } from './Presets';
 import { useLocalize, usePresets } from '~/hooks';
 import { useChatContext } from '~/Providers';
-import store from '~/store';
 
 const PresetsMenu: FC = () => {
   const localize = useLocalize();
@@ -42,7 +41,7 @@ const PresetsMenu: FC = () => {
     presetToDelete,
     confirmDeletePreset,
   } = usePresets();
-  const presetToEdit = useAtomValue(store.presetByIndex(0));
+  const presetToEdit = useAtomValue(presetFamily(0));
 
   const openSaveAsDialog = () => {
     if (!conversation) {
@@ -73,11 +72,12 @@ const PresetsMenu: FC = () => {
             <Button
               size="icon"
               variant="outline"
+              shape="theme"
               tabIndex={0}
               id="presets-button"
               data-testid="presets-button"
               aria-label={localize('com_endpoint_examples')}
-              className="rounded-theme-control bg-presentation hover:bg-surface-hover h-9 w-9 shrink-0 duration-0"
+              className="bg-presentation h-9 w-9 shrink-0 duration-0"
             >
               <BookCopy className="icon-md" aria-hidden="true" />
             </Button>

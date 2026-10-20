@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
-import { atomWithStorage } from 'jotai/utils';
+import { atomWithStorage, createJSONStorage } from 'jotai/utils';
+import { FRESH_READ } from '~/recoil-shim';
 import { logger } from '~/utils';
 import type { SyncStorage } from 'jotai/vanilla/utils/atomWithStorage';
 
@@ -12,8 +13,11 @@ import type { SyncStorage } from 'jotai/vanilla/utils/atomWithStorage';
  * @returns Jotai atom with localStorage persistence
  */
 export function createStorageAtom<T>(key: string, defaultValue: T) {
-  return atomWithStorage<T>(key, defaultValue, undefined, {
+  const storageAtom = atomWithStorage<T>(key, defaultValue, undefined, {
     getOnInit: true,
+  });
+  return Object.assign(storageAtom, {
+    [FRESH_READ]: () => createJSONStorage<T>(() => localStorage).getItem(key, defaultValue),
   });
 }
 
@@ -134,7 +138,11 @@ export function initializeFromStorage<T>(
 
     return value;
   } catch (error) {
-    logger.error('localStorage', `Error initializing ${key} from localStorage, using default. Error:`, error);
+    logger.error(
+      'localStorage',
+      `Error initializing ${key} from localStorage, using default. Error:`,
+      error,
+    );
 
     // Reset corrupted value
     try {

@@ -39,6 +39,42 @@ export type SetterOrUpdater<T> = (valOrUpdater: SetStateAction<T>) => void;
 /** Equivalent to Recoil's `Resetter` */
 export type Resetter = () => void;
 
+/**
+ * Recoil's `set`, generic over the atom so the value type is read off the atom
+ * itself. Inferring it from the write signature instead widens a resettable
+ * atom's value with `typeof RESET`.
+ */
+export type RecoilSet = <T>(a: Atom<T>, value: SetStateAction<T>) => void;
+
+/**
+ * Storage-backed atoms expose a fresh read of localStorage under this key, so a
+ * detached snapshot sees what Recoil's lazily-run effect would have seen.
+ */
+export const FRESH_READ: unique symbol = Symbol('recoil-shim.freshRead');
+
+type FreshReadable<T> = { [FRESH_READ]?: () => T };
+
+/**
+ * Anything Recoil's `reset` accepts. Plain shim atoms only take a
+ * `SetStateAction`, resettable Jotai atoms take `RESET`; `resetToDefault`
+ * handles both at runtime.
+ */
+export type Resettable<T> =
+  | WritableAtom<T, [SetStateAction<T>], void>
+  | WritableAtom<T, [typeof RESET], void>;
+
+/**
+ * Recoil passes a `DefaultValue` instance to a selector's `set` when the caller
+ * resets it; upstream setters test for it with `instanceof` before writing.
+ */
+export class DefaultValue {}
+
+/** The `initializeState` argument of `RecoilRoot`, as upstream specs type it. */
+export interface MutableSnapshot {
+  set: RecoilSet;
+  reset?: <T>(a: Resettable<T>) => void;
+}
+
 type ResetGet = <V>(a: Atom<V>) => V;
 type ResetSet = (a: WritableAtom<unknown, [never], void>, value: never) => void;
 
@@ -62,14 +98,91 @@ function resetToDefault(get: ResetGet, set: ResetSet, a: WritableAtom<unknown, [
 // atom({ key, default }) → jotaiAtom(default)
 // ---------------------------------------------------------------------------
 
+type OnSetHandler<T> = (newValue: T, oldValue: T, isReset: boolean) => void;
+
+/** The subset of Recoil's `AtomEffect` surface that upstream atoms actually use. */
+interface RecoilAtomEffectOpts<T> {
+  node: { key: string };
+  trigger: 'get' | 'set';
+  setSelf: (value: T) => void;
+  resetSelf: () => void;
+  onSet: (handler: OnSetHandler<T>) => void;
+}
+
+type RecoilAtomEffect<T> = (opts: RecoilAtomEffectOpts<T>) => void | (() => void);
+
 interface RecoilAtomOptions<T> {
   key: string;
   default: T;
-  effects?: unknown[];
-  effects_UNSTABLE?: unknown[];
+  effects?: RecoilAtomEffect<T>[];
+  effects_UNSTABLE?: RecoilAtomEffect<T>[];
+}
+
+/**
+ * Builds one atom honoring Recoil `effects`. Effects run once at atom creation
+ * (`trigger: 'get'`); a synchronous `setSelf` there overrides the default, and
+ * `onSet` handlers fire after every write with the new and previous value, as
+ * Recoil does. Writing `RESET` restores the default and reports `isReset`.
+ */
+function resolveUpdate<T>(update: SetStateAction<T> | typeof RESET, previous: T, fallback: T): T {
+  if (update === RESET) {
+    return fallback;
+  }
+  if (typeof update === 'function') {
+    return (update as (prev: T) => T)(previous);
+  }
+  return update;
+}
+
+function atomWithEffects<T>(
+  key: string,
+  defaultValue: T,
+  effects: RecoilAtomEffect<T>[],
+): PrimitiveAtom<T> {
+  const handlers: OnSetHandler<T>[] = [];
+  let initial = defaultValue;
+  let initializing = true;
+  for (const effect of effects) {
+    effect({
+      node: { key },
+      trigger: 'get',
+      setSelf: (value) => {
+        if (initializing) {
+          initial = value;
+        }
+      },
+      resetSelf: () => {
+        if (initializing) {
+          initial = defaultValue;
+        }
+      },
+      onSet: (handler) => handlers.push(handler),
+    });
+  }
+  initializing = false;
+  const base = jotaiAtom<T>(initial);
+  base.debugLabel = `${key}__base`;
+  const a = jotaiAtom(
+    (get) => get(base),
+    (get, set, update: SetStateAction<T> | typeof RESET) => {
+      const previous = get(base);
+      const isReset = update === RESET;
+      const next = resolveUpdate(update, previous, defaultValue);
+      set(base, next);
+      for (const handler of handlers) {
+        handler(next, previous, isReset);
+      }
+    },
+  ) as unknown as PrimitiveAtom<T>;
+  a.debugLabel = key;
+  return a;
 }
 
 export function atom<T>(options: RecoilAtomOptions<T>): PrimitiveAtom<T> {
+  const effects = options.effects ?? options.effects_UNSTABLE;
+  if (effects && effects.length > 0) {
+    return atomWithEffects(options.key, options.default, effects);
+  }
   const a = jotaiAtom<T>(options.default);
   a.debugLabel = options.key;
   return a;
@@ -88,8 +201,8 @@ interface RecoilSelectorGetOpts {
 
 interface RecoilSelectorSetOpts {
   get: RecoilGetRecoilValue;
-  set: <T>(a: WritableAtom<T, [SetStateAction<T>], void>, v: T | SetStateAction<T>) => void;
-  reset: <T>(a: WritableAtom<T, [typeof RESET], void>) => void;
+  set: RecoilSet;
+  reset: <T>(a: Resettable<T>) => void;
 }
 
 interface RecoilSelectorReadOnly<T> {
@@ -113,7 +226,7 @@ export function selector<T>(
   if ('set' in options && typeof options.set === 'function') {
     const recoilSet = options.set;
     a = jotaiAtom(getter, (get, set, newValue: SetStateAction<T>) => {
-      const resetFn = <V>(target: WritableAtom<V, [typeof RESET], void>) =>
+      const resetFn = <V>(target: Resettable<V>) =>
         resetToDefault(get, set as never, target as never);
       recoilSet({ get, set: set as never, reset: resetFn }, newValue);
     }) as WritableAtom<T, [SetStateAction<T>], void>;
@@ -132,6 +245,8 @@ export function selector<T>(
 interface RecoilAtomFamilyOptions<T, P> {
   key: string;
   default: T | ((param: P) => T);
+  effects?: RecoilAtomEffect<T>[] | ((param: P) => RecoilAtomEffect<T>[]);
+  effects_UNSTABLE?: RecoilAtomEffect<T>[] | ((param: P) => RecoilAtomEffect<T>[]);
 }
 
 export function atomFamily<T, P>(
@@ -142,8 +257,14 @@ export function atomFamily<T, P>(
       typeof options.default === 'function'
         ? (options.default as (p: P) => T)(param)
         : options.default;
+    const key = `${options.key}__${String(param)}`;
+    const rawEffects = options.effects ?? options.effects_UNSTABLE;
+    const effects = typeof rawEffects === 'function' ? rawEffects(param) : rawEffects;
+    if (effects && effects.length > 0) {
+      return atomWithEffects(key, defaultVal, effects);
+    }
     const a = jotaiAtom<T>(defaultVal);
-    a.debugLabel = `${options.key}__${String(param)}`;
+    a.debugLabel = key;
     return a;
   });
   return family;
@@ -170,7 +291,7 @@ export function selectorFamily<T, P>(
     if (options.set) {
       const recoilSet = options.set;
       a = jotaiAtom(getter, (get, set, newValue: SetStateAction<T>) => {
-        const resetFn = <V>(target: WritableAtom<V, [typeof RESET], void>) =>
+        const resetFn = <V>(target: Resettable<V>) =>
           resetToDefault(get, set as never, target as never);
         recoilSet(param)({ get, set: set as never, reset: resetFn }, newValue);
       }) as WritableAtom<T, [SetStateAction<T>], void>;
@@ -189,10 +310,8 @@ export function selectorFamily<T, P>(
 // ---------------------------------------------------------------------------
 
 /** Drop-in for `useRecoilState(atom)` → `useAtom(atom)` */
-export function useRecoilState<T>(
-  a: WritableAtom<T, [SetStateAction<T>], void>,
-): [T, SetterOrUpdater<T>] {
-  return useAtom(a);
+export function useRecoilState<T>(a: Atom<T>): [T, SetterOrUpdater<T>] {
+  return useAtom(a as PrimitiveAtom<T>);
 }
 
 /** Drop-in for `useRecoilValue(atom)` → `useAtomValue(atom)` */
@@ -201,14 +320,12 @@ export function useRecoilValue<T>(a: Atom<T>): T {
 }
 
 /** Drop-in for `useSetRecoilState(atom)` → `useSetAtom(atom)` */
-export function useSetRecoilState<T>(
-  a: WritableAtom<T, [SetStateAction<T>], void>,
-): SetterOrUpdater<T> {
-  return useSetAtom(a);
+export function useSetRecoilState<T>(a: Atom<T>): SetterOrUpdater<T> {
+  return useSetAtom(a as PrimitiveAtom<T>);
 }
 
 /** Drop-in for `useResetRecoilState(atom)` → `useResetAtom(atom)` */
-export function useResetRecoilState<T>(a: WritableAtom<T, [typeof RESET], void>): Resetter {
+export function useResetRecoilState<T>(a: Resettable<T>): Resetter {
   const store = useStore();
   return useCallback(() => resetToDefault(store.get, store.set as never, a as never), [store, a]);
 }
@@ -240,8 +357,8 @@ function makeLoadable<T>(value: T): RecoilLoadable<T> {
 export function useRecoilCallback<Args extends unknown[], Result>(
   fn: (iface: {
     get: RecoilGetRecoilValue;
-    set: <T>(a: WritableAtom<T, [SetStateAction<T>], void>, v: T | SetStateAction<T>) => void;
-    reset: <T>(a: WritableAtom<T, [typeof RESET], void>) => void;
+    set: RecoilSet;
+    reset: <T>(a: Resettable<T>) => void;
     snapshot: {
       getPromise: <T>(a: Atom<T>) => Promise<T>;
       getLoadable: <T>(a: Atom<T>) => RecoilLoadable<T>;
@@ -263,9 +380,8 @@ export function useRecoilCallback<Args extends unknown[], Result>(
   return useCallback(
     (...args: Args) => {
       const get = <T>(a: Atom<T>) => store.get(a);
-      const set = <T>(a: WritableAtom<T, [SetStateAction<T>], void>, v: T | SetStateAction<T>) =>
-        store.set(a, v);
-      const reset = <T>(a: WritableAtom<T, [typeof RESET], void>) =>
+      const set: RecoilSet = (a, v) => store.set(a as never, v as never);
+      const reset = <T>(a: Resettable<T>) =>
         resetToDefault(store.get, store.set as never, a as never);
       const snapshot = {
         getPromise: async <T>(a: Atom<T>) => store.get(a),
@@ -300,20 +416,39 @@ export function RecoilRoot({
   initializeState,
 }: {
   children: React.ReactNode;
-  initializeState?: (opts: {
-    set: <T>(a: WritableAtom<T, [SetStateAction<T>], void>, value: T) => void;
-  }) => void;
+  initializeState?: (snapshot: MutableSnapshot) => void;
 }) {
   /** Recoil seeds once at mount, before the first render of its children. */
   const [store] = useState(() => {
     const created = createStore();
     initializeState?.({
-      set: <T>(a: WritableAtom<T, [SetStateAction<T>], void>, value: T) =>
-        created.set(a, value as never),
+      set: (a, value) => created.set(a as never, value as never),
+      reset: (a) => resetToDefault(created.get, created.set as never, a as never),
     });
     return created;
   });
   return createElement(Provider, { store }, children);
+}
+
+/**
+ * Recoil's `snapshot_UNSTABLE`: a detached read of atom values. Each call gets
+ * its own store, so a `getOnInit` storage atom re-reads localStorage here, which
+ * is what the store specs rely on.
+ */
+export function snapshot_UNSTABLE(initializeState?: (snapshot: MutableSnapshot) => void) {
+  const store = createStore();
+  initializeState?.({
+    set: (a, value) => store.set(a as never, value as never),
+    reset: (a) => resetToDefault(store.get, store.set as never, a as never),
+  });
+  const read = <T>(a: Atom<T>) => {
+    const fresh = (a as FreshReadable<T>)[FRESH_READ];
+    return fresh ? fresh() : store.get(a);
+  };
+  return {
+    getLoadable: <T>(a: Atom<T>) => makeLoadable(read(a)),
+    getPromise: async <T>(a: Atom<T>) => read(a),
+  };
 }
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@ import type { Pluggable } from 'unified';
 import type { Artifact } from '~/common';
 import { useMessageContext } from '~/Providers';
 import { logger, extractContent, isArtifactRoute } from '~/utils';
+import { normalizeArtifactType } from '~/utils/artifacts';
 import { artifactsState } from '~/store/artifacts';
 import ArtifactButton from './ArtifactButton';
 
@@ -129,7 +130,7 @@ export function Artifact({
         id: artifactKey,
         identifier,
         title,
-        type,
+        type: normalizeArtifactType(type),
         content,
         messageId,
         index: artifactIndex,

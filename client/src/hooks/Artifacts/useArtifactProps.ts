@@ -6,8 +6,8 @@ import {
   getKey,
   getProps,
   getTemplate,
-  getArtifactWorkspaceFilename,
   getArtifactFilename,
+  normalizeArtifactType,
   getSvgFiles,
   isSvgArtifactType,
   languageForFilename,
@@ -15,7 +15,7 @@ import {
   TOOL_ARTIFACT_TYPES,
 } from '~/utils/artifacts';
 import { withOfficeContrast } from '~/utils/officePreview';
-import { getMarkdownFiles, getPlainTextFiles } from '~/utils/markdown';
+import { getMarkdownFiles } from '~/utils/markdown';
 import { getMermaidFiles } from '~/utils/mermaid';
 
 export default function useArtifactProps({ artifact }: { artifact: Artifact }) {
@@ -23,8 +23,8 @@ export default function useArtifactProps({ artifact }: { artifact: Artifact }) {
   const isDarkMode = resolvedMode === 'dark';
 
   const [fileKey, files] = useMemo(() => {
-    const key = getKey(artifact.type ?? '', artifact.language);
-    const type = artifact.type ?? '';
+    const type = normalizeArtifactType(artifact.type ?? '');
+    const key = getKey(type, artifact.language);
 
     if (key.includes('mermaid')) {
       return ['diagram.mmd', getMermaidFiles(artifact.content ?? '', isDarkMode, highContrast)];
@@ -45,12 +45,8 @@ export default function useArtifactProps({ artifact }: { artifact: Artifact }) {
       return ['content.md', getMarkdownFiles(wrapped, isDarkMode, highContrast)];
     }
 
-    if (type === 'text/markdown' || type === 'text/md') {
+    if (type === TOOL_ARTIFACT_TYPES.MARKDOWN || type === TOOL_ARTIFACT_TYPES.PLAIN_TEXT) {
       return ['content.md', getMarkdownFiles(artifact.content ?? '', isDarkMode, highContrast)];
-    }
-
-    if (type === 'text/plain') {
-      return ['content.txt', getPlainTextFiles(artifact.content ?? '')];
     }
 
     /* Office preview buckets (DOCX/SPREADSHEET/PRESENTATION): the backend
@@ -78,7 +74,7 @@ export default function useArtifactProps({ artifact }: { artifact: Artifact }) {
       return [getArtifactFilename(type), getSvgFiles(artifact.content ?? '')];
     }
 
-    const fileKey = getArtifactWorkspaceFilename(artifact.type ?? '', artifact.language);
+    const fileKey = getArtifactFilename(type, artifact.language);
     const files = removeNullishValues({
       [fileKey]: artifact.content,
     });

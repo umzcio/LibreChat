@@ -1,6 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useSetAtom } from 'jotai';
-// @ts-expect-error - react-avatar-editor has no type definitions
 import AvatarEditor from 'react-avatar-editor';
 import { FileImage, RotateCw, Upload, ZoomIn, ZoomOut, Move, X } from 'lucide-react';
 import { fileConfig as defaultFileConfig, mergeFileConfig } from 'librechat-data-provider';

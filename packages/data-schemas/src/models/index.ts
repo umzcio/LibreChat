@@ -8,10 +8,14 @@ import { createAgentTriggerUserPurgeModel } from './triggerUserPurge';
 import { createRefreshTokenBridgeModel } from './refreshTokenBridge';
 import { createAgentTriggerDeliveryModel } from './triggerDelivery';
 import { createToolApprovalGrantModel } from './toolApprovalGrant';
+import { createSkillUploadIntentModel } from './skillUploadIntent';
 import { createSkillSyncStatusModel } from './skillSyncStatus';
 import { createConversationTagModel } from './conversationTag';
 import { createCodeEnvironmentModel } from './codeEnvironment';
+import { createSkillDeletionModel } from './skillDeletion';
 import { createAgentCategoryModel } from './agentCategory';
+import { createResourceLockModel } from './resourceLock';
+import { createChatProjectModel } from './chatProject';
 import { createAgentApiKeyModel } from './agentApiKey';
 import { createTransactionModel } from './transaction';
 import { createPromptGroupModel } from './promptGroup';
@@ -31,20 +35,18 @@ import { createSessionModel } from './session';
 import { createPasskeyModel } from './passkey';
 import { createBalanceModel } from './balance';
 import { createMessageModel } from './message';
-import { createAgentModel } from './agent';
-import { createMCPCosmeticOverrideModel } from './mcpCosmeticOverride';
-import { createRoleModel } from './role';
 import { createActionModel } from './action';
 import { createBannerModel } from './banner';
 import { createPresetModel } from './preset';
 import { createPromptModel } from './prompt';
 import { createMemoryModel } from './memory';
-import { createGroupModel } from './group';
-import { createChatProjectModel } from './chatProject';
 import { createConfigModel } from './config';
 import { createTokenModel } from './token';
+import { createAgentModel } from './agent';
 import { createSkillModel } from './skill';
+import { createGroupModel } from './group';
 import { createUserModel } from './user';
+import { createRoleModel } from './role';
 import { createFileModel } from './file';
 import { createKeyModel } from './key';
 import logger from '~/config/winston';
@@ -80,6 +82,8 @@ export function createModels(mongoose: typeof import('mongoose')): {
   PromptGroup: ReturnType<typeof createPromptGroupModel>;
   Skill: ReturnType<typeof createSkillModel>;
   SkillFile: ReturnType<typeof createSkillFileModel>;
+  SkillDeletion: ReturnType<typeof createSkillDeletionModel>;
+  SkillUploadIntent: ReturnType<typeof createSkillUploadIntentModel>;
   SkillSyncCredential: ReturnType<typeof createSkillSyncCredentialModel>;
   SkillSyncStatus: ReturnType<typeof createSkillSyncStatusModel>;
   ConversationTag: ReturnType<typeof createConversationTagModel>;
@@ -102,6 +106,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
   ScheduleRun: ReturnType<typeof createScheduleRunModel>;
   RefreshTokenBridge: ReturnType<typeof createRefreshTokenBridgeModel>;
   OpenIDRefreshFlight: ReturnType<typeof createOpenIDRefreshFlightModel>;
+  ResourceLock: ReturnType<typeof createResourceLockModel>;
 } {
   const models = {
     User: createUserModel(mongoose),
@@ -111,13 +116,13 @@ export function createModels(mongoose: typeof import('mongoose')): {
     Passkey: createPasskeyModel(mongoose),
     Balance: createBalanceModel(mongoose),
     Conversation: createConversationModel(mongoose),
+    ChatProject: createChatProjectModel(mongoose),
     CodeEnvironment: createCodeEnvironmentModel(mongoose),
     Message: createMessageModel(mongoose),
     Agent: createAgentModel(mongoose),
     AgentApiKey: createAgentApiKeyModel(mongoose),
     AgentCategory: createAgentCategoryModel(mongoose),
     MCPServer: createMCPServerModel(mongoose),
-    MCPCosmeticOverride: createMCPCosmeticOverrideModel(mongoose),
     Role: createRoleModel(mongoose),
     Action: createActionModel(mongoose),
     Assistant: createAssistantModel(mongoose),
@@ -131,6 +136,8 @@ export function createModels(mongoose: typeof import('mongoose')): {
     PromptGroup: createPromptGroupModel(mongoose),
     Skill: createSkillModel(mongoose),
     SkillFile: createSkillFileModel(mongoose),
+    SkillDeletion: createSkillDeletionModel(mongoose),
+    SkillUploadIntent: createSkillUploadIntentModel(mongoose),
     SkillSyncCredential: createSkillSyncCredentialModel(mongoose),
     SkillSyncStatus: createSkillSyncStatusModel(mongoose),
     ConversationTag: createConversationTagModel(mongoose),
@@ -143,7 +150,6 @@ export function createModels(mongoose: typeof import('mongoose')): {
     SystemGrant: createSystemGrantModel(mongoose),
     AuditLog: createAuditLogModel(mongoose),
     Group: createGroupModel(mongoose),
-    ChatProject: createChatProjectModel(mongoose),
     Config: createConfigModel(mongoose),
     AgentTriggerDelivery: createAgentTriggerDeliveryModel(mongoose),
     AgentTriggerLaneSequence: createAgentTriggerLaneSequenceModel(mongoose),
@@ -154,6 +160,7 @@ export function createModels(mongoose: typeof import('mongoose')): {
     ScheduleRun: createScheduleRunModel(mongoose),
     RefreshTokenBridge: createRefreshTokenBridgeModel(mongoose),
     OpenIDRefreshFlight: createOpenIDRefreshFlightModel(mongoose),
+    ResourceLock: createResourceLockModel(mongoose),
   };
   /**
    * Background index builds fail silently unless an 'index' listener is

@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import filenamify from 'filenamify';
 import exportFromJSON from 'export-from-json';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useToastContext } from '@librechat/client';
 import { QueryKeys } from 'librechat-data-provider';
+import { presetFamily } from '@librechat/chat/react';
 import { useQueryClient } from '@tanstack/react-query';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import { useRecoilState, useSetRecoilState, useRecoilValue } from 'recoil';
 import { useCreatePresetMutation, useGetModelsQuery } from 'librechat-data-provider/react-query';
 import type { TPreset, TEndpointsConfig } from 'librechat-data-provider';
 import {
@@ -12,7 +14,6 @@ import {
   removeUnavailableTools,
   getConvoSwitchLogic,
   cleanupPreset,
-  logger,
 } from '~/utils';
 import {
   useUpdatePresetMutation,
@@ -37,14 +38,14 @@ export default function usePresets(index = 0) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [presetToDelete, setPresetToDelete] = useState<TPreset | null>(null);
 
-  const modularChat = useAtomValue(store.modularChat);
-  const availableTools = useAtomValue(store.availableTools);
-  const setPresetModalVisible = useSetAtom(store.presetModalVisible);
-  const [_defaultPreset, setDefaultPreset] = useAtom(store.defaultPreset);
+  const modularChat = useRecoilValue(store.modularChat);
+  const availableTools = useRecoilValue(store.availableTools);
+  const setPresetModalVisible = useSetRecoilState(store.presetModalVisible);
+  const [_defaultPreset, setDefaultPreset] = useRecoilState(store.defaultPreset);
   const presetsQuery = useGetPresetsQuery({ enabled: !!user && isAuthenticated });
-  const preset = useAtomValue(store.presetByIndex(index));
-  const setPreset = useSetAtom(store.presetByIndex(index));
-  const conversationId = useAtomValue(store.conversationIdByIndex(index));
+  const preset = useAtomValue(presetFamily(index));
+  const setPreset = useSetAtom(presetFamily(index));
+  const conversationId = useRecoilValue(store.conversationIdByIndex(index));
   const { data: modelsData } = useGetModelsQuery();
   const { newConversation } = useNewConvo(index);
 
@@ -105,7 +106,7 @@ export default function usePresets(index = 0) {
     },
     onError: (error) => {
       queryClient.invalidateQueries([QueryKeys.presets]);
-      logger.error('Presets', 'Error deleting the preset:', error);
+      console.error('Error deleting the preset:', error);
       showToast({
         message: localize('com_endpoint_preset_delete_error'),
         severity: NotificationSeverity.ERROR,
@@ -132,7 +133,7 @@ export default function usePresets(index = 0) {
       queryClient.invalidateQueries([QueryKeys.presets]);
     },
     onError: (error) => {
-      logger.error('Presets', 'Error updating the preset:', error);
+      console.error('Error updating the preset:', error);
       showToast({
         message: localize('com_endpoint_preset_save_error'),
         severity: NotificationSeverity.ERROR,
@@ -153,7 +154,7 @@ export default function usePresets(index = 0) {
           queryClient.invalidateQueries([QueryKeys.presets]);
         },
         onError: (error) => {
-          logger.error('Presets', 'Error uploading the preset:', error);
+          console.error('Error uploading the preset:', error);
           showToast({
             message: localize('com_endpoint_preset_import_error'),
             severity: NotificationSeverity.ERROR,

@@ -1,7 +1,8 @@
 import React from 'react';
 import '@testing-library/jest-dom/extend-expect';
-import { render, fireEvent } from 'test/layout-test-utils';
+import { RecoilRoot } from 'recoil';
 import ConversationModeSwitch from './ConversationModeSwitch';
+import { render, fireEvent } from 'test/layout-test-utils';
 
 describe('ConversationModeSwitch', () => {
   /**
@@ -15,7 +16,9 @@ describe('ConversationModeSwitch', () => {
 
   it('renders correctly', () => {
     const { getByTestId } = render(
-      <ConversationModeSwitch />,
+      <RecoilRoot>
+        <ConversationModeSwitch />
+      </RecoilRoot>,
     );
 
     expect(getByTestId('ConversationMode')).toBeInTheDocument();
@@ -23,7 +26,9 @@ describe('ConversationModeSwitch', () => {
 
   it('calls onCheckedChange when the switch is toggled', () => {
     const { getByTestId } = render(
-      <ConversationModeSwitch onCheckedChange={mockSetConversationMode} />,
+      <RecoilRoot>
+        <ConversationModeSwitch onCheckedChange={mockSetConversationMode} />
+      </RecoilRoot>,
     );
     const switchElement = getByTestId('ConversationMode');
     fireEvent.click(switchElement);

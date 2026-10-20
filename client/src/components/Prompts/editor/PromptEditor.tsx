@@ -131,7 +131,7 @@ const PromptEditor: React.FC<Props> = ({ name, isEditing, setIsEditing }) => {
                     rehypePlugins={rehypePlugins}
                     // @ts-expect-error - custom component types don't match react-markdown expected signatures
                     components={{ p: PromptVariableGfm, code: codeNoExecution }}
-                    className="markdown prose dark:prose-invert light text-text-primary w-full break-words"
+                    className="markdown prose light text-text-primary w-full break-words"
                   >
                     {field.value}
                   </ReactMarkdown>

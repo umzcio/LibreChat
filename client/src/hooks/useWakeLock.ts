@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { logger } from '~/utils';
 
 /**
  * Extended Navigator type that includes the Screen Wake Lock API
@@ -43,7 +42,7 @@ const DEBUG_WAKE_LOCK = false;
  *
  * @example
  * ```tsx
- * const isGeneratingResponse = useAtomValue(anySubmittingSelector);
+ * const isGeneratingResponse = useAtomValue(anySubmittingAtom);
  * useWakeLock(isGeneratingResponse);
  * ```
  *
@@ -59,7 +58,7 @@ export const useWakeLock = (shouldHold: boolean) => {
   useEffect(() => {
     if (!supportsWakeLock) {
       if (DEBUG_WAKE_LOCK) {
-        logger.log('WakeLock', 'API not supported in this browser');
+        console.log('[WakeLock] API not supported in this browser');
       }
       return;
     }
@@ -90,10 +89,10 @@ export const useWakeLock = (shouldHold: boolean) => {
       try {
         await wakeLockRef.current.release();
         if (DEBUG_WAKE_LOCK) {
-          logger.log('WakeLock', 'Lock released successfully');
+          console.log('[WakeLock] Lock released successfully');
         }
       } catch (error) {
-        logger.warn('WakeLock', 'release failed', error);
+        console.warn('[WakeLock] release failed', error);
       } finally {
         wakeLockRef.current = null;
       }
@@ -122,7 +121,7 @@ export const useWakeLock = (shouldHold: boolean) => {
         wakeLockRef.current = sentinel;
 
         if (DEBUG_WAKE_LOCK) {
-          logger.log('WakeLock', 'Lock acquired successfully');
+          console.log('[WakeLock] Lock acquired successfully');
         }
 
         /**
@@ -148,12 +147,12 @@ export const useWakeLock = (shouldHold: boolean) => {
           sentinel.removeEventListener('release', handleRelease);
 
           if (DEBUG_WAKE_LOCK) {
-            logger.log('WakeLock', 'Lock released, checking if re-acquire needed');
+            console.log('[WakeLock] Lock released, checking if re-acquire needed');
           }
 
           if (!cancelled && shouldHold && document.visibilityState === 'visible') {
             if (DEBUG_WAKE_LOCK) {
-              logger.log('WakeLock', 'Re-acquiring lock');
+              console.log('[WakeLock] Re-acquiring lock');
             }
             void requestLock();
           }
@@ -161,7 +160,7 @@ export const useWakeLock = (shouldHold: boolean) => {
 
         sentinel.addEventListener('release', handleRelease);
       } catch (error) {
-        logger.warn('WakeLock', 'request failed', error);
+        console.warn('[WakeLock] request failed', error);
       }
     };
 
@@ -176,7 +175,7 @@ export const useWakeLock = (shouldHold: boolean) => {
       }
 
       if (DEBUG_WAKE_LOCK) {
-        logger.log('WakeLock', 'Visibility changed:', document.visibilityState);
+        console.log('[WakeLock] Visibility changed:', document.visibilityState);
       }
 
       if (document.visibilityState === 'visible' && shouldHold) {

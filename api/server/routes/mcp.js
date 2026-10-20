@@ -1,5 +1,10 @@
 const { Router } = require('express');
-const { logger, getTenantId, tenantStorage } = require('@librechat/data-schemas');
+const {
+  logger,
+  getTenantId,
+  tenantStorage,
+  SystemCapabilities,
+} = require('@librechat/data-schemas');
 const {
   CacheKeys,
   Constants,
@@ -44,7 +49,11 @@ const {
   getMCPServerById,
   getMCPTools,
 } = require('~/server/controllers/mcp');
-const checkAdmin = require('~/server/middleware/roles/admin');
+const { requireCapability } = require('~/server/middleware/roles/capabilities');
+
+/** Resolved per request so a test double of data-schemas without capabilities still loads the router. */
+const requireAdminAccess = (req, res, next) =>
+  requireCapability(SystemCapabilities.ACCESS_ADMIN)(req, res, next);
 const {
   readMCPResource,
   listMCPResources,
@@ -1314,7 +1323,7 @@ router.patch(
 router.patch(
   '/servers/:serverName/cosmetics',
   requireJwtAuth,
-  checkAdmin,
+  requireAdminAccess,
   updateMCPServerCosmeticsController,
 );
 

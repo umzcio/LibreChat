@@ -1,21 +1,25 @@
-import { atom } from 'jotai';
-import { atomFamily } from 'jotai/utils';
-import type { TAttachment } from 'librechat-data-provider';
-import { createStorageAtom } from './jotai-utils';
-import type { BadgeItem } from '~/common';
+import { atom, selectorFamily } from 'recoil';
+import { TAttachment } from 'librechat-data-provider';
+import { atomWithLocalStorage } from './utils';
 
-const hideBannerHint = createStorageAtom<string[]>('hideBannerHint', []);
-hideBannerHint.debugLabel = 'hideBannerHint';
+const hideBannerHint = atomWithLocalStorage('hideBannerHint', [] as string[]);
 
-const messageAttachmentsMap = atom<Record<string, TAttachment[] | undefined>>({});
-messageAttachmentsMap.debugLabel = 'messageAttachmentsMap';
+const messageAttachmentsMap = atom<Record<string, TAttachment[] | undefined>>({
+  key: 'messageAttachmentsMap',
+  default: {},
+});
 
 /**
- * Derived atom family to get attachments for a specific conversation.
+ * Selector to get attachments for a specific conversation.
  */
-const conversationAttachmentsSelector = atomFamily(
-  (conversationId: string | undefined) => {
-    const derived = atom<Record<string, TAttachment[]>>((get) => {
+const conversationAttachmentsSelector = selectorFamily<
+  Record<string, TAttachment[]>,
+  string | undefined
+>({
+  key: 'conversationAttachments',
+  get:
+    (conversationId) =>
+    ({ get }) => {
       if (!conversationId) {
         return {};
       }
@@ -23,9 +27,10 @@ const conversationAttachmentsSelector = atomFamily(
       const attachmentsMap = get(messageAttachmentsMap);
       const result: Record<string, TAttachment[]> = {};
 
-      for (const [messageId, attachments] of Object.entries(attachmentsMap)) {
+      // Filter to only include attachments for this conversation
+      Object.entries(attachmentsMap).forEach(([messageId, attachments]) => {
         if (!attachments || attachments.length === 0) {
-          continue;
+          return;
         }
 
         const relevantAttachments = attachments.filter(
@@ -35,62 +40,52 @@ const conversationAttachmentsSelector = atomFamily(
         if (relevantAttachments.length > 0) {
           result[messageId] = relevantAttachments;
         }
-      }
+      });
 
       return result;
-    });
-    derived.debugLabel = `conversationAttachments(${conversationId})`;
-    return derived;
-  },
-);
+    },
+});
 
-const queriesEnabled = atom<boolean>(true);
-queriesEnabled.debugLabel = 'queriesEnabled';
+const queriesEnabled = atom<boolean>({
+  key: 'queriesEnabled',
+  default: true,
+});
 
-const isEditingBadges = atom<boolean>(false);
-isEditingBadges.debugLabel = 'isEditingBadges';
-
-const showShortcutsDialog = atom<boolean>(false);
-showShortcutsDialog.debugLabel = 'showShortcutsDialog';
+const showShortcutsDialog = atom<boolean>({
+  key: 'showShortcutsDialog',
+  default: false,
+});
 
 export type KeyboardDeleteTarget = {
   conversationId: string;
   title: string;
 };
 
-const keyboardDeleteTarget = atom<KeyboardDeleteTarget | null>(null);
-keyboardDeleteTarget.debugLabel = 'keyboardDeleteTarget';
+const keyboardDeleteTarget = atom<KeyboardDeleteTarget | null>({
+  key: 'keyboardDeleteTarget',
+  default: null,
+});
 
 export type ShortcutOverride = {
   mac: string | null;
   other: string | null;
 };
 
-const customShortcuts = createStorageAtom<Record<string, ShortcutOverride>>(
+const customShortcuts = atomWithLocalStorage<Record<string, ShortcutOverride>>(
   'customKeyboardShortcuts',
   {},
 );
 
 /** When false, no keyboard shortcut fires and the UI stops advertising them. */
-const shortcutsEnabled = createStorageAtom<boolean>('keyboardShortcutsEnabled', true);
-
-const chatBadges = createStorageAtom<Pick<BadgeItem, 'id'>[]>('chatBadges', [
-  // When adding new badges, make sure to add them to useChatBadges.ts as well and add them as last item
-  // DO NOT CHANGE THE ORDER OF THE BADGES ALREADY IN THE ARRAY
-  { id: '1' },
-  // { id: '2' },
-]);
-chatBadges.debugLabel = 'chatBadges';
+const shortcutsEnabled = atomWithLocalStorage<boolean>('keyboardShortcutsEnabled', true);
 
 export default {
   hideBannerHint,
   messageAttachmentsMap,
   conversationAttachmentsSelector,
   queriesEnabled,
-  isEditingBadges,
   showShortcutsDialog,
   keyboardDeleteTarget,
   customShortcuts,
   shortcutsEnabled,
-  chatBadges,
 };
