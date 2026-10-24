@@ -515,6 +515,8 @@ const getMCPServerById = async (req, res) => {
       serverName,
       userId,
       configServers,
+      req.user?.role,
+      { idOnTheSource: req.user?.idOnTheSource },
     );
 
     if (!parsedConfig) {
@@ -559,7 +561,13 @@ const updateMCPServerController = async (req, res) => {
      * to point OBO-minted tokens at an attacker-controlled endpoint. Adds,
      * modifies, and removes are all caught.
      */
-    const existingConfig = await getMCPServersRegistry().getServerConfig(serverName, userId);
+    const existingConfig = await getMCPServersRegistry().getServerConfig(
+      serverName,
+      userId,
+      undefined,
+      undefined,
+      { includeHidden: true },
+    );
     if (configHasObo(existingConfig) && !(await callerCanConfigureObo(req))) {
       if (violatesOboLockdown(existingConfig, validation.data)) {
         logger.warn(
@@ -644,7 +652,15 @@ const deleteMCPServerController = async (req, res, uninstallOAuthMCP) => {
     const userId = req.user?.id;
     const { serverName } = req.params;
     const registry = getMCPServersRegistry();
-    const existingConfig = await registry.getServerConfig(serverName, userId);
+    const existingConfig = await registry.getServerConfig(
+      serverName,
+      userId,
+      undefined,
+      undefined,
+      {
+        includeHidden: true,
+      },
+    );
     const tokenIdentifier = `mcp:${serverName}`;
     const getTokenUserIds = () =>
       mongoose.models.Token

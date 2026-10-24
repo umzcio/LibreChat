@@ -7,9 +7,9 @@ import type {
   TFile,
 } from 'librechat-data-provider';
 import type { QueryClient } from '@tanstack/react-query';
+import { messageAttachmentsMapAtom } from '~/hooks/SSE/atoms';
 import { invalidateRecentFiles } from '~/utils/files';
 import { handleMemoryArtifact } from '~/utils/memory';
-import store from '~/store';
 
 /** Identity of a re-emitted web-search snapshot: its tool call, turn, agent,
  *  and host step. Scoped to `web_search` because that is the flow whose server
@@ -31,7 +31,7 @@ const searchSnapshotKeyOf = (attachment: TAttachment): string | undefined => {
 };
 
 export default function useAttachmentHandler(queryClient?: QueryClient) {
-  const setAttachmentsMap = useSetAtom(store.messageAttachmentsMap);
+  const setAttachmentsMap = useSetAtom(messageAttachmentsMapAtom);
 
   return ({ data }: { data: TAttachment; submission: EventSubmission }) => {
     const { messageId } = data;

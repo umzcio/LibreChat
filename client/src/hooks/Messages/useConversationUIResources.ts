@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 import { Tools } from 'librechat-data-provider';
 import type { TAttachment, UIResource } from 'librechat-data-provider';
+import { conversationAttachmentsFamily } from '~/hooks/SSE/atoms';
 import { useOptionalMessagesOperations } from '~/Providers';
-import store from '~/store';
 
 /**
  * Hook to collect all UI resources in a conversation, indexed by resource ID.
@@ -18,9 +18,7 @@ export function useConversationUIResources(
 ): Map<string, UIResource> {
   const { getMessages } = useOptionalMessagesOperations();
 
-  const conversationAttachmentsMap = useAtomValue(
-    store.conversationAttachmentsSelector(conversationId),
-  );
+  const conversationAttachmentsMap = useAtomValue(conversationAttachmentsFamily(conversationId));
 
   return useMemo(() => {
     const map = new Map<string, UIResource>();
@@ -45,7 +43,7 @@ export function useConversationUIResources(
       collectResources(message.attachments);
     });
 
-    // Collect from in-flight messages (Jotai state during streaming - only when we have a conversationId)
+    // Collect from in-flight messages (Recoil state during streaming - only when we have a conversationId)
     if (conversationId) {
       Object.values(conversationAttachmentsMap).forEach(collectResources);
     }

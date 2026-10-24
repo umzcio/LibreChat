@@ -1,7 +1,7 @@
 const { logger } = require('@librechat/data-schemas');
 const { resolveAssistantToolPermissions } = require('@librechat/api');
 const { ToolCallTypes } = require('librechat-data-provider');
-const { validateAuthor, validateMutationAuthor } = require('~/server/middleware/assistants/validateAuthor');
+const validateAuthor = require('~/server/middleware/assistants/validateAuthor');
 const { validateAndUpdateTool } = require('~/server/services/ActionService');
 const {
   healMcpToolNames,
@@ -144,7 +144,7 @@ const createAssistant = async (req, res) => {
  * @returns {Promise<Assistant>} The updated assistant.
  */
 const updateAssistant = async ({ req, openai, assistant_id, updateData }) => {
-  await validateMutationAuthor({ req, openai });
+  await validateAuthor({ req, openai });
   const tools = [];
   let conversation_starters = null;
 

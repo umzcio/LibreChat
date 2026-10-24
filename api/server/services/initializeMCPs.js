@@ -9,6 +9,8 @@ const {
   setMCPToolsChangedGenerationRenewalHandler,
   setMCPToolsChangedRevisionHandler,
   createMCPAppBindingCodec,
+  createMCPPolicyResolver,
+  reportStoredMCPTombstones,
 } = require('@librechat/api');
 const { syncStaticTools, mergeAppTools, getAppConfig, invalidateCachedTools } = require('./Config');
 const { startMCPAuthorizationFenceRetryWorker } = require('./MCPAuthorizationFenceRetry');
@@ -18,37 +20,8 @@ const {
   getNextAppToolsPublicationRevision,
   updateMCPServerTools,
 } = require('./Config/mcp');
-const { createMCPServersRegistry, createMCPManager, getMCPServersRegistry } = require('~/config');
+const { createMCPServersRegistry, createMCPManager } = require('~/config');
 const db = require('~/models');
-
-/**
- * Resolves the current request's effective MCP allowlists from the merged (tenant-scoped)
- * config. The registry calls this per inspection/connection so admin-panel `mcpSettings`
- * overrides are honored without a restart. Tenant comes from the ALS context inside
- * `getAppConfig`; `userId`/`role` pick up user/role-scoped overrides when an actor exists.
- * @param {{ userId?: string, role?: string }} [ctx]
- */
-async function resolveMCPAllowlists(ctx) {
-  const appConfig = await getAppConfig({
-    role: ctx?.role,
-    userId: ctx?.userId,
-    failClosed: true,
-  });
-  return {
-    allowedDomains: appConfig?.mcpSettings?.allowedDomains,
-    allowedAddresses: appConfig?.mcpSettings?.allowedAddresses,
-    mcpApps: resolveMCPAppsPolicy(
-      appConfig?.mcpSettings?.apps,
-      undefined,
-      appConfig?.mcpAppSandbox?.maxPersistedAppBytes,
-      appConfig?.mcpAppSandbox?.maxAdmissionRequestsPerMinute,
-      appConfig?.mcpAppSandbox?.url,
-      appConfig?.mcpAppSandbox?.maxActiveViews,
-      appConfig?.mcpAppSandbox?.maxActionPreviewChars,
-      appConfig?.mcpAppSandbox?.operationLimits,
-    ),
-  };
-}
 
 /**
  * Refreshes one server's tools after it reported `notifications/tools/list_changed`.
@@ -125,7 +98,7 @@ async function initializeMCPs() {
       mongoose,
       appConfig?.mcpSettings?.allowedDomains,
       appConfig?.mcpSettings?.allowedAddresses,
-      resolveMCPAllowlists,
+      createMCPPolicyResolver(getAppConfig),
       resolveMCPAppsPolicy(
         appConfig?.mcpSettings?.apps,
         undefined,
@@ -141,6 +114,12 @@ async function initializeMCPs() {
     logger.error('[MCP] Failed to initialize MCPServersRegistry:', error);
     throw error;
   }
+
+  /** Runs alongside the connections below. It never rejects, so a failed start leaves no unhandled rejection. */
+  const tombstoneReport = reportStoredMCPTombstones(
+    (fieldPath) => db.listConfigTombstones(fieldPath),
+    appConfig?.mcpConfig,
+  );
 
   try {
     const mcpManager = await createMCPManager(mcpServers || {}, {
@@ -162,17 +141,6 @@ async function initializeMCPs() {
     );
     registerShutdownTask('MCP app connections', () => mcpManager.disconnectAppServers());
 
-    // Apply persisted cosmetic overrides (title, description, icon) to yaml/config servers
-    try {
-      const overrides = await db.getAllCosmeticOverrides();
-      if (overrides.length > 0) {
-        await getMCPServersRegistry().applyCosmeticOverrides(overrides);
-        logger.info(`[MCP] Applied ${overrides.length} cosmetic override(s) to server configs.`);
-      }
-    } catch (error) {
-      logger.warn('[MCP] Failed to apply cosmetic overrides, continuing without:', error);
-    }
-
     if (mcpServers && Object.keys(mcpServers).length > 0) {
       const mcpTools = (await mcpManager.getAppToolFunctions()) || {};
       try {
@@ -193,6 +161,7 @@ async function initializeMCPs() {
     logger.error('[MCP] Failed to initialize MCPManager:', error);
     throw error;
   }
+  await tombstoneReport;
 }
 
 module.exports = initializeMCPs;
