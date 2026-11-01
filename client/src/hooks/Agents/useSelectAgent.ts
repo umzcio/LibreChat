@@ -93,10 +93,10 @@ export default function useSelectAgent() {
         }
       } catch (error) {
         if ((error as { silent: boolean } | undefined)?.silent) {
-          logger.warn('SelectAgent', 'Current fetch was cancelled');
+          console.warn('Current fetch was cancelled');
           return;
         }
-        logger.error('SelectAgent', 'Error fetching full agent data:', error);
+        console.error('Error fetching full agent data:', error);
         await updateConversation({}, { ...template, agent_id: undefined }, true);
       }
     },

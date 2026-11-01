@@ -44,10 +44,6 @@ jest.mock('~/store', () => ({
   },
 }));
 
-jest.mock('~/components/Chat/Input/Files/FilePreview', () => () => (
-  <div data-testid="artifact-file-preview" />
-));
-
 jest.mock('~/components/Chat/Messages/Content/Parts/ArtifactRow', () => ({
   __esModule: true,
   default: ({ onOpen }: { onOpen: () => void }) => (

@@ -440,7 +440,7 @@ const createMCPServerController = async (req, res) => {
     if (!validation.success) {
       return res.status(400).json({
         message: 'Invalid configuration',
-        errors: validation.error.errors,
+        errors: validation.error.issues,
       });
     }
     if (validation.data.iconPath) {
@@ -546,7 +546,7 @@ const updateMCPServerController = async (req, res) => {
     if (!validation.success) {
       return res.status(400).json({
         message: 'Invalid configuration',
-        errors: validation.error.errors,
+        errors: validation.error.issues,
       });
     }
     if (validation.data.iconPath) {
@@ -679,7 +679,11 @@ const deleteMCPServerController = async (req, res, uninstallOAuthMCP) => {
           }).lean()
         : Promise.resolve([]);
     const [oauthDeletionSnapshot, retainedTools] = await Promise.all([
-      prepareMCPServerOAuthDeletion({ getTokenUserIds, getAclEntries }),
+      prepareMCPServerOAuthDeletion({
+        getTokenUserIds,
+        getAclEntries,
+        getViewerUserIds: db.findMCPServerViewerUserIds,
+      }),
       getMCPServerTools(userId, serverName, existingConfig),
     ]);
     await invalidateCachedTools({ userId, serverName });

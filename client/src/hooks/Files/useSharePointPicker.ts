@@ -1,4 +1,4 @@
-import { useRef, useCallback } from 'react';
+import { useRef, useEffect, useCallback } from 'react';
 import { useAtom } from 'jotai';
 import { useToastContext } from '@librechat/client';
 import type { SharePointFile } from '~/data-provider/Files/sharepoint';
@@ -352,6 +352,7 @@ export default function useSharePointPicker({
       activeEventListenerRef.current = null;
     }
     if (portRef.current) {
+      portRef.current.removeEventListener('message', portMessageHandler);
       portRef.current.close();
       portRef.current = null;
     }
@@ -359,7 +360,17 @@ export default function useSharePointPicker({
       containerNode.innerHTML = '';
     }
     channelIdRef.current = '';
-  }, [containerNode]);
+  }, [containerNode, portMessageHandler]);
+
+  /** The window and port listeners must not outlive the component, even if the owner never closes the picker. */
+  const cleanupRef = useRef(cleanup);
+  cleanupRef.current = cleanup;
+  useEffect(
+    () => () => {
+      cleanupRef.current();
+    },
+    [],
+  );
 
   const handleDialogClose = useCallback(() => {
     cleanup();

@@ -1,18 +1,20 @@
 import { memo, useMemo } from 'react';
 import { useAtomValue } from 'jotai';
-import { fontSizeAtom } from '~/store/fontSize';
+import {
+  SubRow,
+  MessageRow,
+  AuthorHeader,
+  getHeaderModelName,
+  getMessageRowWidthClass,
+} from '@librechat/chat/components';
 import type { TMessage } from 'librechat-data-provider';
 import type { TMessageProps, TMessageIcon } from '~/common';
-import MessageRow, { getMessageRowWidthClass } from '~/components/Chat/Messages/ui/MessageRow';
-import AuthorHeader from '~/components/Chat/Messages/Content/Parts/AuthorHeader';
 import MinimalHoverButtons from '~/components/Chat/Messages/MinimalHoverButtons';
-import { getHeaderModelName } from '~/components/Chat/Messages/ui/HeaderLabel';
 import { getHeaderPrefixForScreenReader, getMessageAriaLabel } from '~/utils';
 import SearchContent, { rendersMarkdownLite } from './Content/SearchContent';
 import Icon from '~/components/Chat/Messages/MessageIcon';
 import { useAuthContext, useLocalize } from '~/hooks';
 import SearchButtons from './SearchButtons';
-import SubRow from './SubRow';
 import { cn } from '~/utils';
 import store from '~/store';
 
@@ -71,8 +73,7 @@ export function areSearchMessagePropsEqual(
 }
 
 function SearchMessage({ message }: Pick<TMessageProps, 'message'>) {
-  const fontSize = useAtomValue(fontSizeAtom);
-  const UsernameDisplay = useAtomValue(store.UsernameDisplay);
+  const UsernameDisplay = useAtomValue<boolean>(store.UsernameDisplay);
   const { user } = useAuthContext();
   const localize = useLocalize();
 
@@ -123,6 +124,7 @@ function SearchMessage({ message }: Pick<TMessageProps, 'message'>) {
         className={cn('border-border-light mx-auto border-b px-4 py-4', getMessageRowWidthClass())}
       >
         <MessageRow
+          message={message}
           id={message.messageId}
           icon={<Icon iconData={iconData} />}
           label={messageLabel}
