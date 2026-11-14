@@ -26,7 +26,7 @@ const getCurrentVersion = async (req, endpoint) => {
     const endpointsConfig = await getEndpointsConfig(req);
     version = `v${endpointsConfig?.[endpoint]?.version ?? defaultAssistantsVersion[endpoint]}`;
   }
-  if (!version?.startsWith('v') && version?.length !== 2) {
+  if (!version?.startsWith('v') && version.length !== 2) {
     throw new Error(`[${req.baseUrl}] Invalid version: ${version}`);
   }
   return version;
@@ -259,10 +259,11 @@ function filterAssistants({ assistants, userId, assistantsConfig }) {
   } else if (excludedIds?.length) {
     return assistants.filter((assistant) => !excludedIds.includes(assistant.id));
   }
-  return assistants.filter((assistant) => userId === assistant.metadata?.author);
+  return assistants;
 }
 
 module.exports = {
   getOpenAIClient,
   fetchAssistants,
+  filterAssistants,
 };

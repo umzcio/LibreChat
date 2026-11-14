@@ -217,7 +217,7 @@ export default function MCPServerDialog({
               <div className="flex items-center gap-2">
                 <Button
                   variant="destructive-soft"
-                  size="sm"
+                  size="icon"
                   aria-label={localize('com_ui_delete_mcp_server_name', {
                     0: server?.config?.title || server?.serverName || '',
                   })}
@@ -231,6 +231,7 @@ export default function MCPServerDialog({
                     resourceDbId={server.dbId}
                     resourceName={server.config.title || ''}
                     resourceType={ResourceType.MCPSERVER}
+                    buttonClassName="h-theme-button"
                   />
                 )}
               </div>

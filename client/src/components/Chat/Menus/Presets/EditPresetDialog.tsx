@@ -1,12 +1,11 @@
 import { useAtom } from 'jotai';
 import { useCallback, useEffect, useMemo } from 'react';
-import { useRecoilState } from 'recoil';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   QueryKeys,
   alternateName,
   isAgentsEndpoint,
-  resolveModelCatalogKey,
+  isAssistantsEndpoint,
 } from 'librechat-data-provider';
 import {
   Input,
@@ -17,9 +16,10 @@ import {
   ControlCombobox,
   OGDialogContent,
 } from '@librechat/client';
-import type { TModelsConfig, TEndpointsConfig } from 'librechat-data-provider';
+import type { TEndpointsConfig } from 'librechat-data-provider';
 import { useSetIndexOptions, useLocalize, useDebouncedInput } from '~/hooks';
 import PopoverButtons from '~/components/Chat/Input/PopoverButtons';
+import { useModelCatalog } from '~/data-provider/Endpoints/models';
 import { mapEndpoints, getConvoSwitchLogic } from '~/utils';
 import { EndpointSettings } from '~/components/Endpoints';
 import { useGetEndpointsQuery } from '~/data-provider';
@@ -45,6 +45,10 @@ const EditPresetDialog = ({
     initialValue: preset?.title,
   });
   const [presetModalVisible, setPresetModalVisible] = useAtom(store.presetModalVisible);
+  const modelsQuery = useModelCatalog(
+    { enabled: presetModalVisible },
+    { eager: true, endpoints: [preset?.endpoint ?? ''] },
+  );
 
   const { data: _endpoints = [] } = useGetEndpointsQuery({
     select: mapEndpoints,
@@ -78,15 +82,8 @@ const EditPresetDialog = ({
       return;
     }
 
-    const modelsConfig = queryClient.getQueryData<TModelsConfig>([QueryKeys.models]);
-    if (!modelsConfig) {
-      return;
-    }
-
-    const models = modelsConfig[resolveModelCatalogKey(presetEndpoint, modelsConfig)] as
-      | string[]
-      | undefined;
-    if (!models) {
+    const models = modelsQuery.data[presetEndpoint];
+    if (!modelsQuery.endpointQueries[presetEndpoint]?.isSuccess || !models) {
       return;
     }
     if (!models.length) {
@@ -98,13 +95,13 @@ const EditPresetDialog = ({
     }
 
     if (!models.includes(preset.model ?? '')) {
-      console.log('setting model', models[0]);
       setOption('model')(models[0]);
     }
-  }, [preset, queryClient, setOption]);
+  }, [preset, modelsQuery.data, modelsQuery.endpointQueries, setOption]);
 
   const switchEndpoint = useCallback(
     (newEndpoint: string) => {
+      if (newEndpoint === preset?.endpoint) return;
       if (!setOptions) {
         return console.warn('setOptions is not defined');
       }
@@ -119,9 +116,12 @@ const EditPresetDialog = ({
       setOptions({
         endpoint: newEndpoint,
         endpointType: newEndpointType,
+        model: undefined,
+        agent_id: undefined,
+        assistant_id: undefined,
       });
     },
-    [queryClient, setOptions],
+    [preset?.endpoint, queryClient, setOptions],
   );
 
   const handleOpenChange = (open: boolean) => {
@@ -133,6 +133,7 @@ const EditPresetDialog = ({
 
   const { endpoint: _endpoint, endpointType, model } = preset || {};
   const endpoint = _endpoint ?? '';
+  const hasTarget = !!model || (isAssistantsEndpoint(endpoint) && !!preset?.assistant_id);
 
   if (!endpoint) {
     return null;
@@ -218,10 +219,10 @@ const EditPresetDialog = ({
 
         {/* Action buttons */}
         <div className="border-border-medium flex shrink-0 justify-end gap-2 border-t pt-3">
-          <Button variant="outline" onClick={exportPreset}>
+          <Button variant="outline" onClick={exportPreset} disabled={!hasTarget}>
             {localize('com_endpoint_export')}
           </Button>
-          <Button variant="submit" onClick={submitPreset}>
+          <Button variant="submit" onClick={submitPreset} disabled={!hasTarget}>
             {localize('com_ui_save')}
           </Button>
         </div>

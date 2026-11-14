@@ -308,7 +308,7 @@ ${svg}
 const standardDependencies = {
   three: '^0.167.1',
   'lucide-react': '^0.394.0',
-  'react-router-dom': '^6.11.2',
+  'react-router-dom': '^7.18.5',
   'class-variance-authority': '^0.6.0',
   clsx: '^1.2.1',
   'date-fns': '^3.3.1',
@@ -416,9 +416,12 @@ export function buildSandpackOptions(
     return sharedOptions;
   }
 
+  const bundlerURL =
+    template === 'static' ? startupConfig.staticBundlerURL : startupConfig.bundlerURL;
+  /** An empty env value (e.g. `${SANDPACK_BUNDLER_URL:-}` in Compose) means unset. */
   return {
     ...sharedOptions,
-    bundlerURL: template === 'static' ? startupConfig.staticBundlerURL : startupConfig.bundlerURL,
+    bundlerURL: bundlerURL || undefined,
   };
 }
 
