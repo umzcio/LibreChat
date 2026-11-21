@@ -3,6 +3,7 @@ import throttle from 'lodash/throttle';
 import { visit } from 'unist-util-visit';
 import { useSetAtom } from 'jotai';
 import { useLocation } from 'react-router-dom';
+import { useIsPartsPreview } from '@librechat/chat/react';
 import type { Pluggable } from 'unified';
 import type { Artifact } from '~/common';
 import { useMessageContext } from '~/Providers';
@@ -97,6 +98,8 @@ export function Artifact({
   node: unknown;
 }) {
   const location = useLocation();
+  /** A picture of a row drawn elsewhere: the row itself registers the artifact. */
+  const isPreview = useIsPartsPreview();
   const { messageId } = useMessageContext();
   const artifactIndex = props.stableIndex != null ? parseInt(props.stableIndex, 10) : 0;
 
@@ -137,7 +140,7 @@ export function Artifact({
         lastUpdateTime: now,
       };
 
-      if (!isArtifactRoute(location.pathname)) {
+      if (isPreview || !isArtifactRoute(location.pathname)) {
         return setArtifact(currentArtifact);
       }
 
@@ -166,6 +169,7 @@ export function Artifact({
     messageId,
     artifactIndex,
     location.pathname,
+    isPreview,
   ]);
 
   useEffect(() => () => throttledUpdateRef.current.cancel(), []);

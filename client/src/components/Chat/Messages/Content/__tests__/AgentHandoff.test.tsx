@@ -1,5 +1,7 @@
 import React from 'react';
+import { QueryKeys, Constants } from 'librechat-data-provider';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AgentHandoff from '../AgentHandoff';
 
 jest.mock('~/hooks', () => ({
@@ -27,7 +29,7 @@ jest.mock('@librechat/chat/components', () => ({
   }),
 }));
 
-jest.mock('~/Providers', () => ({
+jest.mock('~/Providers/AgentsMapContext', () => ({
   useAgentsMapContext: () => ({
     'agent-123': { name: 'Test Agent' },
   }),
@@ -55,14 +57,24 @@ jest.mock('copy-to-clipboard', () => ({
   default: (...args: unknown[]) => mockCopy(...(args as [])),
 }));
 
-const renderAgentHandoff = (props: {
-  name: string;
-  args: string | Record<string, unknown>;
-  output?: string | null;
-}) =>
-  render(
-    <AgentHandoff {...props} />,
+const renderAgentHandoff = (
+  props: {
+    name: string;
+    args: string | Record<string, unknown>;
+    output?: string | null;
+  },
+  configuredTargets: Array<{ id: string; name: string }> = [],
+) => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  queryClient.setQueryData([QueryKeys.modelSpecHandoffs], configuredTargets);
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <AgentHandoff {...props} />
+    </QueryClientProvider>,
   );
+};
 
 describe('AgentHandoff', () => {
   beforeEach(() => {
@@ -198,4 +210,14 @@ describe('AgentHandoff', () => {
     expect(screen.getByText('Review the rollout and report')).toBeInTheDocument();
     expect(screen.queryByText(/"instructions"/)).not.toBeInTheDocument();
   });
+});
+
+test('shows the configured label for a preset handoff outside the saved-agent map', () => {
+  const id = Constants.MODEL_SPEC_AGENT_PREFIX + '123';
+  renderAgentHandoff({ name: Constants.LC_TRANSFER_TO_ + id, args: '' }, [
+    { id, name: 'Preset Specialist' },
+  ]);
+  expect(
+    screen.getByRole('button', { name: 'Transferred to Preset Specialist' }),
+  ).toBeInTheDocument();
 });

@@ -42,6 +42,8 @@ export type MCPServerUpdateParams = {
 export type MCPServerDBObjectResponse = {
   dbId?: string;
   serverName: string;
+  /** Inspection/configuration revision of this server definition. */
+  updatedAt?: number;
   /** True if access is only via agent (not directly shared with user) */
   consumeOnly?: boolean;
   /** Origin of this server definition — yaml, config, or user */
@@ -68,6 +70,10 @@ export type MCPReinitializeFailureReason =
   | 'initialization_failed';
 
 export interface MCPReinitializeResponse {
+  /** Revision of the resolved configuration used by this Connect operation. */
+  configurationUpdatedAt?: number;
+  /** Credential/catalog generation invalidated by this Connect request. */
+  authorizationGeneration?: string;
   success: boolean;
   message: string;
   serverName: string;
